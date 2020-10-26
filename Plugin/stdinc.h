@@ -1,8 +1,23 @@
-﻿#pragma once
+#pragma once
 
 #define NOMINMAX
 
-#include <windows.h>
+#ifdef _WIN32
+#  include <windows.h>
+#  include <shlobj.h>
+#  include <boost/utility/string_view.hpp>
+#  include "include/injector/hooking.hpp"
+#  include "include/injector/calling.hpp"
+#  include "include/injector/assembly.hpp"
+#endif
+
+#ifdef __unix__
+#  include <errno.h>
+typedef int errno_t;
+typedef bool boolean;
+const int NOERROR = 0;
+#endif
+
 #include <cstdint>
 #include <cstddef>
 #include <fstream>
@@ -14,11 +29,6 @@
 #include <utility>
 #include <cstring>
 #include <filesystem>
-#include <shlobj.h>
-#include <boost/utility/string_view.hpp>
-#include "include/injector/hooking.hpp"
-#include "include/injector/calling.hpp"
-#include "include/injector/assembly.hpp"
 
 #define VALIDATE_SIZE(type,size) static_assert(sizeof(type)==size, "Type size error.");
 
@@ -77,7 +87,7 @@ typedef struct {
 typedef struct _runoption {
 	// プログラムバージョン
 	EU4Version version;
-	
+
 	// テスト
 	boolean test;
 
