@@ -12,8 +12,10 @@
 #endif
 
 #ifdef __unix__
+#  include <errno.h>
 typedef int errno_t;
 typedef bool boolean;
+const int NOERROR = 0;
 #endif
 
 #include <cstdint>
