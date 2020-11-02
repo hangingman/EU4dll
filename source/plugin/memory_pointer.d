@@ -37,8 +37,8 @@ class MemoryPointer
         return cast(T*)(this.address(offset));
     }
 
-    // operator std::uintptr_t() const
-    // {
-    //  return this->address();
-    // }
+    const(uintptr) opCast(uintptr)()
+    {
+        return this.address();
+    }
 };
