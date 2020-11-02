@@ -260,5 +260,8 @@ paket-files/
 __pycache__/
 *.pyc
 
-# cmake
-build/
+# dlang
+*.a
+.dub/
+eu4dll
+*-unittest

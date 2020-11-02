@@ -1,0 +1,22 @@
+{
+    "name": "eu4dll",
+    "authors": [
+	"hiroyuki nagata"
+    ],
+    "description": "This dll makes it possible to display double-byte characters on Europa Universalis IV.",
+    "copyright": "Copyright © 2020, hiroyuki nagata",
+    "license": "MIT",
+    "configurations": [
+        {
+            "name": "library",
+            "targetType": "library"
+        },
+        {
+            "name": "unittest",
+            "targetType": "library",
+	    "dependencies": {
+		"silly": "~>1.0.2"
+	    }
+        }
+    ],
+}
