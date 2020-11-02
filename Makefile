@@ -3,4 +3,5 @@ all:
 
 
 test:
-	dub test
+	dub clean
+	dub test --build=unittest
