@@ -1,6 +1,8 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"freck-streams": "1.2.0",
+		"scriptlike": "0.10.3",
 		"silly": "1.0.2"
 	}
 }
