@@ -3,7 +3,7 @@ module plugin.byte_pattern;
 
 import std.typecons;
 import core.stdc.stdint;
-import std.container : DList;
+import std.container : Array;
 import std.file : thisExePath;
 import freck.streams.stream;
 import freck.streams.filestream;
@@ -14,10 +14,10 @@ import plugin.memory_pointer;
 
 class BytePattern
 {
-    DList!(Tuple!(uintptr_t, uintptr_t)) _ranges;
-    DList!(uint8_t) _pattern;
-    DList!(uint8_t) _mask;
-    DList!(MemoryPointer) _results;
+    Array!(Tuple!(uintptr_t, uintptr_t)) _ranges;
+    Array!(uint8_t) _pattern;
+    Array!(uint8_t) _mask;
+    Array!(MemoryPointer) _results;
     string _literal;
     ptrdiff_t[256] _bmbc;
     static Stream _stream = null;
@@ -81,5 +81,20 @@ public:
 
     this()
     {
+    };
+
+    MemoryPointer get(size_t index)
+    {
+        return this._results[index];
+    };
+
+    MemoryPointer getFirst()
+    {
+        return this.get(0);
+    };
+
+    MemoryPointer getSecond()
+    {
+        return this.get(1);
     };
 };
