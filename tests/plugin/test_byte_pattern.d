@@ -23,3 +23,10 @@ unittest
     b.startLog("unittest");
     assert(existsAsFile(logFilePath.toString()));
 }
+
+@("tempInstance")
+unittest
+{
+    auto b = BytePattern.tempInstance();
+    assert(b !is null);
+}

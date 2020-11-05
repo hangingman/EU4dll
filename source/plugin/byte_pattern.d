@@ -11,6 +11,8 @@ import scriptlike.path.extras : Path;
 import scriptlike.core;
 import plugin.memory_pointer;
 
+import core.sys.posix.dlfcn;
+
 
 class BytePattern
 {
@@ -74,13 +76,14 @@ public:
         // NOP
     };
 
-    // static ref BytePattern tempInstance()
-    // {
-    //     return this;
-    // };
+    static typeof(this) tempInstance()
+    {
+        return new BytePattern();
+    };
 
     this()
     {
+        setModule();
     };
 
     MemoryPointer get(size_t index)
@@ -96,5 +99,26 @@ public:
     MemoryPointer getSecond()
     {
         return this.get(1);
+    };
+
+    BytePattern setModule()
+    {
+        version(Windows)
+            {
+                
+            }
+        else
+            {
+                // GetModuleHandle(NULL) on Linux
+                // https://stackoverflow.com/questions/6972211/getmodulehandlenull-on-linux
+                MemoryPointer defaultModule = cast(MemoryPointer) dlopen(null, RTLD_LAZY);
+                return setModule(defaultModule);
+            }
+    };
+
+    BytePattern setModule(MemoryPointer mod)
+    {
+        this.getModuleRanges(mod);
+        return this;
     };
 };
