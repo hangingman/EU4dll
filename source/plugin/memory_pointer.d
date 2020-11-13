@@ -2,13 +2,14 @@ module plugin.memory_pointer;
 
 
 import core.stdc.stdint;
+import std.stdio;
 
 
 class MemoryPointer
 {
     union
     {
-        void *Pointer;
+        void* Pointer;
         uintptr_t Address;
     };
 
@@ -27,7 +28,7 @@ class MemoryPointer
         this.Address = i;
     }
 
-    const uintptr_t address(ptrdiff_t offset = 0)
+    uintptr_t address(ptrdiff_t offset = 0)
     {
         return (this.Address + offset);
     }
@@ -37,8 +38,9 @@ class MemoryPointer
         return cast(T*)(this.address(offset));
     }
 
-    const(uintptr) opCast(uintptr)()
-    {
-        return this.address();
-    }
+    // MemoryPointer opCast(uintptr)()
+    // {
+    //     writeln("opCast");
+    //     return this.address();
+    // }
 };

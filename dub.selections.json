@@ -1,6 +1,7 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"elf-d": "0.2.5",
 		"freck-streams": "1.2.0",
 		"scriptlike": "0.10.3",
 		"silly": "1.0.2"

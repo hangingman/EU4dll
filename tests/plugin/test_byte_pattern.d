@@ -4,7 +4,11 @@ import std.file : thisExePath;
 import scriptlike.file.extras : existsAsFile, tryRemove;
 import scriptlike.path.extras : Path;
 import scriptlike.core;
+import plugin.memory_pointer;
 import plugin.byte_pattern;
+import core.sys.posix.dlfcn;
+import std.stdio;
+
 
 @("default constructor")
 unittest
@@ -30,3 +34,12 @@ unittest
     auto b = BytePattern.tempInstance();
     assert(b !is null);
 }
+
+@("setModule")
+unittest
+{
+    MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
+    assert(dll !is null);
+    dll.address();
+}
+

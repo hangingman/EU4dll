@@ -12,7 +12,8 @@
             "targetType": "library",
 	    "dependencies": {
 		"freck-streams": "~>1.2.0",
-		"scriptlike": "~>0.10.3"
+		"scriptlike": "~>0.10.3",
+		"elf-d": "~>0.2.5"
 	    }
         },
         {
@@ -24,6 +25,7 @@
 	    "dependencies": {
 		"freck-streams": "~>1.2.0",
 		"scriptlike": "~>0.10.3",
+		"elf-d": "~>0.2.5",
 		"silly": "~>1.0.2"
 	    }
         }

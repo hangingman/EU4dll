@@ -1,22 +1,24 @@
 module plugin.byte_pattern;
 
 
-import std.typecons;
 import core.stdc.stdint;
+import elf;
+import freck.streams.filestream;
+import freck.streams.stream;
+import plugin.memory_pointer;
+import scriptlike.core;
+import scriptlike.path.extras : Path;
 import std.container : Array;
 import std.file : thisExePath;
-import freck.streams.stream;
-import freck.streams.filestream;
-import scriptlike.path.extras : Path;
-import scriptlike.core;
-import plugin.memory_pointer;
-
+import std.typecons;
 import core.sys.posix.dlfcn;
 
 
 class BytePattern
 {
-    Array!(Tuple!(uintptr_t, uintptr_t)) _ranges;
+    alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
+
+    Array!(Range) _ranges;
     Array!(uint8_t) _pattern;
     Array!(uint8_t) _mask;
     Array!(MemoryPointer) _results;
@@ -33,8 +35,38 @@ class BytePattern
     {
     };
 
-    void getModuleRanges(ref MemoryPointer memoryPointer)
+    void getModuleRanges(MemoryPointer mod)
     {
+        // DLLのすべてのセクションテーブルを取得し、その開始アドレス終了アドレス
+        // を _ranges に格納するPE/COFFの場合とELFでの実装が必要
+        _ranges.clear();
+        Range range;
+        
+        version(Windows)
+            {
+                
+            }
+        else
+            {
+                auto dll = thisExePath();
+                ELF elf = ELF.fromFile(dll);
+
+                // ELF sections
+                foreach (section; elf.sections) {
+
+                    auto secSize = section.size;
+                    //range.first = mod.address() + section.address;
+                    
+                    // writeln("  Section (", section.name, ")");
+                    // writefln("    type: %s", section.type);
+                    // writefln("    address: 0x%x", section.address);
+                    // writefln("    offset: 0x%x", section.offset);
+                    // writefln("    flags: 0x%08b", section.flags);
+                    // writefln("    size: %s bytes", section.size);
+                    // writefln("    entry size: %s bytes", section.entrySize);
+                    // writeln();
+                }
+            }
     };
 
     void bmPreprocess()
@@ -111,8 +143,8 @@ public:
             {
                 // GetModuleHandle(NULL) on Linux
                 // https://stackoverflow.com/questions/6972211/getmodulehandlenull-on-linux
-                MemoryPointer defaultModule = cast(MemoryPointer) dlopen(null, RTLD_LAZY);
-                return setModule(defaultModule);
+                MemoryPointer dll = cast(MemoryPointer) dlopen(null, RTLD_LAZY);
+                return setModule(dll);
             }
     };
 
