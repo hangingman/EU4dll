@@ -22,11 +22,11 @@ unittest
 @("startLog")
 unittest
 {
-    Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_unittest.log");
+    Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_unittest1.log");
     tryRemove(logFilePath);
     
     auto b = new BytePattern();
-    b.startLog("unittest");
+    b.startLog("unittest1");
     b.debugOutput("Hello,EU4!");
     
     assert(existsAsFile(logFilePath.toString()));
@@ -36,6 +36,27 @@ unittest
     assert(logs.length == 3);
     assert(logs[0] == "Hello,EU4!");
     assert(logs[1] == replicate("-", 80));
+}
+
+@("debugOutput")
+unittest
+{
+    Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_unittest2.log");
+    tryRemove(logFilePath);
+    
+    auto b = new BytePattern();
+    b.startLog("unittest2");
+    b._literal = "Hello World!";
+    b.debugOutput();
+    
+    assert(existsAsFile(logFilePath.toString()));
+    
+    const string[] logs = readText(logFilePath.toString()).split("\n");
+    assert(logs !is null);
+    assert(logs.length == 4);
+    assert(logs[0] == "Result(s) of pattern: 48656C6C6F20576F726C6421");
+    assert(logs[1] == "None");
+    assert(logs[2] == replicate("-", 80));
 }
 
 @("tempInstance")

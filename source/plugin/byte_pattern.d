@@ -14,6 +14,7 @@ import std.file : thisExePath;
 import std.stdio;
 import std.typecons;
 import std.array : replicate;
+import std.format;
 
 
 alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
@@ -81,7 +82,11 @@ class BytePattern
             }
     };
 
-
+    size_t count()
+    {
+        return _results.length;
+    }
+    
     bool hasSize(size_t expected, string desc)
     {
         return true;
@@ -113,7 +118,31 @@ class BytePattern
 public:
     void debugOutput()
     {
+        if (this._stream is null)
+            {
+                return;
+            }
         
+        logStream().write(cast(ubyte[]) _literal.format!("Result(s) of pattern: %(%02X%)"));
+        logStream().write(cast(ubyte[]) "\n");
+
+        if (count() > 0)
+            {
+                foreach (pointer; _results)
+                    {
+                        logStream().write(cast(ubyte[]) pointer.address().format!("0x%s"));
+                        logStream().write(cast(ubyte[]) "\n");                
+                    }
+            }
+        else
+            {
+                logStream().write(cast(ubyte[]) "None");
+                logStream().write(cast(ubyte[]) "\n");
+            }
+        
+        logStream().write(cast(ubyte[]) sep);
+        logStream().write(cast(ubyte[]) "\n");
+        _stream.seek(0, Seek.set);
     };
 
     void debugOutput(const string message)
@@ -124,21 +153,26 @@ public:
             }
 
         logStream().write(cast(ubyte[]) message);
-        logStream().write(cast(ubyte[]) "\n");
+        logStream().write(cast(ubyte[]) "\n");        
         logStream().write(cast(ubyte[]) sep);
         logStream().write(cast(ubyte[]) "\n");
+        
         _stream.seek(0, Seek.set);
     };
     
     static void startLog(const string moduleName)
     {
+        shutdownLog();
         Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_${moduleName}.log");
         logStream(logFilePath.toString());
     };
 
     static void shutdownLog()
     {
-        // NOP
+        if (_stream !is null)
+            {
+                _stream = null;
+            }
     };
 
     static typeof(this) tempInstance()

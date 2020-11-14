@@ -3,4 +3,4 @@ all:
 
 test:
 	dub build --build=unittest
-	dub test --build=unittest
+	dub test --build=unittest -- --threads=1
