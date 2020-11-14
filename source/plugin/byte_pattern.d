@@ -13,6 +13,7 @@ import std.container : Array;
 import std.file : thisExePath;
 import std.stdio;
 import std.typecons;
+import std.array : replicate;
 
 
 alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
@@ -27,14 +28,16 @@ class BytePattern
     string _literal;
     ptrdiff_t[256] _bmbc;
     static Stream _stream = null;
+    const string sep = replicate("-", 80);
 
     Tuple!(uint8_t, uint8_t) parseSubPattern()
     {
         return tuple(cast(uint8_t) 0x00, cast(uint8_t) 0x00);
     };
 
-    void transformPattern()
+    void transformPattern(string literal)
     {
+        
     };
 
     void getModuleRanges(MemoryPointer mod, string binPath = thisExePath())
@@ -78,15 +81,22 @@ class BytePattern
             }
     };
 
+
+    bool hasSize(size_t expected, string desc)
+    {
+        return true;
+    };
+    
+    bool empty()
+    {
+        return _results.empty();
+    };
+    
     void bmPreprocess()
     {
     };
 
     void bmSearch()
-    {
-    };
-
-    void debugOutput()
     {
     };
 
@@ -97,13 +107,27 @@ class BytePattern
                 this._stream = new FileStream(logFilePath, "w+");
             }
 
-        assert(logFilePath !is null);
         return this._stream;
     };
     
 public:
+    void debugOutput()
+    {
+        
+    };
+
     void debugOutput(const string message)
     {
+        if (this._stream is null)
+            {
+                return;
+            }
+
+        logStream().write(cast(ubyte[]) message);
+        logStream().write(cast(ubyte[]) "\n");
+        logStream().write(cast(ubyte[]) sep);
+        logStream().write(cast(ubyte[]) "\n");
+        _stream.seek(0, Seek.set);
     };
     
     static void startLog(const string moduleName)
@@ -142,6 +166,13 @@ public:
         return this.get(1);
     };
 
+    BytePattern setPattern(string patternLiteral)
+    {
+        transformPattern(patternLiteral);
+        bmPreprocess();
+        return this;
+    };
+    
     BytePattern setModule()
     {
         version(Windows)

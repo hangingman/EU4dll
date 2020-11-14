@@ -8,6 +8,8 @@ import plugin.memory_pointer;
 import plugin.byte_pattern;
 import core.sys.posix.dlfcn;
 import std.stdio;
+import std.file;
+import std.array;
 
 
 @("default constructor")
@@ -25,7 +27,15 @@ unittest
     
     auto b = new BytePattern();
     b.startLog("unittest");
+    b.debugOutput("Hello,EU4!");
+    
     assert(existsAsFile(logFilePath.toString()));
+    
+    const string[] logs = readText(logFilePath.toString()).split("\n");
+    assert(logs !is null);
+    assert(logs.length == 3);
+    assert(logs[0] == "Hello,EU4!");
+    assert(logs[1] == replicate("-", 80));
 }
 
 @("tempInstance")
@@ -33,6 +43,13 @@ unittest
 {
     auto b = BytePattern.tempInstance();
     assert(b !is null);
+}
+
+@("empty")
+unittest
+{
+    auto b = BytePattern.tempInstance();
+    assert(b.empty());
 }
 
 @("setModule")
@@ -57,7 +74,6 @@ unittest
     assert(b._ranges[0].first == 88160);
     assert(b._ranges[0].second == 901916);
     // rodata
-    writeln(b._ranges[1]);
     assert(b._ranges[1].first == 901952);
     assert(b._ranges[1].second == 993632);
 }
