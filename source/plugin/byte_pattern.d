@@ -15,9 +15,11 @@ import std.stdio;
 import std.typecons;
 import std.array : replicate;
 import std.format;
+import std.range;
 
 
 alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
+alias Pat = Tuple!(uint8_t, "first", uint8_t, "second");
 
 
 class BytePattern
@@ -31,14 +33,98 @@ class BytePattern
     static Stream _stream = null;
     const string sep = replicate("-", 80);
 
-    Tuple!(uint8_t, uint8_t) parseSubPattern()
+    uint8_t digitToValue(uint8_t ch)
     {
-        return tuple(cast(uint8_t) 0x00, cast(uint8_t) 0x00);
+        if ('0' <= ch && ch <= '9')
+            {
+                return cast(uint8_t) (ch - '0');
+            }
+        else if ('A' <= ch && ch <= 'F')
+            {
+                return cast(uint8_t) (ch - 'A' + 10);
+            }
+        else if ('a' <= ch && ch <= 'f')
+            {
+                return cast(uint8_t) (ch - 'a' + 10);
+            }
+        
+        throw new Exception("Could not parse pattern.");
+    };
+    
+    Pat parseSubPattern(string sub)
+    {
+        // パターンマッチを使いたいが、D言語にはない
+        Pat result;
+        
+        if (sub.length == 1)
+            {
+                if (sub[0] == '?')
+                    {
+                        result.first = 0;
+                        result.second = 0;
+                    }
+                else
+                    {
+                        result.first = digitToValue(sub[0]);
+                        result.second = 0xFF;
+                    }
+            }
+        else if (sub.length == 2)
+            {
+                if (sub[0] == '?' && sub[1] == '?')
+                    {
+                        result.first = 0;
+                        result.second = 0;
+                    }
+                else if (sub[0] == '?')
+                    {
+                        result.first = digitToValue(sub[1]);
+                        result.second = 0xF;
+                    }
+                else if (sub[1] == '?')
+                    {
+                        result.first = cast(uint8_t) (digitToValue(sub[0]) << 4);
+                        result.second = 0xF0;
+                    }
+                else
+                    {
+                        result.first = cast(uint8_t) ((digitToValue(sub[0]) << 4) | digitToValue(sub[1]));
+                        result.second = 0xFF;
+                    }
+            }
+        else
+            {
+                throw new Exception("Could not parse pattern.");
+            }
+        
+        return result;
     };
 
     void transformPattern(string literal)
     {
-        
+        clear();
+        _literal = literal;
+
+        if (literal.empty())
+            {
+                return;
+            }
+
+        Array!(string) subPatterns = _literal.split(" ");
+
+        try
+            {
+                foreach (sub; subPatterns)
+                    {
+                        auto pat = parseSubPattern(sub);
+                        _pattern ~= pat.first;
+                        _mask ~= pat.second;
+                    }
+            }
+        catch (Exception e)
+            {
+                this.clear();
+            }
     };
 
     void getModuleRanges(MemoryPointer mod, string binPath = thisExePath())
@@ -82,6 +168,14 @@ class BytePattern
             }
     };
 
+    void clear()
+    {
+        _literal = "";
+        _pattern.clear();
+        _mask.clear();
+        _results.clear();
+    }
+    
     size_t count()
     {
         return _results.length;
