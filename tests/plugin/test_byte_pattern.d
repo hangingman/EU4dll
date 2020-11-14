@@ -32,6 +32,20 @@ unittest
     assert(15==b.digitToValue('f'));
 }
 
+@("transformPattern")
+unittest
+{
+    auto b = BytePattern.tempInstance();
+    // Hello World!
+    b.transformPattern("48 65 6C 6C 6F 20 57 6F 72 6C 64 21");
+    assert(b._literal == "48 65 6C 6C 6F 20 57 6F 72 6C 64 21");
+    assert(b._pattern.length == 12);
+    assert(b._mask.length == 12);
+
+    // 16進数が10進数に変換される
+    assert(b._pattern[0] == 72, mixin(interp!"${b._pattern[0]} != 72"));
+}
+
 @("startLog")
 unittest
 {
