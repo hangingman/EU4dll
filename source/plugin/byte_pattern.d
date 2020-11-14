@@ -2,6 +2,7 @@ module plugin.byte_pattern;
 
 
 import core.stdc.stdint;
+import core.sys.posix.dlfcn;
 import elf;
 import freck.streams.filestream;
 import freck.streams.stream;
@@ -10,14 +11,15 @@ import scriptlike.core;
 import scriptlike.path.extras : Path;
 import std.container : Array;
 import std.file : thisExePath;
+import std.stdio;
 import std.typecons;
-import core.sys.posix.dlfcn;
+
+
+alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
 
 
 class BytePattern
 {
-    alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
-
     Array!(Range) _ranges;
     Array!(uint8_t) _pattern;
     Array!(uint8_t) _mask;
@@ -35,12 +37,11 @@ class BytePattern
     {
     };
 
-    void getModuleRanges(MemoryPointer mod)
+    void getModuleRanges(MemoryPointer mod, string binPath = thisExePath())
     {
         // DLLのすべてのセクションテーブルを取得し、その開始アドレス終了アドレス
         // を _ranges に格納するPE/COFFの場合とELFでの実装が必要
         _ranges.clear();
-        Range range;
         
         version(Windows)
             {
@@ -48,23 +49,31 @@ class BytePattern
             }
         else
             {
-                auto dll = thisExePath();
-                ELF elf = ELF.fromFile(dll);
+                ELF elf = ELF.fromFile(binPath);
 
                 // ELF sections
                 foreach (section; elf.sections) {
-
+                    Range range;
                     auto secSize = section.size;
-                    //range.first = mod.address() + section.address;
+                    range.first = section.address;
+
+                    if (section.name == ".text" || section.name == ".rodata")
+                        {
+                            // .text, .rodataのセクションの範囲を取得する
+                            // writeln("  Section (", section.name, ")");
+                            // writefln("    type: %s", section.type);
+                            // writefln("    address: 0x%x", section.address);
+                            // writefln("    offset: 0x%x", section.offset);
+                            // writefln("    flags: 0x%08b", section.flags);
+                            // writefln("    size: %s bytes", section.size);
+                            // writefln("    entry size: %s bytes", section.entrySize);
+                            // writeln();
+
+                            range.second = range.first + secSize;
+                            _ranges.insert(range);
+                        }
+                    // TODO: 最初のセクションを格納
                     
-                    // writeln("  Section (", section.name, ")");
-                    // writefln("    type: %s", section.type);
-                    // writefln("    address: 0x%x", section.address);
-                    // writefln("    offset: 0x%x", section.offset);
-                    // writefln("    flags: 0x%08b", section.flags);
-                    // writefln("    size: %s bytes", section.size);
-                    // writefln("    entry size: %s bytes", section.entrySize);
-                    // writeln();
                 }
             }
     };
@@ -143,7 +152,7 @@ public:
             {
                 // GetModuleHandle(NULL) on Linux
                 // https://stackoverflow.com/questions/6972211/getmodulehandlenull-on-linux
-                MemoryPointer dll = cast(MemoryPointer) dlopen(null, RTLD_LAZY);
+                MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
                 return setModule(dll);
             }
     };

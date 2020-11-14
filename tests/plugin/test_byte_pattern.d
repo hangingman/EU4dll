@@ -43,3 +43,21 @@ unittest
     dll.address();
 }
 
+@("getModuleRanges")
+unittest
+{
+    // elf-Linux-lib-x64.so をテストする
+    auto b = BytePattern.tempInstance();
+    Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
+    b.getModuleRanges(null, binPath.toString());
+
+    assert(b._ranges.length==2);
+
+    // text
+    assert(b._ranges[0].first == 88160);
+    assert(b._ranges[0].second == 901916);
+    // rodata
+    writeln(b._ranges[1]);
+    assert(b._ranges[1].first == 901952);
+    assert(b._ranges[1].second == 993632);
+}
