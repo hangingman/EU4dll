@@ -29,6 +29,12 @@ This dll makes it possible to display double-byte characters on Europa Universal
 
 If you find a bug, **create a issue** in this repository.
 
+## Build
+
+```sh
+$ make all
+```
+
 ## Spec
 
 ### plugins/plugin.ini

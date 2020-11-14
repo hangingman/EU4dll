@@ -262,6 +262,6 @@ __pycache__/
 
 # dlang
 *.a
+*.so
 .dub/
-eu4dll
 *-unittest

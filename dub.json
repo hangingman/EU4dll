@@ -8,8 +8,8 @@
     "license": "MIT",
     "configurations": [
         {
-            "name": "library",
-            "targetType": "library",
+            "name": "eu4dll",
+            "targetType": "dynamicLibrary",
 	    "dependencies": {
 		"freck-streams": "~>1.2.0",
 		"scriptlike": "~>0.10.3",
@@ -18,7 +18,7 @@
         },
         {
             "name": "unittest",
-            "targetType": "library",
+            "targetType": "dynamicLibrary",
 	    "targetPath" : "tests",
             "sourcePaths": ["tests/"],
             "importPaths": ["tests/"],
