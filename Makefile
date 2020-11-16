@@ -7,3 +7,17 @@ test:
 
 clean:
 	dub clean
+
+# https://github.com/Ai-Himmel/Linux-so-hijack
+# .so file hijack
+hijack:
+	dmd dummy.d -ofdummy
+
+	@echo "--- test exe ---"
+	@./dummy
+	@echo "----------------"
+
+	dub build
+	@echo "--- hijack   ---"
+	@LD_PRELOAD="./libeu4dll.so" ./dummy
+	@echo "----------------"

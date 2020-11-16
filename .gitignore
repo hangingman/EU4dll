@@ -265,3 +265,5 @@ __pycache__/
 *.so
 .dub/
 *-unittest
+*.o
+dummy

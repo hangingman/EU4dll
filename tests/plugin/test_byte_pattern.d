@@ -23,7 +23,6 @@ unittest
 unittest
 {
     auto b = BytePattern.tempInstance();
-    writeln(b.digitToValue('0'));
     assert(0==b.digitToValue('0'));
     assert(9==b.digitToValue('9'));
     assert(10==b.digitToValue('A'));
