@@ -19,5 +19,5 @@ hijack:
 
 	dub build
 	@echo "--- hijack   ---"
-	@LD_PRELOAD="./libeu4dll.so" ./dummy
+	@LD_PRELOAD=./libeu4dll.so ./dummy
 	@echo "----------------"
