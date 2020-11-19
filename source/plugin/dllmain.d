@@ -9,7 +9,7 @@ extern(C):
 
 
 pragma(crt_constructor)
-void highjack()
+void hijack()
 {
     writeln("this is hijacked!!!");
 }
