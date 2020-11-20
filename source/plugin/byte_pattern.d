@@ -203,7 +203,8 @@ class BytePattern
     {
         if (this._stream is null)
             {
-                this._stream = new FileStream(logFilePath, "w+");
+                auto fout = File(logFilePath, "w+");
+                this._stream = new FileStream(fout);
             }
 
         return this._stream;
@@ -257,7 +258,9 @@ public:
     static void startLog(const string moduleName)
     {
         shutdownLog();
-        Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_${moduleName}.log");
+        // TODO: EU4と同じディレクトリに書き込もうとするとno such file or directoryとなるため
+        // とりあえず１つ上のディレクトリに書き込んでいる、単体のプログラムだと問題が再現しない
+        Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_${moduleName}.log");
         logStream(logFilePath.toString());
     };
 

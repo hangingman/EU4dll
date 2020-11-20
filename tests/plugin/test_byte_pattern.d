@@ -48,7 +48,7 @@ unittest
 @("startLog")
 unittest
 {
-    Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_unittest1.log");
+    Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest1.log");
     tryRemove(logFilePath);
     
     auto b = new BytePattern();
@@ -67,7 +67,7 @@ unittest
 @("debugOutput")
 unittest
 {
-    Path logFilePath = Path(thisExePath()).up() ~ mixin(interp!"pattern_unittest2.log");
+    Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest2.log");
     tryRemove(logFilePath);
     
     auto b = new BytePattern();
