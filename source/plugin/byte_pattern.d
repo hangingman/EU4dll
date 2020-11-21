@@ -16,6 +16,7 @@ import std.typecons;
 import std.array : replicate;
 import std.format;
 import std.range;
+import std.algorithm;
 
 
 alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
@@ -197,6 +198,50 @@ class BytePattern
 
     void bmSearch()
     {
+        const Array!ubyte pbytes = this._pattern.dup;
+        const Array!ubyte pmask = this._mask.dup;
+        size_t patternLen = this._pattern.length();
+
+        this._results.clear();
+
+        if (patternLen == 0)
+            {
+                return;
+            }
+
+        foreach (range ; this._ranges)
+            {
+                uint8_t* rangeBegin = cast(uint8_t*) range.first;
+                uint8_t* rangeEnd = cast(uint8_t*) (range.second - patternLen);
+                ptrdiff_t index;
+
+                try {
+
+                    while (rangeBegin <= rangeEnd)
+                        {
+                            for (index = patternLen - 1; index >= 0; --index)
+                                {
+                                    if ((pbytes[index] & pmask[index]) != (rangeBegin[index] & pmask[index]))
+                                        {
+                                            break;
+                                        }
+                                }
+
+                            if (index == -1)
+                                {
+                                    this._results ~= new MemoryPointer(rangeBegin);
+                                    rangeBegin += patternLen;
+                                }
+                            else
+                                {
+                                    rangeBegin += max(index - this._bmbc[rangeBegin[index]], 1);
+                                }
+                        }
+                    
+                } catch (Exception e) {
+                    debugOutput(e.toString());
+                }
+            }
     };
 
     BytePattern search()
