@@ -163,8 +163,6 @@ class BytePattern
                             range.second = range.first + secSize;
                             _ranges.insert(range);
                         }
-                    // TODO: 最初のセクションを格納
-                    
                 }
             }
     };

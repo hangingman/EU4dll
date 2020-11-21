@@ -4,6 +4,8 @@ module plugin.dllmain;
 import std.stdio;
 import core.stdc.stdlib;
 import plugin.byte_pattern;
+import plugin.constant;
+import plugin.misc;
 
 
 extern(C):
@@ -30,7 +32,7 @@ void hijackProcess()
     int success = 0;
 
     // versionを文字列から取得
-    //EU4Version version = Misc::getVersion();
+    EU4Version eu4Version = Misc.getVersion();
     
     if (success == 0)
         {
