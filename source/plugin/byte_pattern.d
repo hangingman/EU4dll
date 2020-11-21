@@ -199,6 +199,19 @@ class BytePattern
     {
     };
 
+    BytePattern search()
+    {
+        bmSearch();
+        debugOutput();
+        return this;
+    };
+    
+    BytePattern findPattern(string patternLiteral)
+    {
+        this.setPattern(patternLiteral).search();
+        return this;
+    };
+    
     static Stream logStream(string logFilePath=null)
     {
         if (this._stream is null)

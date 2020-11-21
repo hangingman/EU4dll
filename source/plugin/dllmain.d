@@ -29,6 +29,9 @@ void hijackProcess()
 
     int success = 0;
 
+    // versionを文字列から取得
+    //EU4Version version = Misc::getVersion();
+    
     if (success == 0)
         {
             BytePattern.tempInstance().debugOutput("DLL [OK]");
