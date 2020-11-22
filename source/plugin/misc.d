@@ -15,9 +15,6 @@ static:
     EU4Version getVersion()
     {        
         BytePattern b = BytePattern.tempInstance();
-        writeln("EU4Version getVersion");
-        writeln(b.format!("byte pattern is %s"));
-        b.debugOutput("still alive ?");
         b.findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
 
         if (b.count() > 0)

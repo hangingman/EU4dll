@@ -291,6 +291,19 @@ class BytePattern
     };
     
 public:
+    /++
+     + デバッグログを出力する
+     +
+     + Example:
+     + ---
+     + // 内部に検索結果の文字列が格納されている場合それも出力する
+     + Result(s) of pattern: 455534
+     + 
+     + // 以下のようにすればasciiに戻せる
+     + $ echo "455534" | xxd -r -p
+     + EU4
+     + ---
+     +/
     void debugOutput()
     {
         if (this._stream is null)
