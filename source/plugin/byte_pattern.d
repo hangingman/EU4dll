@@ -10,6 +10,7 @@ import plugin.memory_pointer;
 import plugin.singleton;
 import scriptlike.core;
 import scriptlike.file.extras : existsAsFile;
+import scriptlike.file.wrappers : readText;
 import scriptlike.path.extras : Path;
 import std.conv;
 import std.container : Array;
@@ -20,10 +21,12 @@ import std.array : replicate;
 import std.format;
 import std.range;
 import std.algorithm;
+import core.stdc.stdlib;
 
 
-alias Range = Tuple!(uintptr_t, "first", uintptr_t, "second");
+alias PtRange = Tuple!(uintptr_t, "first", uintptr_t, "second");
 alias Pat = Tuple!(uint8_t, "first", uint8_t, "second");
+alias Bytes = ubyte[];
 
 
 class BytePattern
@@ -31,9 +34,9 @@ class BytePattern
     // シングルトンパターン
     mixin singleton;
     
-    Array!(Range) _ranges;
-    Array!(uint8_t) _pattern;
-    Array!(uint8_t) _mask;
+    Array!(PtRange) _ranges;
+    string _pattern;
+    string _mask;
     Array!(MemoryPointer) _results;
     string _literal;
     ptrdiff_t[256] _bmbc;
@@ -75,7 +78,14 @@ class BytePattern
             .chunks(2)
             .map!(digits => cast(char) digits.to!ubyte(16))
             .to!string;
-    }
+    };
+
+    Bytes binToRange(string binPath)
+    {
+        auto fstream = new FileStream(binPath, "r+b");
+        size_t size = fstream.length;
+        return fstream.read(size);
+    };
     
     Pat parseSubPattern(string sub)
     {
@@ -155,6 +165,7 @@ class BytePattern
 
     void getModuleRanges(MemoryPointer mod, string binPath = thisExePath())
     {
+        // writeln(binPath.format!"module path: %s");
         // DLLのすべてのセクションテーブルを取得し、その開始アドレス終了アドレス
         // を _ranges に格納するPE/COFFの場合とELFでの実装が必要
         _ranges.clear();
@@ -169,7 +180,7 @@ class BytePattern
 
                 // ELF sections
                 foreach (section; elf.sections) {
-                    Range range;
+                    PtRange range;
                     auto secSize = section.size;
                     range.first = section.address;
 
@@ -195,8 +206,8 @@ class BytePattern
     void clear()
     {
         _literal = "";
-        _pattern.clear();
-        _mask.clear();
+        _pattern = "";
+        _mask = "";
         _results.clear();
     }
     
@@ -215,57 +226,73 @@ class BytePattern
         return _results.empty();
     };
     
-    void bmPreprocess()
+    void bmPreprocess(string binPath = thisExePath())
     {
+        
     };
 
-    void bmSearch()
+    /**
+     * ボイヤー-ムーア文字列検索
+     */
+    void bmSearch(string binPath = thisExePath())
     {
-        const Array!ubyte pbytes = this._pattern.dup;
-        const Array!ubyte pmask = this._mask.dup;
-        size_t patternLen = this._pattern.length();
-        debugOutput(mixin(interp!"bmSearch patternLen: ${patternLen}"));
+        
+        // const Array!ubyte pbytes = this._pattern.dup;
+        // const Array!ubyte pmask = this._mask.dup;
+        // const string pbytes = this._pattern.dup.to!string;
+        // const string pmask = this._mask.dup.to!string;
+        // size_t patternLen = this._pattern.length;
+        // debugOutput(mixin(interp!"bmSearch patternLen: ${patternLen}"));
 
-        this._results.clear();
+        // this._results.clear();
 
-        if (patternLen == 0)
-            {
-                return;
-            }
+        // if (patternLen == 0)
+        //     {
+        //         return;
+        //     }
 
-        foreach (range ; this._ranges)
-            {
-                uint8_t* rangeBegin = cast(uint8_t*) range.first;
-                uint8_t* rangeEnd = cast(uint8_t*) (range.second - patternLen);
-                ptrdiff_t index;
+        // foreach (range ; this._ranges)
+        //     {
+        //         uint8_t* rangeBegin = cast(uint8_t*) range.first;
+        //         uint8_t* rangeEnd = cast(uint8_t*) (range.second - patternLen);
+        //         ptrdiff_t index;
+        //         writeln(mixin(interp!"bmSearch rageBegin: ${rangeBegin}, rangeEnd: ${rangeEnd}"));
+                
+        //         writeln(mixin(interp!"pbytes: ${pbytes}"));
+        //         writeln(mixin(interp!"pmask: ${pmask}"));
 
-                try {
+        //         try {
 
-                    while (rangeBegin <= rangeEnd)
-                        {
-                            for (index = patternLen - 1; index >= 0; --index)
-                                {
-                                    if ((pbytes[index] & pmask[index]) != (rangeBegin[index] & pmask[index]))
-                                        {
-                                            break;
-                                        }
-                                }
-
-                            if (index == -1)
-                                {
-                                    this._results ~= new MemoryPointer(rangeBegin);
-                                    rangeBegin += patternLen;
-                                }
-                            else
-                                {
-                                    rangeBegin += max(index - this._bmbc[rangeBegin[index]], 1);
-                                }
-                        }
+        //             Range[range.first .. range.second];
                     
-                } catch (Exception e) {
-                    debugOutput(e.toString());
-                }
-            }
+                    // while (rangeBegin <= rangeEnd)
+                    //     {
+                    //         writeln(mixin(interp!"index: ${index}"));
+                    //         for (index = patternLen - 1; index >= 0; --index)
+                    //             {
+                    //                 if ((pbytes[index] & pmask[index]) != (rangeBegin[index] & pmask[index]))
+                    //                     {
+                    //                         break;
+                    //                     }
+                    //             }
+                    //         if (index == -1)
+                    //             {
+                    //                 writeln(mixin(interp!"detect rageBegin: ${rangeBegin}"));
+                    //                 this._results ~= new MemoryPointer(rangeBegin);
+                    //                 rangeBegin += patternLen;
+                    //             }
+                    //         else
+                    //             {
+                    //                 rangeBegin += max(index - this._bmbc[rangeBegin[index]], 1);
+                    //             }
+                    //     }
+                    
+            //     } catch (Exception e) {
+            //         debugOutput(e.toString());
+            //     }
+
+            //     exit(-1);
+            // }
     };
 
     BytePattern search()
@@ -300,11 +327,11 @@ public:
      +
      + Example:
      + ---
-     + // 内部に検索結果の文字列が格納されている場合それも出力する
-     + Result(s) of pattern: 455534
+     + // 内部に検索結果の文字列が格納されている場合それを出力する
+     + Result(s) of pattern: 45 55 34
      + 
      + // 以下のようにすればasciiに戻せる
-     + $ echo "455534" | xxd -r -p
+     + $ echo "45 55 34" | sed -e 's/ //g' | xxd -r -p
      + EU4
      + ---
      +/
@@ -315,7 +342,9 @@ public:
                 return;
             }
         
-        logStream().write(cast(ubyte[]) _literal.format!("Result(s) of pattern: %(%02X%)"));
+        logStream().write(cast(ubyte[]) _literal.format!("Result(s) of pattern: %s"));
+        logStream().write(cast(ubyte[]) "\n");
+        logStream().write(cast(ubyte[]) hexToUTF8(_literal).format!("(%s)"));
         logStream().write(cast(ubyte[]) "\n");
 
         if (count() > 0)

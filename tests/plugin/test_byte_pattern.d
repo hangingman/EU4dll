@@ -41,6 +41,17 @@ unittest
     b.hexToUTF8("45 55 34 20 76 31 2E ? ? 2E ?").should.equal("EU4 v1.**.*");
 }
 
+@("binToRange")
+unittest
+{
+    auto b = BytePattern.tempInstance();
+    Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
+    Bytes contents = b.binToRange(binPath.toString());
+    contents.length.should.equal(1145944);
+    contents[0].should.equal(0x7F);
+    contents[1..4].should.equal(cast(ubyte[])['E', 'L', 'F']);
+}
+
 @("transformPattern")
 unittest
 {
@@ -82,17 +93,19 @@ unittest
     
     auto b = new BytePattern();
     b.startLog("unittest2");
-    b._literal = "Hello World!";
+    b._literal = "48656C6C6F20576F726C6421";
     b.debugOutput();
     
     assert(existsAsFile(logFilePath.toString()));
     
     const string[] logs = readText(logFilePath.toString()).split("\n");
     assert(logs !is null);
-    assert(logs.length == 4);
-    assert(logs[0] == "Result(s) of pattern: 48656C6C6F20576F726C6421");
-    assert(logs[1] == "None");
-    assert(logs[2] == replicate("-", 80));
+    assert(logs.length == 5);
+
+    logs[0].should.equal("Result(s) of pattern: 48656C6C6F20576F726C6421");
+    logs[1].should.equal("(Hello World!)");
+    logs[2].should.equal("None");
+    logs[3].should.equal(replicate("-", 80));
 }
 
 @("tempInstance")

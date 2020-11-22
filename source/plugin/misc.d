@@ -15,7 +15,8 @@ static:
     EU4Version getVersion()
     {        
         BytePattern b = BytePattern.tempInstance();
-        b.findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
+        // b.findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
+        b.findPattern("45 55 34 20 76 31 2E 33 30 2E 34");
 
         if (b.count() > 0)
             {
