@@ -10,6 +10,7 @@ import core.sys.posix.dlfcn;
 import std.stdio;
 import std.file;
 import std.array;
+import fluent.asserts;
 
 
 @("default constructor")
@@ -29,6 +30,15 @@ unittest
     assert(15==b.digitToValue('F'));
     assert(10==b.digitToValue('a'));
     assert(15==b.digitToValue('f'));
+}
+
+@("hexToUTF8")
+unittest
+{
+    auto b = BytePattern.tempInstance();
+    b.hexToUTF8("48656c6c6f20576f726c6421").should.equal("Hello World!");
+    b.hexToUTF8("48 65 6C 6C 6F 20 57 6F 72 6C 64 21").should.equal("Hello World!");    
+    b.hexToUTF8("45 55 34 20 76 31 2E ? ? 2E ?").should.equal("EU4 v1.**.*");
 }
 
 @("transformPattern")

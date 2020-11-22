@@ -11,6 +11,7 @@ import plugin.singleton;
 import scriptlike.core;
 import scriptlike.file.extras : existsAsFile;
 import scriptlike.path.extras : Path;
+import std.conv;
 import std.container : Array;
 import std.file : thisExePath;
 import std.stdio;
@@ -66,6 +67,15 @@ class BytePattern
         
         throw new Exception("Could not parse pattern.");
     };
+
+    string hexToUTF8(string hex)
+    {
+        return hex.replace(" ", "")
+            .replace("?", "2A")
+            .chunks(2)
+            .map!(digits => cast(char) digits.to!ubyte(16))
+            .to!string;
+    }
     
     Pat parseSubPattern(string sub)
     {
@@ -267,24 +277,18 @@ class BytePattern
     
     BytePattern findPattern(string patternLiteral)
     {
-        debugOutput(mixin(interp!"findPattern ${patternLiteral}"));
+        debugOutput(mixin(interp!"findPattern str: ${hexToUTF8(patternLiteral)},hex: ${patternLiteral}"));
         this.setPattern(patternLiteral).search();
         return this;
     };
     
     static Stream logStream(string logFilePath=null)
     {
-        writeln(logFilePath.format!("logStream called ! on %s"));
         if (this._stream is null)
             {
-                writeln("_stream is null");
                 const string mode = existsAsFile(logFilePath) ? "a+" : "w+";
                 auto fout = File(logFilePath, mode);
                 this._stream = new FileStream(fout);
-            }
-        else
-            {
-                writeln("_stream is not null");
             }
 
         return this._stream;
@@ -335,7 +339,6 @@ public:
 
     void debugOutput(const string message)
     {
-        writeln(message.format!("debugOutput => %s"));
         if (this._stream is null)
             {
                 return;
@@ -347,8 +350,6 @@ public:
         logStream().write(cast(ubyte[]) "\n");
         
         _stream.seek(0, Seek.set);
-
-        writeln(message.format!("debugOutput written => %s"));
     };
     
     static void startLog(const string moduleName)

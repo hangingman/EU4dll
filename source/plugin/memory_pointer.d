@@ -37,10 +37,4 @@ class MemoryPointer
     {
         return cast(T*)(this.address(offset));
     }
-
-    // MemoryPointer opCast(uintptr)()
-    // {
-    //     writeln("opCast");
-    //     return this.address();
-    // }
 };

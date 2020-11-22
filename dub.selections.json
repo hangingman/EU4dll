@@ -1,9 +1,13 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"ddmp": "0.0.1-0.dev.3",
 		"elf-d": "0.2.5",
+		"fluent-asserts": "0.13.3",
 		"freck-streams": "1.2.0",
+		"libdparse": "0.14.0",
 		"scriptlike": "0.10.3",
-		"silly": "1.0.2"
+		"silly": "1.0.2",
+		"stdx-allocator": "2.77.5"
 	}
 }
