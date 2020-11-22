@@ -7,7 +7,9 @@ import elf;
 import freck.streams.filestream;
 import freck.streams.stream;
 import plugin.memory_pointer;
+import plugin.singleton;
 import scriptlike.core;
+import scriptlike.file.extras : existsAsFile;
 import scriptlike.path.extras : Path;
 import std.container : Array;
 import std.file : thisExePath;
@@ -25,6 +27,9 @@ alias Pat = Tuple!(uint8_t, "first", uint8_t, "second");
 
 class BytePattern
 {
+    // シングルトンパターン
+    mixin singleton;
+    
     Array!(Range) _ranges;
     Array!(uint8_t) _pattern;
     Array!(uint8_t) _mask;
@@ -33,7 +38,17 @@ class BytePattern
     ptrdiff_t[256] _bmbc;
     static Stream _stream = null;
     const string sep = replicate("-", 80);
+    
+    static typeof(this) tempInstance()
+    {
+        return BytePattern();
+    };
 
+    this()
+    {
+        setModule();
+    };
+    
     uint8_t digitToValue(uint8_t ch)
     {
         if ('0' <= ch && ch <= '9')
@@ -199,6 +214,7 @@ class BytePattern
         const Array!ubyte pbytes = this._pattern.dup;
         const Array!ubyte pmask = this._mask.dup;
         size_t patternLen = this._pattern.length();
+        debugOutput(mixin(interp!"bmSearch patternLen: ${patternLen}"));
 
         this._results.clear();
 
@@ -251,16 +267,24 @@ class BytePattern
     
     BytePattern findPattern(string patternLiteral)
     {
+        debugOutput(mixin(interp!"findPattern ${patternLiteral}"));
         this.setPattern(patternLiteral).search();
         return this;
     };
     
     static Stream logStream(string logFilePath=null)
     {
+        writeln(logFilePath.format!("logStream called ! on %s"));
         if (this._stream is null)
             {
-                auto fout = File(logFilePath, "w+");
+                writeln("_stream is null");
+                const string mode = existsAsFile(logFilePath) ? "a+" : "w+";
+                auto fout = File(logFilePath, mode);
                 this._stream = new FileStream(fout);
+            }
+        else
+            {
+                writeln("_stream is not null");
             }
 
         return this._stream;
@@ -298,6 +322,7 @@ public:
 
     void debugOutput(const string message)
     {
+        writeln(message.format!("debugOutput => %s"));
         if (this._stream is null)
             {
                 return;
@@ -309,6 +334,8 @@ public:
         logStream().write(cast(ubyte[]) "\n");
         
         _stream.seek(0, Seek.set);
+
+        writeln(message.format!("debugOutput written => %s"));
     };
     
     static void startLog(const string moduleName)
@@ -317,7 +344,7 @@ public:
         // TODO: EU4と同じディレクトリに書き込もうとするとno such file or directoryとなるため
         // とりあえず１つ上のディレクトリに書き込んでいる、単体のプログラムだと問題が再現しない
         Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_${moduleName}.log");
-        logStream(logFilePath.toString());
+        tempInstance().logStream(logFilePath.toString());
     };
 
     static void shutdownLog()
@@ -326,16 +353,6 @@ public:
             {
                 _stream = null;
             }
-    };
-
-    static typeof(this) tempInstance()
-    {
-        return new BytePattern();
-    };
-
-    this()
-    {
-        setModule();
     };
 
     MemoryPointer get(size_t index)
