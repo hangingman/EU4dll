@@ -12,29 +12,28 @@ class MemoryPointer
         void* Pointer;
         uintptr_t Address;
     };
+    size_t byteLength;
 
     this()
     {
         this.Pointer = Pointer.init;
+        this.byteLength = 0;
     }
 
-    this(void *p)
+    this(void *p, size_t byteLength = 0)
     {
         this.Pointer = p;
+        this.byteLength = byteLength;
     }
 
-    this(uintptr_t i)
+    this(uintptr_t i, size_t byteLength = 0)
     {
         this.Address = i;
+        this.byteLength = byteLength;
     }
 
     uintptr_t address(ptrdiff_t offset = 0)
     {
         return (this.Address + offset);
-    }
-
-    const(T*) pointer(T)(ptrdiff_t offset = 0)
-    {
-        return cast(T*)(this.address(offset));
     }
 };

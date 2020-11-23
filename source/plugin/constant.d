@@ -1,7 +1,7 @@
 module plugin.constant;
 
 
-enum EU4Version
+enum EU4Ver
     {
      UNKNOWN = 0,
      v1_25_X = 125,

@@ -23,6 +23,7 @@ import std.range;
 import std.algorithm;
 import core.stdc.stdlib;
 import std.algorithm.searching : BoyerMooreFinder;
+import cerealed;
 
 
 alias PtRange = Tuple!(uintptr_t, "first", uintptr_t, "second");
@@ -35,7 +36,8 @@ class BytePattern
 {
     // シングルトンパターン
     mixin singleton;
-    
+
+    Bytes[string] _contents;
     Array!(PtRange) _ranges;
     Patterns _maskedPattern;
     Array!(MemoryPointer) _results;
@@ -43,7 +45,7 @@ class BytePattern
     ptrdiff_t[256] _bmbc;
     static Stream _stream = null;
     const string sep = replicate("-", 80);
-    
+
     static typeof(this) tempInstance()
     {
         return BytePattern();
@@ -53,7 +55,7 @@ class BytePattern
     {
         setModule();
     };
-    
+
     uint8_t digitToValue(uint8_t ch)
     {
         if ('0' <= ch && ch <= '9')
@@ -68,7 +70,7 @@ class BytePattern
             {
                 return cast(uint8_t) (ch - 'a' + 10);
             }
-        
+
         throw new Exception("Could not parse pattern.");
     };
 
@@ -81,18 +83,23 @@ class BytePattern
             .to!string;
     };
 
-    Bytes binToRange(string binPath)
+    Bytes binToRange(string binPath = thisExePath())
     {
+        if (auto content = binPath in _contents)
+            {
+                return *content;
+            }
         auto fstream = new FileStream(binPath, "r");
         size_t size = fstream.length;
-        return fstream.read(size);
+        _contents[binPath] = fstream.read(size);
+        return _contents[binPath];
     };
-    
+
     Pat parseSubPattern(string sub)
     {
         // パターンマッチを使いたいが、D言語にはない
         Pat result;
-        
+
         if (sub.length == 1)
             {
                 if (sub[0] == '?')
@@ -133,7 +140,7 @@ class BytePattern
             {
                 throw new Exception("Could not parse pattern.");
             }
-        
+
         return result;
     };
 
@@ -169,10 +176,10 @@ class BytePattern
         // DLLのすべてのセクションテーブルを取得し、その開始アドレス終了アドレス
         // を _ranges に格納するPE/COFFの場合とELFでの実装が必要
         _ranges.clear();
-        
+
         version(Windows)
             {
-                
+
             }
         else
             {
@@ -209,21 +216,21 @@ class BytePattern
         _maskedPattern = [];
         _results.clear();
     }
-    
+
     size_t count()
     {
         return _results.length;
     }
-    
+
     bool hasSize(size_t expected, string desc)
     {
         return true;
     };
-    
+
     bool empty()
     {
         return _results.empty();
-    };    
+    };
 
     void findIndexes(string binPath = thisExePath())
     {
@@ -248,26 +255,20 @@ class BytePattern
                     writeln("mask:");
                     writeln(pattern.map!(d => to!string(d.mask, 16) ));
                 }
-                
+
+                auto section = contents[range.first .. range.second];
                 ptrdiff_t index = countUntil!((a, b)
                                               {
                                                   return (a & b.mask) == (b.pattern & b.mask);
-                                              })(contents[range.first .. range.second], pattern);
-                
+                                              })(section, pattern);
+
                 if (index != -1)
                     {
-                        MemoryPointer m = new MemoryPointer(index);
+                        MemoryPointer m = new MemoryPointer(range.first + index, patternLen);
                         this._results.insert(m);
                         debug {
-                            writeln(index.format!"Found on: %d");
-                            assert(index <= contents.length, mixin(interp!"index over"));
-                            assert(index + patternLen <= contents.length, mixin(interp!"contents len over"));
-                            
-                            try {
-                                writeln(contents[index .. patternLen+1].map!(d => to!string(d, 16) ));
-                            } catch (Throwable e) {
-                                writeln(e.toString());
-                            }
+                            writeln((range.first + index).format!"Found on: %d");
+                            writeln(section[index .. index + patternLen].map!(d => to!string(d, 16) ));
                         }
                     }
             }
@@ -279,14 +280,35 @@ class BytePattern
         debugOutput();
         return this;
     };
-    
+
     BytePattern findPattern(string patternLiteral)
     {
         debugOutput(mixin(interp!"findPattern str: ${hexToUTF8(patternLiteral)},hex: ${patternLiteral}"));
         this.setPattern(patternLiteral).search();
         return this;
     };
-    
+
+    T found(T)()
+    {
+        auto m = getFirst();
+        const ubyte[] content = binToRange()[m.address() .. m.address(m.byteLength)];
+        debug {
+            writeln("-- found --");
+            writeln(m.address().format!("from %d"));
+            writeln(m.address(m.byteLength).format!("to %d"));
+            writeln(content.map!(d => to!string(d, 16) ));
+        }
+        T ans = decerealise!T(content);
+        return ans;
+    }
+
+    T findPattern(T)(string patternLiteral)
+    {
+        findPattern(patternLiteral);
+        auto m = getFirst();
+        return found!(T);
+    }
+
     static Stream logStream(string logFilePath=null)
     {
         if (this._stream is null)
@@ -298,7 +320,7 @@ class BytePattern
 
         return this._stream;
     };
-    
+
 public:
     /++
      + デバッグログを出力する
@@ -307,7 +329,7 @@ public:
      + ---
      + // 内部に検索結果の文字列が格納されている場合それを出力する
      + Result(s) of pattern: 45 55 34
-     + 
+     +
      + // 以下のようにすればasciiに戻せる
      + $ echo "45 55 34" | sed -e 's/ //g' | xxd -r -p
      + EU4
@@ -319,7 +341,7 @@ public:
             {
                 return;
             }
-        
+
         logStream().write(cast(ubyte[]) _literal.format!("Result(s) of pattern: %s"));
         logStream().write(cast(ubyte[]) "\n");
         logStream().write(cast(ubyte[]) hexToUTF8(_literal).format!("(%s)"));
@@ -330,7 +352,7 @@ public:
                 foreach (pointer; _results)
                     {
                         logStream().write(cast(ubyte[]) pointer.address().format!("0x%s"));
-                        logStream().write(cast(ubyte[]) "\n");                
+                        logStream().write(cast(ubyte[]) "\n");
                     }
             }
         else
@@ -338,7 +360,7 @@ public:
                 logStream().write(cast(ubyte[]) "None");
                 logStream().write(cast(ubyte[]) "\n");
             }
-        
+
         logStream().write(cast(ubyte[]) sep);
         logStream().write(cast(ubyte[]) "\n");
         _stream.seek(0, Seek.set);
@@ -352,13 +374,13 @@ public:
             }
 
         logStream().write(cast(ubyte[]) message);
-        logStream().write(cast(ubyte[]) "\n");        
+        logStream().write(cast(ubyte[]) "\n");
         logStream().write(cast(ubyte[]) sep);
         logStream().write(cast(ubyte[]) "\n");
-        
+
         _stream.seek(0, Seek.set);
     };
-    
+
     static void startLog(const string moduleName)
     {
         shutdownLog();
@@ -396,7 +418,7 @@ public:
         transformPattern(patternLiteral);
         return this;
     };
-    
+
     BytePattern setModule(string binPath = thisExePath())
     {
         this.getModuleRanges(binPath);

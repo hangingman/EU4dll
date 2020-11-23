@@ -32,8 +32,8 @@ void hijackProcess()
     int success = 0;
 
     // versionを文字列から取得
-    EU4Version eu4Version = Misc.getVersion();
-    
+    EU4Ver eu4Version = Misc.getVersion();
+
     if (success == 0)
         {
             BytePattern.tempInstance().debugOutput("DLL [OK]");
@@ -42,7 +42,5 @@ void hijackProcess()
         {
             BytePattern.tempInstance().debugOutput("DLL [NG]");
             exit(-1);
-        }    
+        }
 }
-
-
