@@ -13,7 +13,7 @@ import scriptlike.file.extras : existsAsFile;
 import scriptlike.file.wrappers : readText;
 import scriptlike.path.extras : Path;
 import std.conv;
-import std.container : Array;
+import std.container : Array, SList;
 import std.file : thisExePath;
 import std.stdio;
 import std.typecons;
@@ -22,6 +22,7 @@ import std.format;
 import std.range;
 import std.algorithm;
 import core.stdc.stdlib;
+import std.algorithm.searching : BoyerMooreFinder;
 
 
 alias PtRange = Tuple!(uintptr_t, "first", uintptr_t, "second");
@@ -35,7 +36,7 @@ class BytePattern
     mixin singleton;
     
     Array!(PtRange) _ranges;
-    string _pattern;
+    Bytes _pattern;
     string _mask;
     Array!(MemoryPointer) _results;
     string _literal;
@@ -163,7 +164,7 @@ class BytePattern
             }
     };
 
-    void getModuleRanges(MemoryPointer mod, string binPath = thisExePath())
+    void getModuleRanges(string binPath = thisExePath())
     {
         // writeln(binPath.format!"module path: %s");
         // DLLのすべてのセクションテーブルを取得し、その開始アドレス終了アドレス
@@ -206,7 +207,7 @@ class BytePattern
     void clear()
     {
         _literal = "";
-        _pattern = "";
+        _pattern = [];
         _mask = "";
         _results.clear();
     }
@@ -224,80 +225,37 @@ class BytePattern
     bool empty()
     {
         return _results.empty();
-    };
-    
-    void bmPreprocess(string binPath = thisExePath())
+    };    
+
+    void findIndexes(string binPath = thisExePath())
     {
-        
-    };
+        const Bytes contents = binToRange(binPath);
+        const Bytes pbytes = this._pattern;
+        const size_t patternLen = this._pattern.length;
+        this._results.clear();
 
-    /**
-     * ボイヤー-ムーア文字列検索
-     */
-    void bmSearch(string binPath = thisExePath())
-    {
-        
-        // const Array!ubyte pbytes = this._pattern.dup;
-        // const Array!ubyte pmask = this._mask.dup;
-        // const string pbytes = this._pattern.dup.to!string;
-        // const string pmask = this._mask.dup.to!string;
-        // size_t patternLen = this._pattern.length;
-        // debugOutput(mixin(interp!"bmSearch patternLen: ${patternLen}"));
+        if (patternLen == 0)
+            {
+                return;
+            }
 
-        // this._results.clear();
-
-        // if (patternLen == 0)
-        //     {
-        //         return;
-        //     }
-
-        // foreach (range ; this._ranges)
-        //     {
-        //         uint8_t* rangeBegin = cast(uint8_t*) range.first;
-        //         uint8_t* rangeEnd = cast(uint8_t*) (range.second - patternLen);
-        //         ptrdiff_t index;
-        //         writeln(mixin(interp!"bmSearch rageBegin: ${rangeBegin}, rangeEnd: ${rangeEnd}"));
-                
-        //         writeln(mixin(interp!"pbytes: ${pbytes}"));
-        //         writeln(mixin(interp!"pmask: ${pmask}"));
-
-        //         try {
-
-        //             Range[range.first .. range.second];
-                    
-                    // while (rangeBegin <= rangeEnd)
-                    //     {
-                    //         writeln(mixin(interp!"index: ${index}"));
-                    //         for (index = patternLen - 1; index >= 0; --index)
-                    //             {
-                    //                 if ((pbytes[index] & pmask[index]) != (rangeBegin[index] & pmask[index]))
-                    //                     {
-                    //                         break;
-                    //                     }
-                    //             }
-                    //         if (index == -1)
-                    //             {
-                    //                 writeln(mixin(interp!"detect rageBegin: ${rangeBegin}"));
-                    //                 this._results ~= new MemoryPointer(rangeBegin);
-                    //                 rangeBegin += patternLen;
-                    //             }
-                    //         else
-                    //             {
-                    //                 rangeBegin += max(index - this._bmbc[rangeBegin[index]], 1);
-                    //             }
-                    //     }
-                    
-            //     } catch (Exception e) {
-            //         debugOutput(e.toString());
-            //     }
-
-            //     exit(-1);
-            // }
+        foreach (range ; this._ranges)
+            {
+                writeln(mixin(interp!"module size: ${contents.length}"));
+                writeln(mixin(interp!"[${range.first} .. ${range.second}]"));
+                ptrdiff_t index = countUntil(contents[range.first .. range.second], pbytes);
+                if (index != -1)
+                    {
+                        MemoryPointer m = new MemoryPointer(index);
+                        this._results.insert(m);
+                        writeln(contents[index .. patternLen+1].map!(d => to!string(d, 16) ));
+                    }
+            }
     };
 
     BytePattern search()
     {
-        bmSearch();
+        findIndexes();
         debugOutput();
         return this;
     };
@@ -416,28 +374,12 @@ public:
     BytePattern setPattern(string patternLiteral)
     {
         transformPattern(patternLiteral);
-        bmPreprocess();
         return this;
     };
     
-    BytePattern setModule()
+    BytePattern setModule(string binPath = thisExePath())
     {
-        version(Windows)
-            {
-                
-            }
-        else
-            {
-                // GetModuleHandle(NULL) on Linux
-                // https://stackoverflow.com/questions/6972211/getmodulehandlenull-on-linux
-                MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
-                return setModule(dll);
-            }
-    };
-
-    BytePattern setModule(MemoryPointer mod)
-    {
-        this.getModuleRanges(mod);
+        this.getModuleRanges(binPath);
         return this;
     };
 };

@@ -52,6 +52,23 @@ unittest
     contents[1..4].should.equal(cast(ubyte[])['E', 'L', 'F']);
 }
 
+@("findIndexes")
+unittest
+{
+    auto b = BytePattern.tempInstance();
+    Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
+    b.setModule(binPath.toString());
+
+    // ELFを検索
+    b.setPattern("45 4C 46"); 
+    b._ranges ~= PtRange(0, 100); // 本来はヘッダ部分は検索しないがテストのため
+
+    // 検索する
+    b.findIndexes(binPath.toString());
+    b._results.length.should.equal(1);
+}
+
+
 @("transformPattern")
 unittest
 {
@@ -122,13 +139,13 @@ unittest
     assert(b.empty());
 }
 
-@("setModule")
-unittest
-{
-    MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
-    assert(dll !is null);
-    dll.address();
-}
+// @("setModule")
+// unittest
+// {
+//     MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
+//     assert(dll !is null);
+//     dll.address();
+// }
 
 @("getModuleRanges")
 unittest
@@ -136,7 +153,7 @@ unittest
     // elf-Linux-lib-x64.so をテストする
     auto b = BytePattern.tempInstance();
     Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
-    b.getModuleRanges(null, binPath.toString());
+    b.getModuleRanges(binPath.toString());
 
     assert(b._ranges.length==2);
 
