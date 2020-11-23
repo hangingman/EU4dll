@@ -83,7 +83,7 @@ class BytePattern
 
     Bytes binToRange(string binPath)
     {
-        auto fstream = new FileStream(binPath, "r+b");
+        auto fstream = new FileStream(binPath, "r");
         size_t size = fstream.length;
         return fstream.read(size);
     };
@@ -227,7 +227,7 @@ class BytePattern
 
     void findIndexes(string binPath = thisExePath())
     {
-        const Bytes contents = binToRange(binPath);
+        const Bytes contents = binToRange(binPath).dup;
         const Patterns pattern = this._maskedPattern.dup;
         const size_t patternLen = this._maskedPattern.length;
         this._results.clear();
@@ -248,6 +248,7 @@ class BytePattern
                     writeln("mask:");
                     writeln(pattern.map!(d => to!string(d.mask, 16) ));
                 }
+                
                 ptrdiff_t index = countUntil!((a, b)
                                               {
                                                   return (a & b.mask) == (b.pattern & b.mask);
@@ -257,7 +258,17 @@ class BytePattern
                     {
                         MemoryPointer m = new MemoryPointer(index);
                         this._results.insert(m);
-                        writeln(contents[index .. patternLen+1].map!(d => to!string(d, 16) ));
+                        debug {
+                            writeln(index.format!"Found on: %d");
+                            assert(index <= contents.length, mixin(interp!"index over"));
+                            assert(index + patternLen <= contents.length, mixin(interp!"contents len over"));
+                            
+                            try {
+                                writeln(contents[index .. patternLen+1].map!(d => to!string(d, 16) ));
+                            } catch (Throwable e) {
+                                writeln(e.toString());
+                            }
+                        }
                     }
             }
     };

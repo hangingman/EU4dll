@@ -27,7 +27,7 @@ hijack:
 #
 EU4_DIR := ~/.steam/debian-installation/steamapps/common/Europa\ Universalis\ IV/
 
-run-eu4-hijack: all
+run: all
 	@echo "--- copy eu4dll.so ---"
 	cp -f ./libeu4dll.so $(EU4_DIR)
 	@echo "--- run eu4 ---"
