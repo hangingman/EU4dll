@@ -10,6 +10,7 @@ import core.sys.posix.dlfcn;
 import std.stdio;
 import std.file;
 import std.array;
+import std.container;
 import fluent.asserts;
 
 
@@ -55,17 +56,31 @@ unittest
 @("findIndexes")
 unittest
 {
-    auto b = BytePattern.tempInstance();
     Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
-    b.setModule(binPath.toString());
+    auto b = BytePattern.tempInstance();
 
-    // ELFを検索
-    b.setPattern("45 4C 46"); 
-    b._ranges ~= PtRange(0, 100); // 本来はヘッダ部分は検索しないがテストのため
+    with (b)
+        {
+            // ELFを検索
+            setModule(binPath.toString());
+            setPattern("45 4C 46"); 
+            _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
+            findIndexes(binPath.toString());
+            _results.length.should.equal(1);
+            _results[0].address.should.equal(1);
+            }
 
-    // 検索する
-    b.findIndexes(binPath.toString());
-    b._results.length.should.equal(1);
+    with (b)
+        {
+            // E?Fを検索
+            setModule(binPath.toString());
+            setPattern("45 ?? 46"); 
+            _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
+            findIndexes(binPath.toString());
+            _results.length.should.equal(1);
+            _results[0].address.should.equal(1);
+        }
+
 }
 
 
@@ -76,11 +91,21 @@ unittest
     // Hello World!
     b.transformPattern("48 65 6C 6C 6F 20 57 6F 72 6C 64 21");
     assert(b._literal == "48 65 6C 6C 6F 20 57 6F 72 6C 64 21");
-    assert(b._pattern.length == 12);
-    assert(b._mask.length == 12);
+    assert(b._maskedPattern.length == 12);
 
     // 16進数が10進数に変換される
-    assert(b._pattern[0] == 72, mixin(interp!"${b._pattern[0]} != 72"));
+    assert(b._maskedPattern[0].pattern == 72, mixin(interp!"${b._maskedPattern[0].pattern} != 72"));
+}
+
+@("parseSubPattern")
+unittest
+{
+    // 2byte単位でmaskを作成する(maskしている部分はワイルドカード扱い)
+    auto b = BytePattern.tempInstance();
+    b.parseSubPattern("??").should.equal(Pat(0x00, 0x00));
+    b.parseSubPattern("8?").should.equal(Pat(0x80, 0xF0));
+    b.parseSubPattern("?8").should.equal(Pat(0x08, 0x0F));
+    b.parseSubPattern("88").should.equal(Pat(0x88, 0xFF));
 }
 
 @("startLog")

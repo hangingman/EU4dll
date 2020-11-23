@@ -26,7 +26,8 @@ import std.algorithm.searching : BoyerMooreFinder;
 
 
 alias PtRange = Tuple!(uintptr_t, "first", uintptr_t, "second");
-alias Pat = Tuple!(uint8_t, "first", uint8_t, "second");
+alias Pat = Tuple!(uint8_t, "pattern", uint8_t, "mask");
+alias Patterns = Pat[];
 alias Bytes = ubyte[];
 
 
@@ -36,8 +37,7 @@ class BytePattern
     mixin singleton;
     
     Array!(PtRange) _ranges;
-    Bytes _pattern;
-    string _mask;
+    Patterns _maskedPattern;
     Array!(MemoryPointer) _results;
     string _literal;
     ptrdiff_t[256] _bmbc;
@@ -97,36 +97,36 @@ class BytePattern
             {
                 if (sub[0] == '?')
                     {
-                        result.first = 0;
-                        result.second = 0;
+                        result.pattern = 0;
+                        result.mask = 0;
                     }
                 else
                     {
-                        result.first = digitToValue(sub[0]);
-                        result.second = 0xFF;
+                        result.pattern = digitToValue(sub[0]);
+                        result.mask = 0xFF;
                     }
             }
         else if (sub.length == 2)
             {
                 if (sub[0] == '?' && sub[1] == '?')
                     {
-                        result.first = 0;
-                        result.second = 0;
+                        result.pattern = 0;
+                        result.mask = 0;
                     }
                 else if (sub[0] == '?')
                     {
-                        result.first = digitToValue(sub[1]);
-                        result.second = 0xF;
+                        result.pattern = digitToValue(sub[1]);
+                        result.mask = 0xF;
                     }
                 else if (sub[1] == '?')
                     {
-                        result.first = cast(uint8_t) (digitToValue(sub[0]) << 4);
-                        result.second = 0xF0;
+                        result.pattern = cast(uint8_t) (digitToValue(sub[0]) << 4);
+                        result.mask = 0xF0;
                     }
                 else
                     {
-                        result.first = cast(uint8_t) ((digitToValue(sub[0]) << 4) | digitToValue(sub[1]));
-                        result.second = 0xFF;
+                        result.pattern = cast(uint8_t) ((digitToValue(sub[0]) << 4) | digitToValue(sub[1]));
+                        result.mask = 0xFF;
                     }
             }
         else
@@ -154,8 +154,7 @@ class BytePattern
                 foreach (sub; subPatterns)
                     {
                         auto pat = parseSubPattern(sub);
-                        _pattern ~= pat.first;
-                        _mask ~= pat.second;
+                        _maskedPattern ~= pat;
                     }
             }
         catch (Exception e)
@@ -207,8 +206,7 @@ class BytePattern
     void clear()
     {
         _literal = "";
-        _pattern = [];
-        _mask = "";
+        _maskedPattern = [];
         _results.clear();
     }
     
@@ -230,8 +228,8 @@ class BytePattern
     void findIndexes(string binPath = thisExePath())
     {
         const Bytes contents = binToRange(binPath);
-        const Bytes pbytes = this._pattern;
-        const size_t patternLen = this._pattern.length;
+        const Patterns pattern = this._maskedPattern.dup;
+        const size_t patternLen = this._maskedPattern.length;
         this._results.clear();
 
         if (patternLen == 0)
@@ -241,9 +239,20 @@ class BytePattern
 
         foreach (range ; this._ranges)
             {
-                writeln(mixin(interp!"module size: ${contents.length}"));
-                writeln(mixin(interp!"[${range.first} .. ${range.second}]"));
-                ptrdiff_t index = countUntil(contents[range.first .. range.second], pbytes);
+                debug {
+                    writeln(mixin(interp!"module size: ${contents.length}"));
+                    writeln(mixin(interp!"[${range.first} .. ${range.second}]"));
+
+                    writeln("pattern:");
+                    writeln(pattern.map!(d => to!string(d.pattern, 16) ));
+                    writeln("mask:");
+                    writeln(pattern.map!(d => to!string(d.mask, 16) ));
+                }
+                ptrdiff_t index = countUntil!((a, b)
+                                              {
+                                                  return (a & b.mask) == (b.pattern & b.mask);
+                                              })(contents[range.first .. range.second], pattern);
+                
                 if (index != -1)
                     {
                         MemoryPointer m = new MemoryPointer(index);
