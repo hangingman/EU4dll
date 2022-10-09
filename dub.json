@@ -9,7 +9,21 @@
     "configurations": [
         {
             "name": "eu4dll",
+            "targetName": "eu4dll",
             "targetType": "dynamicLibrary",
+            "dependencies": {
+                "freck-streams": "~>1.2.0",
+                "scriptlike": "~>0.10.3",
+                "elf-d": "~>0.2.5",
+                "cerealed": "~>0.6.11"
+            }
+        },
+        {
+            "name": "eu4dll-poc",
+            "targetName": "eu4dll-poc",
+            "targetType": "dynamicLibrary",
+            "targetPath" : "tests/poc/",
+            "sourceFiles": ["tests/poc/dllmain.d"],
             "dependencies": {
                 "freck-streams": "~>1.2.0",
                 "scriptlike": "~>0.10.3",
