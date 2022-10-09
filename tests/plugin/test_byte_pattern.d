@@ -38,7 +38,7 @@ unittest
 {
     auto b = BytePattern.tempInstance();
     b.hexToUTF8("48656c6c6f20576f726c6421").should.equal("Hello World!");
-    b.hexToUTF8("48 65 6C 6C 6F 20 57 6F 72 6C 64 21").should.equal("Hello World!");    
+    b.hexToUTF8("48 65 6C 6C 6F 20 57 6F 72 6C 64 21").should.equal("Hello World!");
     b.hexToUTF8("45 55 34 20 76 31 2E ? ? 2E ?").should.equal("EU4 v1.**.*");
 }
 
@@ -63,7 +63,7 @@ unittest
         {
             // ELFを検索
             setModule(binPath.toString());
-            setPattern("45 4C 46"); 
+            setPattern("45 4C 46");
             _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
@@ -74,7 +74,7 @@ unittest
         {
             // E?Fを検索
             setModule(binPath.toString());
-            setPattern("45 ?? 46"); 
+            setPattern("45 ?? 46");
             _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
@@ -113,13 +113,13 @@ unittest
 {
     Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest1.log");
     tryRemove(logFilePath);
-    
+
     auto b = new BytePattern();
     b.startLog("unittest1");
     b.debugOutput("Hello,EU4!");
-    
+
     assert(existsAsFile(logFilePath.toString()));
-    
+
     const string[] logs = readText(logFilePath.toString()).split("\n");
     assert(logs !is null);
     assert(logs.length == 3);
@@ -132,14 +132,14 @@ unittest
 {
     Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest2.log");
     tryRemove(logFilePath);
-    
+
     auto b = new BytePattern();
     b.startLog("unittest2");
     b._literal = "48656C6C6F20576F726C6421";
     b.debugOutput();
-    
+
     assert(existsAsFile(logFilePath.toString()));
-    
+
     const string[] logs = readText(logFilePath.toString()).split("\n");
     assert(logs !is null);
     assert(logs.length == 5);
@@ -163,14 +163,6 @@ unittest
     auto b = BytePattern.tempInstance();
     assert(b.empty());
 }
-
-// @("setModule")
-// unittest
-// {
-//     MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
-//     assert(dll !is null);
-//     dll.address();
-// }
 
 @("getModuleRanges")
 unittest

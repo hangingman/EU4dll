@@ -28,7 +28,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 
 	dub build
 	dub build -c eu4dll-poc
-	make -C tests
+	make -C tests/poc/
 
 #
 # EU4にdllをかませて起動、dll.soっておかしいので後で変えたい
