@@ -25,9 +25,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 	@echo "----------------"
 
 	dub build
-	@echo "--- hijack   ---"
-	@LD_PRELOAD=./libeu4dll.so ./dummy
-	@echo "----------------"
+	make -C tests
 
 #
 # EU4にdllをかませて起動、dll.soっておかしいので後で変えたい
