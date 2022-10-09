@@ -14,6 +14,8 @@ test: ## Run unit tests for the project.
 
 clean: ## Clean the project build files.
 	dub clean
+	rm -f libeu4dll.so
+	rm -f *.log
 
 # https://github.com/Ai-Himmel/Linux-so-hijack
 # .so file hijack
@@ -25,6 +27,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 	@echo "----------------"
 
 	dub build
+	dub build -c eu4dll-poc
 	make -C tests
 
 #
