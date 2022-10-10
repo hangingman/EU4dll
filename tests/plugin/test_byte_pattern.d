@@ -12,6 +12,7 @@ import std.file;
 import std.array;
 import std.container;
 import fluent.asserts;
+import std.mmfile;
 
 
 @("default constructor")
@@ -170,14 +171,31 @@ unittest
     // elf-Linux-lib-x64.so をテストする
     auto b = BytePattern.tempInstance();
     Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
-    b.getModuleRanges(binPath.toString());
 
-    assert(b._ranges.length==2);
+    with (b)
+        {
+            getModuleRanges(binPath.toString());
+            assert(_ranges.length==2);
 
-    // text
-    assert(b._ranges[0].first == 88160);
-    assert(b._ranges[0].second == 901916);
-    // rodata
-    assert(b._ranges[1].first == 901952);
-    assert(b._ranges[1].second == 993632);
+            // text
+            assert(_ranges[0].first == 88160);
+            assert(_ranges[0].second == 901916);
+            // rodata
+            assert(_ranges[1].first == 901952);
+            assert(_ranges[1].second == 993632);
+        }
+
+    with (b)
+        {
+            MmFile mmf = new MmFile(binPath.toString(), MmFile.Mode.read, 0, null);
+            getModuleRanges(mmf);
+            assert(_ranges.length==2);
+
+            // text
+            assert(_ranges[0].first == 88160);
+            assert(_ranges[0].second == 901916);
+            // rodata
+            assert(_ranges[1].first == 901952);
+            assert(_ranges[1].second == 993632);
+        }
 }

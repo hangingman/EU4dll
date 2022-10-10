@@ -5,6 +5,7 @@ import std.stdio;
 import core.stdc.stdlib;
 import plugin.byte_pattern;
 import scriptlike.path.extras : Path;
+import std.mmfile;
 
 
 extern(C):
@@ -20,5 +21,8 @@ void hijackProcess()
 {
     BytePattern.startLog("eu4jps");
     auto b = BytePattern.tempInstance();
-    Path binPath = Path(__FILE__) ~ "libeu4dll-poc.so";
+    Path binPath = Path(__FILE__) ~ "dummy";
+
+    MmFile mmf = new MmFile(binPath.toString(), MmFile.Mode.readWrite, 0, null);
+
 }
