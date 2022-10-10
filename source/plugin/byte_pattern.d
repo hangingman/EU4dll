@@ -24,6 +24,7 @@ import std.algorithm;
 import core.stdc.stdlib;
 import std.algorithm.searching : BoyerMooreFinder;
 import cerealed;
+import std.mmfile;
 
 
 alias PtRange = Tuple!(uintptr_t, "first", uintptr_t, "second");
@@ -49,12 +50,12 @@ class BytePattern
     static typeof(this) tempInstance()
     {
         return BytePattern();
-    };
+    }
 
     this()
     {
         setModule();
-    };
+    }
 
     uint8_t digitToValue(uint8_t ch)
     {
@@ -72,7 +73,7 @@ class BytePattern
             }
 
         throw new Exception("Could not parse pattern.");
-    };
+    }
 
     string hexToUTF8(string hex)
     {
@@ -81,7 +82,7 @@ class BytePattern
             .chunks(2)
             .map!(digits => cast(char) digits.to!ubyte(16))
             .to!string;
-    };
+    }
 
     Bytes binToRange(string binPath = thisExePath())
     {
@@ -93,7 +94,7 @@ class BytePattern
         size_t size = fstream.length;
         _contents[binPath] = fstream.read(size);
         return _contents[binPath];
-    };
+    }
 
     Pat parseSubPattern(string sub)
     {
@@ -142,7 +143,7 @@ class BytePattern
             }
 
         return result;
-    };
+    }
 
     void transformPattern(string literal)
     {
@@ -168,47 +169,50 @@ class BytePattern
             {
                 this.clear();
             }
-    };
+    }
+
+    // elf-dの実装でも、内部的にはファイルをMmFileとして扱っている
+    // https://github.com/yazd/elf-d/blob/master/source/elf/package.d
+    void getModuleRanges(MmFile mmf)
+    {
+        ELF elf = ELF.fromFile(mmf);
+        setModuleRanges(elf);
+    }
 
     void getModuleRanges(string binPath = thisExePath())
     {
-        // writeln(binPath.format!"module path: %s");
-        // DLLのすべてのセクションテーブルを取得し、その開始アドレス終了アドレス
-        // を _ranges に格納するPE/COFFの場合とELFでの実装が必要
+        ELF elf = ELF.fromFile(binPath);
+        setModuleRanges(elf);
+    }
+
+    void setModuleRanges(ELF elf)
+    {
+        // 実行ファイルのすべてのセクションテーブルを取得し、その開始アドレス終了アドレスを
+        // _ranges に格納する(ELFでの実装のみ対応)
         _ranges.clear();
 
-        version(Windows)
-            {
+        foreach (section; elf.sections) {
+            PtRange range;
+            auto secSize = section.size;
+            range.first = section.address;
 
-            }
-        else
-            {
-                ELF elf = ELF.fromFile(binPath);
+            if (section.name == ".text" || section.name == ".rodata")
+                {
+                    // .text, .rodataのセクションの範囲を取得する
+                    // writeln("  Section (", section.name, ")");
+                    // writefln("    type: %s", section.type);
+                    // writefln("    address: 0x%x", section.address);
+                    // writefln("    offset: 0x%x", section.offset);
+                    // writefln("    flags: 0x%08b", section.flags);
+                    // writefln("    size: %s bytes", section.size);
+                    // writefln("    entry size: %s bytes", section.entrySize);
+                    // writeln();
 
-                // ELF sections
-                foreach (section; elf.sections) {
-                    PtRange range;
-                    auto secSize = section.size;
-                    range.first = section.address;
-
-                    if (section.name == ".text" || section.name == ".rodata")
-                        {
-                            // .text, .rodataのセクションの範囲を取得する
-                            // writeln("  Section (", section.name, ")");
-                            // writefln("    type: %s", section.type);
-                            // writefln("    address: 0x%x", section.address);
-                            // writefln("    offset: 0x%x", section.offset);
-                            // writefln("    flags: 0x%08b", section.flags);
-                            // writefln("    size: %s bytes", section.size);
-                            // writefln("    entry size: %s bytes", section.entrySize);
-                            // writeln();
-
-                            range.second = range.first + secSize;
-                            _ranges.insert(range);
-                        }
+                    range.second = range.first + secSize;
+                    _ranges.insert(range);
                 }
-            }
-    };
+        }
+    }
 
     void clear()
     {
@@ -225,12 +229,12 @@ class BytePattern
     bool hasSize(size_t expected, string desc)
     {
         return true;
-    };
+    }
 
     bool empty()
     {
         return _results.empty();
-    };
+    }
 
     void findIndexes(string binPath = thisExePath())
     {
@@ -272,21 +276,21 @@ class BytePattern
                         }
                     }
             }
-    };
+    }
 
     BytePattern search()
     {
         findIndexes();
         debugOutput();
         return this;
-    };
+    }
 
     BytePattern findPattern(string patternLiteral)
     {
         debugOutput(mixin(interp!"findPattern str: ${hexToUTF8(patternLiteral)},hex: ${patternLiteral}"));
         this.setPattern(patternLiteral).search();
         return this;
-    };
+    }
 
     T found(T)()
     {
@@ -317,7 +321,7 @@ class BytePattern
             }
 
         return this._stream;
-    };
+    }
 
 public:
     /++
@@ -362,7 +366,7 @@ public:
         logStream().write(cast(ubyte[]) sep);
         logStream().write(cast(ubyte[]) "\n");
         _stream.seek(0, Seek.set);
-    };
+    }
 
     void debugOutput(const string message)
     {
@@ -377,7 +381,7 @@ public:
         logStream().write(cast(ubyte[]) "\n");
 
         _stream.seek(0, Seek.set);
-    };
+    }
 
     static void startLog(const string moduleName)
     {
@@ -386,7 +390,7 @@ public:
         // とりあえず１つ上のディレクトリに書き込んでいる、単体のプログラムだと問題が再現しない
         Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_${moduleName}.log");
         tempInstance().logStream(logFilePath.toString());
-    };
+    }
 
     static void shutdownLog()
     {
@@ -394,32 +398,38 @@ public:
             {
                 _stream = null;
             }
-    };
+    }
 
     MemoryPointer get(size_t index)
     {
         return this._results[index];
-    };
+    }
 
     MemoryPointer getFirst()
     {
         return this.get(0);
-    };
+    }
 
     MemoryPointer getSecond()
     {
         return this.get(1);
-    };
+    }
 
     BytePattern setPattern(string patternLiteral)
     {
         transformPattern(patternLiteral);
         return this;
-    };
+    }
 
     BytePattern setModule(string binPath = thisExePath())
     {
         this.getModuleRanges(binPath);
         return this;
-    };
-};
+    }
+
+    BytePattern setMmFile(MmFile mmf)
+    {
+        this.getModuleRanges(mmf);
+        return this;
+    }
+}
