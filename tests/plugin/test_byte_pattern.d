@@ -69,7 +69,7 @@ unittest
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
             _results[0].address.should.equal(1);
-            }
+        }
 
     with (b)
         {

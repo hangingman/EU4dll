@@ -199,15 +199,6 @@ class BytePattern
             if (section.name == ".text" || section.name == ".rodata")
                 {
                     // .text, .rodataのセクションの範囲を取得する
-                    // writeln("  Section (", section.name, ")");
-                    // writefln("    type: %s", section.type);
-                    // writefln("    address: 0x%x", section.address);
-                    // writefln("    offset: 0x%x", section.offset);
-                    // writefln("    flags: 0x%08b", section.flags);
-                    // writefln("    size: %s bytes", section.size);
-                    // writefln("    entry size: %s bytes", section.entrySize);
-                    // writeln();
-
                     range.second = range.first + secSize;
                     _ranges.insert(range);
                 }

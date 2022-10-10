@@ -7,6 +7,6 @@ all:
 	@./dummy
 	@echo "----------------"
 
-	@echo "--- highjack   ---"
+	@echo "--- highjack ---"
 	@LD_PRELOAD=./libeu4dll-poc.so ./dummy
 	@echo "----------------"
