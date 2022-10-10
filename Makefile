@@ -27,6 +27,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 	@echo "----------------"
 
 	dub build
+	rm -f tests/poc/{*.o,*.so}
 	dub build -c eu4dll-poc
 	make -C tests/poc/
 
