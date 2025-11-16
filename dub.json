@@ -11,6 +11,7 @@
             "name": "eu4dll",
             "targetName": "eu4dll",
             "targetType": "dynamicLibrary",
+            "sourcePaths": ["source/"],
             "dependencies": {
                 "freck-streams": "~>1.2.0",
                 "scriptlike": "~>0.10.3",
@@ -40,7 +41,7 @@
             "name": "unittest",
             "targetType": "dynamicLibrary",
             "targetPath" : "tests",
-            "sourcePaths": ["tests/"],
+            "sourcePaths": ["source/", "tests/"],
             "importPaths": ["tests/"],
             "dependencies": {
                 "freck-streams": "~>1.2.0",
