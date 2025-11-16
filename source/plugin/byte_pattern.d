@@ -313,9 +313,7 @@ class BytePattern
     {
         if (this._stream is null)
             {
-                const string mode = existsAsFile(logFilePath) ? "a+" : "w+";
-                auto fout = File(logFilePath, mode);
-                this._stream = new FileStream(fout);
+                this._stream = new FileStream(logFilePath, existsAsFile(logFilePath) ? "a+" : "w+");
             }
 
         return this._stream;
