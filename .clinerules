@@ -1,0 +1,233 @@
+# .clinerules
+
+**日本語で回答するようにしてください**
+
+# Clineのメモリーバンク（Memory Bank）
+
+- 私はCline、専門的なソフトウェアエンジニアであり、セッションごとに記憶が完全リセットされる
+- そのため**メモリバンク(Memory Bank)ファイル**が唯一の過去情報源となる
+- **すべてのタスクの開始時にMemory Bank内のファイルを読むことは必須であり、オプションではない**
+
+## メモリバンク(Memory Bank)ファイル構成
+
+```
+memory-bank/
+  ├─ 01_project_overview.md                     # プロジェクトの全体像
+  ├─ 02_architecture.md                         # アーキテクチャ設計
+  ├─ 03_development_guide.md                    # 開発環境のセットアップと手順
+  ├─ 04_testing_guide.md                        # テスト戦略と手順
+  ├─ 05_coding_guidelines.md                    # コーディング規約
+  ├─ 06_git_workflow.md                         # Gitのブランチ運用ルール
+  ├─ 07_ai_workflow.md                          # AIアシスタントとの協業ワークフロー
+  ├─ 07_commit_message_guidelines.md            # コミットメッセージの規約
+  └─ 08_conversation_guidelines.md              # AIアシスタントとの会話ガイドライン
+```
+
+<if_tool_exists tool="filesystem">
+- **MCPサーバ (filesystem) が利用可能な場合、memory-bank/ 以下のすべてのマークダウンファイルを絶対パスで一括読み込みする**
+- `filesystem` MCPサーバーの`read_multiple_files`ツールを使用し、
+- `Current Working Directory` に指定された絶対パスで`paths`を指定する
+ 
+`filesystem` MCPサーバーの`read_multiple_files`指定の例
+
+```json
+{
+  "paths": [
+    "/<Current Working Directory>/memory-bank/01_project_overview.md",
+    "/<Current Working Directory>/memory-bank/02_architecture.md",
+    "/<Current Working Directory>/memory-bank/03_development_guide.md",
+    "/<Current Working Directory>/memory-bank/04_testing_guide.md",
+    "/<Current Working Directory>/memory-bank/05_coding_guidelines.md",
+    "/<Current Working Directory>/memory-bank/06_git_workflow.md",
+    "/<Current Working Directory>/memory-bank/07_ai_workflow.md",
+    "/<Current Working Directory>/memory-bank/07_commit_message_guidelines.md",
+    "/<Current Working Directory>/memory-bank/08_conversation_guidelines.md",
+  ]
+}
+</if_tool_exists>
+
+<else>
+- **MCPサーバ (filesystem) が利用できない場合、すべてのタスク開始時には、memory-bank/ 以下の主要なマークダウンファイルを必ず読む**
+</else>
+
+- 必要に応じて details/ フォルダやその他のドキュメントを参照
+
+
+### コアワークフロー（概要）
+
+1. **Plan Mode**:
+
+```mermaid
+flowchart TD
+    Start[開始] --> ReadFiles[Memory Bankを読む]
+    ReadFiles --> CheckFiles{ファイルは完全か？}
+    
+    CheckFiles -->|No| Plan[計画を作成]
+    Plan --> Document[チャットで記録]
+    
+    CheckFiles -->|Yes| Verify[コンテキストを検証]
+    Verify --> CheckTaskType{タスクタイプを確認}
+
+    CheckTaskType -->|リファクタリング| ReadTechnicalNotes[backend_technical_notes.mdとfrontend_technical_notes.mdを読む]
+    ReadTechnicalNotes --> Strategy[戦略を立案]
+    
+    CheckTaskType -->|その他| Strategy[戦略を立案]
+    Strategy --> Present[アプローチを提示]
+```
+
+   - memory-bank/core/ のファイルを読み、状況を把握
+   - 新しい実装を開始するとき、またはリファクタリングタスクを実施する際は `implementationDetails.md`, `backend_technical_notes.md`, `frontend_technical_notes.md` を必ず確認すること
+   - 計画を立案し、チャットにまとめる
+
+2. **Act Mode**:
+
+```mermaid
+flowchart TD
+    Start[開始] --> Context[Memory Bankをチェック]
+    Context --> Update[ドキュメントを更新]
+    Update --> Rules[必要なら.clinerulesを更新]
+    Rules --> Execute[タスクを実行]
+    Execute --> Document[変更を記録]
+```
+
+   - 必要に応じてドキュメント更新 (`activeContext.md`や`progress.md`など)
+   - コード等の修正やテストを実施
+   - 大きな変更があれば「update memory bank」コマンドで再整理
+
+3. **Debug Mode** (KT法・チェックリスト方式):
+
+- **目的:**
+  - バグや予期せぬ問題が発生した際に、KT法（ケプナー・トリゴー法）を用いて体系的かつ効率的に根本原因を特定する
+
+- **トリガー:**
+  - ユーザーからのバグ報告。
+  - テスト失敗や監視アラートなど、予期せぬ動作を検知した場合
+
+```mermaid
+flowchart TD
+    subgraph "Phase 1: 調査 & 仮説立案"
+        A[問題発生] --> B[自律調査 (Memory Bank, Git, Code)];
+        B --> C[調査結果に基づき複数の仮説を立案];
+    end
+
+    subgraph "Phase 2: チェックリスト化と記録"
+        C --> D[仮説をMarkdownチェックリスト形式で整形];
+        D --> E[activeContext.mdに「仮説チェックリスト」として追記];
+    end
+
+    subgraph "Phase 3: 体系的な仮説検証"
+        E --> F{チェックリストの先頭から検証開始};
+        F --> G[検証内容を宣言 (例: 「仮説1を検証します」)];
+        G --> H[ツール(grep等)を使い検証実行];
+        H --> I{仮説は正しかったか？};
+        I -- Yes --> J[原因特定];
+        I -- No --> K[チェックリストを更新 (例: [x]と結果を記載)];
+        K --> L{他に未検証の仮説は？};
+        L -- Yes --> F;
+        L -- No --> M[情報不足。ユーザーに追加質問];
+    end
+
+    subgraph "Phase 4: 完了と記録"
+        J --> N[対策案を立案し提示];
+        N --> O[最終結果をprogress.mdに記録];
+    end
+```
+
+   - 必要に応じてドキュメント更新 (`activeContext.md`や`progress.md`など)
+   - コード等の修正やテストを実施
+   - 大きな変更があれば「update memory bank」コマンドで再整理
+
+
+### ドキュメント更新時の留意
+
+- 実装内容は最初に `activeContext.md` に記載する。
+    - `activeContext.md` は常に「今フォーカス中のタスク・変更点・次のTODO」程度に留める。
+- その後、必要に応じて `progress.md` に移動する（実装済み機能として）。
+- メモリバンクを更新する際は **すべてのコアファイルを精査** し、詳細は `details/` に移動
+
+### メモリバンクのアーカイブ
+
+**【重要】メモリバンク(Memory Bank)アーカイブの目的：coreディレクトリの徹底的な軽量化**
+
+coreディレクトリは、プロジェクトの**最新の状況を「一目で把握」** できるように、**徹底的に軽量化** することを目的とします。
+
+- **coreディレクトリに置くもの**: 現在進行中の作業に必要な「**最新の要約**」「**現在の焦点**」「**今後の計画**」など、頻繁に参照する、ごく最小の情報のみ。
+- **archives/ や details/ に移動するもの**: 過去の履歴、実装の詳細、過去の議論など、coreディレクトリの軽量化を阻害する、参照頻度の低い情報。
+
+**coreディレクトリを軽量化することで、以下のメリットが期待できます**:
+- 情報過多による認知負荷の軽減
+- 重要な情報への迅速なアクセス
+- プロジェクト状況の俯瞰的な把握の容易化
+
+**「coreディレクトリは常にスッキリと」** を心がけ、積極的にアーカイブを行い、軽量化に努めてください。
+
+- Memory Bankのアーカイブは、`archive_memory_bank.sh` シェルスクリプトを実行することで行う。
+  - シェルスクリプトは現在の年月日（YYYY/MM/DD）を自動で判断し、`memory-bank/archives/YYYY/MM/` ディレクトリにアーカイブファイルを生成する。
+  - `progress.md` の内容は `memory-bank/archives/YYYY/MM/progress_archive_YYYYMM.md` の末尾に追記される。
+  - `activeContext.md` の内容は `memory-bank/archives/YYYY/MM/activeContext_archive_YYYYMM.md` の末尾に追記される。
+  - アーカイブ後、`progress.md` と `activeContext.md` は雛形の内容で上書きされる。
+- `archive_memory_bank.sh` 実行後、AIはアーカイブされた `progress_archive_YYYYMM.md` と `activeContext_archive_YYYYMM.md` を読み込み、まだ必要な情報（未完了タスク、既知の問題、現在のフォーカス、次のステップなど）を `memory-bank/core/progress.md` と `memory-bank/core/activeContext.md` に追記し直す。
+- アーカイブしたファイルへのリンクは、元のファイルから参照できるようにしておく。
+
+### プロジェクトの知識ベース (.clinerules) で記録する内容
+
+- プロジェクト固有のコーディング方針や命名規則
+- ユーザーやチームの好み、ワークフロー
+- ツール実行ポリシー（テスト、lint、差分出力など）
+
+**詳細なポリシー、手順、サンプルコードは `memory-bank/core/rulesExtras.md` を参照してください。**
+
+---
+
+ ## 主な運用ルール
+
+ ### Git操作関連
+ - **作業ブランチの作成とチェックアウト**:
+     - **すべてのタスクを開始する前に、必ず新しい作業ブランチを作成し、そのブランチにチェックアウトすること。**
+     - ブランチ名は `issues/[issue番号]_[英語の説明]` の形式とする。
+     - 例: `issues/123_add_new_feature`
+ - **ブランチ命名規則**:
+     - 新機能開発をissueベースで行う場合、gitのブランチは `issues/[issue番号]_[英語の説明]` の形式とする。
+     - 例: `issues/123_add_new_feature`
+ - **コミット単位**:
+     - 適切な単位（例：チェックリストのタスク単位）でコミットを行う。
+ - **Git操作時のパス**:
+     - `git_add`や`git_commit`などのGit操作ツールを使用する際は、`repo_path`に現在の作業ディレクトリの絶対パスを常に指定すること。
+ - **プルリクエスト**:
+     - タスク完了後、プルリクエストを作成する。
+ - **プルリクエストのクローズ**:
+     - 開発完了時のプルリクエストの内容には `fix #[issue番号]` を必ず追加し、マージと同時に対応するissueがクローズするようにする。
+     - 例: `fix #123`
+
+ ### Memory Bank関連
+ - **絶対パスの使用**:
+     - memory-bank内を参照するときは `/home/forbarbazz/memory-bank/...` のように必ずルートから始まるパスを用いる
+ - **Memory Bank更新時のGit操作**:
+     - `update memory bank`コマンドを実行する際は、必ず変更をGitにコミットし、リモートリポジトリにプッシュすること。
+     - **【重要】プッシュ忘れに注意！** `update memory bank`を実行したら、必ず`git push`まで完了させること。
+     - もしIssue番号が指定されている場合（例: `update memory bank --issue 123`）、そのIssueにMemory Bankの更新内容を要約したコメントを追加すること。
+
+ ### コード調査・出力関連
+ - **差分出力の優先**:
+     - コード修正は基本的に差分形式か、最小限の抜粋で提示する
+ - **コード調査**: コード検索には `git grep` や `find` を使用 (詳細は `rulesExtras.md` を参照)
+ - **`edit_file` 効果的な利用ガイドライン**:
+     大規模ファイル (> 300-400行目安) や複雑な変更 (複数箇所、広範囲リファクタリング) で `edit_file` が失敗することがあります。以下を試してください:
+     1.  **スコープ限定:** 指示は「関数 `X` を修正」「構造体 `Y` を変更」のように具体的に限定する。
+     2.  **変更量削減:** 複数の変更は、関連性の高い1-2個ずつ複数回の `edit_file` に分割する。
+     3.  **適切なコンテキスト:** 変更箇所の特定に必要な最小限の周辺コード (`// ... existing code ...` の前後) を含める。
+     4.  **(根本対策) ファイル分割:** 可能であれば、ファイルをより小さく機能的に分割する。
+
+ ### その他
+ - **テストケース名の規約**:
+     - テストケースの `name` フィールドは英語で記述する。
+     - テストケースの `name` フィールドには `()` や `,` を使用しない。
+ - **コマンド実行時の注意**:
+     - コマンド実行時にはXMLエスケープ文字（例: `&`）を使用せず、直接 `&` などを使用する。
+
+---
+
+**重要**:
+- **セッションが切り替わるたびに私は完全に新しい状態になる。**
+- **Memory Bankが唯一の過去作業を理解する手段**。
+- **コアファイルはなるべく軽量に保ち、詳細はdetails/へ**
