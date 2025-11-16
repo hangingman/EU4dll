@@ -1,16 +1,23 @@
-all:
+.PHONY: all test clean hijack run help
+
+.DEFAULT_GOAL := help
+
+help: ## Show this help.
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\x1b[36m%-20s\x1b[0m %s\n", $$1, $$2}'
+
+all: ## Build the project using dub.
 	dub build
 
-test:
+test: ## Run unit tests for the project.
 	dub build --build=unittest
 	dub test --build=unittest -- --threads=1
 
-clean:
+clean: ## Clean the project build files.
 	dub clean
 
 # https://github.com/Ai-Himmel/Linux-so-hijack
 # .so file hijack
-hijack:
+hijack: ## Build a dummy executable and test .so file hijacking.
 	dmd dummy.d -ofdummy
 
 	@echo "--- test exe ---"
@@ -27,7 +34,7 @@ hijack:
 #
 EU4_DIR := ~/.steam/debian-installation/steamapps/common/Europa\ Universalis\ IV/
 
-run: all
+run: all ## Copy the built .so to EU4 directory and run EU4 with it.
 	@echo "--- copy eu4dll.so ---"
 	cp -f ./libeu4dll.so $(EU4_DIR)
 	@echo "--- run eu4 ---"
