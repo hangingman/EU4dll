@@ -1,0 +1,4 @@
+description = "MCPツールのfetchを使い、対象URLを取得する"
+prompt = """
+MCPツールのfetchコマンドを使って、指定されたURLのコンテンツを取得してください。
+"""

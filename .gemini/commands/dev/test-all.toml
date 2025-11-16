@@ -1,0 +1,5 @@
+description = "すべてのサービス (app と restate) のユニットテストを実行します。"
+prompt = """
+すべてのサービス (app と restate) のユニットテストを実行します。テストが失敗した場合、修正を試みてください。
+"""
+command = "make test-all"

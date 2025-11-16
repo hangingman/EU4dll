@@ -1,0 +1,7 @@
+description = "すべてのサービス (app と restate) で `lint:fix` を実行し、自動修正可能なLintingの問題を修正します。"
+prompt = """
+すべてのサービス (app と restate) で `make lint-all` を実行します。これにより、自動修正可能なLintingの問題が修正されます。
+
+修正後、変更内容をコミットしてください。
+"""
+command = "make lint-all"

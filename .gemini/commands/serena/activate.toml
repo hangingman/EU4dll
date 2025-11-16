@@ -1,0 +1,4 @@
+description = "Serenaを有効化します。"
+prompt = """
+Serena MCPツールを使うために `activate_project({"project":"<< 指定されたプロジェクト名 >>"})` を実行してください。
+"""

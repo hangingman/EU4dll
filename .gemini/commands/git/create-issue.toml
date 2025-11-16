@@ -1,0 +1,10 @@
+description = "説明をもとに、GitHubにissueを起票します。"
+prompt = """
+以下の課題を解決するためのissueを起票してください。
+
+Issue：
+```
+<ここにIssueの内容を貼り付け>
+```
+
+"""
