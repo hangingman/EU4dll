@@ -12,17 +12,11 @@ jobs:
 
     steps:
     - name: Get source
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
-    - uses: dlang-community/setup-dlang@v1
+    - uses: dlang-community/setup-dlang@v1.4.0
       with:
         compiler: dmd-latest
-
-    - name: Install build tools
-      uses: awalsh128/cache-apt-pkgs-action@v1.1.0
-      with:
-        packages: make
-        version: 1.0
 
     - name: Build
       run: make
