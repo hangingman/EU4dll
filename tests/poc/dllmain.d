@@ -29,10 +29,8 @@ void hijackProcess()
         {
             getModuleRanges(mmf);
             setPattern("48 65 6c 6c 6f"); // Hello
-            findIndexes(binPath.toString());
-            writeln(_results.length);
-            writeln(_results[0].address);
-            //assert(_results.length == 1);
-            //assert(_results[0].address == 1);
+            findIndexes(mmf[]);
+            assert(_results.length == 1);
+            assert(_results[0].address > 0); // アドレスは0より大きいことを確認
         }
 }

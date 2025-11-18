@@ -65,10 +65,10 @@ unittest
             // ELFを検索
             setModule(binPath.toString());
             setPattern("45 4C 46");
-            _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
+            _ranges = make!Array(SectionRange(0, 100, 0)); // fileOffset, size, virtualAddress
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
-            _results[0].address.should.equal(1);
+            _results[0].address.should.equal(1); // fileOffset + index
         }
 
     with (b)
@@ -76,10 +76,10 @@ unittest
             // E?Fを検索
             setModule(binPath.toString());
             setPattern("45 ?? 46");
-            _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
+            _ranges = make!Array(SectionRange(0, 100, 0)); // fileOffset, size, virtualAddress
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
-            _results[0].address.should.equal(1);
+            _results[0].address.should.equal(1); // fileOffset + index
         }
 
 }
@@ -178,11 +178,13 @@ unittest
             assert(_ranges.length==2);
 
             // text
-            assert(_ranges[0].first == 88160);
-            assert(_ranges[0].second == 901916);
+            assert(_ranges[0].fileOffset == 88160);
+            assert(_ranges[0].size == 813756);
+            assert(_ranges[0].virtualAddress == 88160);
             // rodata
-            assert(_ranges[1].first == 901952);
-            assert(_ranges[1].second == 993632);
+            assert(_ranges[1].fileOffset == 901952);
+            assert(_ranges[1].size == 91680);
+            assert(_ranges[1].virtualAddress == 901952);
         }
 
     with (b)
@@ -192,10 +194,12 @@ unittest
             assert(_ranges.length==2);
 
             // text
-            assert(_ranges[0].first == 88160);
-            assert(_ranges[0].second == 901916);
+            assert(_ranges[0].fileOffset == 88160);
+            assert(_ranges[0].size == 813756);
+            assert(_ranges[0].virtualAddress == 88160);
             // rodata
-            assert(_ranges[1].first == 901952);
-            assert(_ranges[1].second == 993632);
+            assert(_ranges[1].fileOffset == 901952);
+            assert(_ranges[1].size == 91680);
+            assert(_ranges[1].virtualAddress == 901952);
         }
 }

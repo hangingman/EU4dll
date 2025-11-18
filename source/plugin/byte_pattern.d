@@ -27,7 +27,7 @@ import cerealed;
 import std.mmfile;
 
 
-alias PtRange = Tuple!(uintptr_t, "first", uintptr_t, "second");
+alias SectionRange = Tuple!(size_t, "fileOffset", size_t, "size", uintptr_t, "virtualAddress");
 alias Pat = Tuple!(uint8_t, "pattern", uint8_t, "mask");
 alias Patterns = Pat[];
 alias Bytes = ubyte[];
@@ -39,7 +39,7 @@ class BytePattern
     mixin singleton;
 
     Bytes[string] _contents;
-    Array!(PtRange) _ranges;
+    Array!(SectionRange) _ranges;
     Patterns _maskedPattern;
     Array!(MemoryPointer) _results;
     string _literal;
@@ -192,16 +192,14 @@ class BytePattern
         _ranges.clear();
 
         foreach (section; elf.sections) {
-            PtRange range;
-            auto secSize = section.size;
-            range.first = section.address;
-
             if (section.name == ".text" || section.name == ".rodata")
-                {
-                    // .text, .rodataのセクションの範囲を取得する
-                    range.second = range.first + secSize;
-                    _ranges.insert(range);
-                }
+            {
+                SectionRange range;
+                range.fileOffset = section.offset;
+                range.size = section.size;
+                range.virtualAddress = section.address;
+                _ranges.insertBack(range);
+            }
         }
     }
 
@@ -229,7 +227,11 @@ class BytePattern
 
     void findIndexes(string binPath = thisExePath())
     {
-        const Bytes contents = binToRange(binPath).dup;
+        findIndexes(binToRange(binPath));
+    }
+
+    void findIndexes(in ubyte[] contents)
+    {
         const Patterns pattern = this._maskedPattern.dup;
         const size_t patternLen = this._maskedPattern.length;
         this._results.clear();
@@ -243,7 +245,7 @@ class BytePattern
             {
                 debug {
                     writeln(mixin(interp!"module size: ${contents.length}"));
-                    writeln(mixin(interp!"[${range.first} .. ${range.second}]"));
+                    writeln(mixin(interp!"[${range.fileOffset} .. ${range.fileOffset + range.size}]"));
 
                     writeln("pattern:");
                     writeln(pattern.map!(d => to!string(d.pattern, 16) ));
@@ -251,7 +253,7 @@ class BytePattern
                     writeln(pattern.map!(d => to!string(d.mask, 16) ));
                 }
 
-                auto section = contents[range.first .. range.second];
+                auto section = contents[range.fileOffset .. range.fileOffset + range.size];
                 ptrdiff_t index = countUntil!((a, b)
                                               {
                                                   return (a & b.mask) == (b.pattern & b.mask);
@@ -259,10 +261,10 @@ class BytePattern
 
                 if (index != -1)
                     {
-                        MemoryPointer m = new MemoryPointer(range.first + index, patternLen);
-                        this._results.insert(m);
+                        MemoryPointer m = new MemoryPointer(range.virtualAddress + index, patternLen);
+                        this._results.insertBack(m);
                         debug {
-                            writeln((range.first + index).format!"Found on: %d");
+                            writeln((range.virtualAddress + index).format!"Found on: %d");
                             writeln(section[index .. index + patternLen].map!(d => to!string(d, 16) ));
                         }
                     }

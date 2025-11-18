@@ -12,11 +12,14 @@ void patch_memory(void* address, const ubyte[] data)
 {
     import core.sys.posix.unistd;
     long pageSize = sysconf(_SC_PAGESIZE);
+    enforce(pageSize != -1, "sysconf(_SC_PAGESIZE) failed");
 
     void* pageAddress = cast(void*)(cast(size_t)address & ~(pageSize - 1));
+    void* endAddress = cast(void*)(cast(size_t)address + data.length);
+    size_t len = cast(size_t)endAddress - cast(size_t)pageAddress;
 
     // (a) 書き込み権限付与
-    enforce(mprotect(pageAddress, pageSize, PROT_READ | PROT_WRITE) == 0, "mprotect for write failed");
+    enforce(mprotect(pageAddress, len, PROT_READ | PROT_WRITE) == 0, "mprotect for write failed");
 
     // (b) パッチ書き込み
     memcpy(address, data.ptr, data.length);
@@ -25,7 +28,7 @@ void patch_memory(void* address, const ubyte[] data)
     atomicFence();
 
     // (c) 実行権限復元
-    enforce(mprotect(pageAddress, pageSize, PROT_READ | PROT_EXEC) == 0, "mprotect for execute failed");
+    enforce(mprotect(pageAddress, len, PROT_READ | PROT_EXEC) == 0, "mprotect for execute failed");
 }
 
 /// RAIIでメモリパッチを管理する構造体 (Structを使用)
