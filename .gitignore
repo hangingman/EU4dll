@@ -268,3 +268,5 @@ __pycache__/
 *.o
 dummy
 .ccls-cache/
+.gemini/extensions/**/*.json
+tests/eu4dll
