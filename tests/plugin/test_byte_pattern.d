@@ -12,6 +12,7 @@ import std.file;
 import std.array;
 import std.container;
 import fluent.asserts;
+import std.mmfile;
 
 
 @("default constructor")
@@ -38,7 +39,7 @@ unittest
 {
     auto b = BytePattern.tempInstance();
     b.hexToUTF8("48656c6c6f20576f726c6421").should.equal("Hello World!");
-    b.hexToUTF8("48 65 6C 6C 6F 20 57 6F 72 6C 64 21").should.equal("Hello World!");    
+    b.hexToUTF8("48 65 6C 6C 6F 20 57 6F 72 6C 64 21").should.equal("Hello World!");
     b.hexToUTF8("45 55 34 20 76 31 2E ? ? 2E ?").should.equal("EU4 v1.**.*");
 }
 
@@ -63,22 +64,22 @@ unittest
         {
             // ELFを検索
             setModule(binPath.toString());
-            setPattern("45 4C 46"); 
-            _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
+            setPattern("45 4C 46");
+            _ranges = make!Array(SectionRange(0, 100, 0)); // fileOffset, size, virtualAddress
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
-            _results[0].address.should.equal(1);
-            }
+            _results[0].address.should.equal(1); // fileOffset + index
+        }
 
     with (b)
         {
             // E?Fを検索
             setModule(binPath.toString());
-            setPattern("45 ?? 46"); 
-            _ranges = make!Array(PtRange(0, 100)); // 本来はヘッダ部分は検索しないがテストのため
+            setPattern("45 ?? 46");
+            _ranges = make!Array(SectionRange(0, 100, 0)); // fileOffset, size, virtualAddress
             findIndexes(binPath.toString());
             _results.length.should.equal(1);
-            _results[0].address.should.equal(1);
+            _results[0].address.should.equal(1); // fileOffset + index
         }
 
 }
@@ -113,13 +114,13 @@ unittest
 {
     Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest1.log");
     tryRemove(logFilePath);
-    
+
     auto b = new BytePattern();
     b.startLog("unittest1");
     b.debugOutput("Hello,EU4!");
-    
+
     assert(existsAsFile(logFilePath.toString()));
-    
+
     const string[] logs = readText(logFilePath.toString()).split("\n");
     assert(logs !is null);
     assert(logs.length == 3);
@@ -132,14 +133,14 @@ unittest
 {
     Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest2.log");
     tryRemove(logFilePath);
-    
+
     auto b = new BytePattern();
     b.startLog("unittest2");
     b._literal = "48656C6C6F20576F726C6421";
     b.debugOutput();
-    
+
     assert(existsAsFile(logFilePath.toString()));
-    
+
     const string[] logs = readText(logFilePath.toString()).split("\n");
     assert(logs !is null);
     assert(logs.length == 5);
@@ -164,28 +165,41 @@ unittest
     assert(b.empty());
 }
 
-// @("setModule")
-// unittest
-// {
-//     MemoryPointer dll = new MemoryPointer(dlopen(null, RTLD_LAZY));
-//     assert(dll !is null);
-//     dll.address();
-// }
-
 @("getModuleRanges")
 unittest
 {
     // elf-Linux-lib-x64.so をテストする
     auto b = BytePattern.tempInstance();
     Path binPath = Path(__FILE__).up().up() ~ "elf-Linux-lib-x64.so";
-    b.getModuleRanges(binPath.toString());
 
-    assert(b._ranges.length==2);
+    with (b)
+        {
+            getModuleRanges(binPath.toString());
+            assert(_ranges.length==2);
 
-    // text
-    assert(b._ranges[0].first == 88160);
-    assert(b._ranges[0].second == 901916);
-    // rodata
-    assert(b._ranges[1].first == 901952);
-    assert(b._ranges[1].second == 993632);
+            // text
+            assert(_ranges[0].fileOffset == 88160);
+            assert(_ranges[0].size == 813756);
+            assert(_ranges[0].virtualAddress == 88160);
+            // rodata
+            assert(_ranges[1].fileOffset == 901952);
+            assert(_ranges[1].size == 91680);
+            assert(_ranges[1].virtualAddress == 901952);
+        }
+
+    with (b)
+        {
+            MmFile mmf = new MmFile(binPath.toString(), MmFile.Mode.read, 0, null);
+            getModuleRanges(mmf);
+            assert(_ranges.length==2);
+
+            // text
+            assert(_ranges[0].fileOffset == 88160);
+            assert(_ranges[0].size == 813756);
+            assert(_ranges[0].virtualAddress == 88160);
+            // rodata
+            assert(_ranges[1].fileOffset == 901952);
+            assert(_ranges[1].size == 91680);
+            assert(_ranges[1].virtualAddress == 901952);
+        }
 }
