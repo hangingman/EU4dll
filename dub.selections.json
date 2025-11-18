@@ -2,7 +2,7 @@
 	"fileVersion": 1,
 	"versions": {
 		"cerealed": "0.6.11",
-		"concepts": "0.0.8",
+		"concepts": "0.0.9",
 		"ddmp": "0.0.1-0.dev.3",
 		"elf-d": "0.2.5",
 		"fluent-asserts": "0.13.3",
