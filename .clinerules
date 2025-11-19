@@ -20,7 +20,8 @@ memory-bank/
   ├─ 06_git_workflow.md                         # Gitのブランチ運用ルール
   ├─ 07_ai_workflow.md                          # AIアシスタントとの協業ワークフロー
   ├─ 07_commit_message_guidelines.md            # コミットメッセージの規約
-  └─ 08_conversation_guidelines.md              # AIアシスタントとの会話ガイドライン
+  ├─ 08_conversation_guidelines.md              # AIアシスタントとの会話ガイドライン
+  └─ linux_development_notes.md                 # Linux開発に関するメモ
 ```
 
 <if_tool_exists tool="filesystem">
@@ -42,6 +43,7 @@ memory-bank/
     "/<Current Working Directory>/memory-bank/07_ai_workflow.md",
     "/<Current Working Directory>/memory-bank/07_commit_message_guidelines.md",
     "/<Current Working Directory>/memory-bank/08_conversation_guidelines.md",
+    "/<Current Working Directory>/memory-bank/linux_development_notes.md"
   ]
 }
 </if_tool_exists>

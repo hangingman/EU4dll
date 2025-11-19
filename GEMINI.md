@@ -23,3 +23,4 @@ Europa Universalis IVで2バイト文字を表示可能にするDLLです。
 @./memory-bank/07_ai_workflow.md
 @./memory-bank/07_commit_message_guidelines.md
 @./memory-bank/08_conversation_guidelines.md
+@./memory-bank/linux_development_notes.md
