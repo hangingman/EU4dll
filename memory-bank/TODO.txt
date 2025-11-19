@@ -2,7 +2,7 @@
 
 ## 優先度: 高
 
--   [ ] `Plugin64/` ディレクトリ内の残りのC++ファイルをD言語に移植する。
+-   [x] `Plugin64/` ディレクトリ内の残りのC++ファイルをD言語に移植する。
     -   **入力・IME関連モジュール**
         -   `input.cpp` / `input_asm.asm`: テキスト入力フック、UTF-8変換。
         -   `ime.cpp` / `ime_asm.asm`: IME制御、再変換対応など。
@@ -16,13 +16,13 @@
         -   `map_view.cpp` / `map_view_asm.asm`: マップ上のテキスト表示。
         -   `map_adjustment.cpp` / `map_adjustment_asm.asm`: マップ文字位置調整。
         -   `map_justify.cpp` / `map_justify_asm.asm`: マップ文字均等割付。
-        -   `map_popup.cpp` / `map_popup_asm.asm`: ポップアップ表示調整。
-        -   `tooltip_and_button.cpp` / `tooltip_and_button_asm.asm`: ツールチップとボタンのUI調整。
-        -   `event_dialog.cpp` / `event_dialog_asm.asm`: イベントダイアログ修正。
+        -   [ ] `map_popup.cpp` / `map_popup_asm.asm`: ポップアップ表示調整。
+        -   [ ] `tooltip_and_button.cpp` / `tooltip_and_button_asm.asm`: ツールチップとボタンのUI調整。
+        -   [ ] `event_dialog.cpp` / `event_dialog_asm.asm`: イベントダイアログ修正。
     -   **システム・その他機能モジュール**
-        -   `file_save.cpp` / `file_save_asm.asm`: セーブデータ関連。
-        -   `options.cpp`: 設定ファイル (`plugin.ini`) 読み込み。
-        -   `dll_main.cpp`, `version.cpp`: DLLエントリーポイント、バージョン管理。
+        -   [ ] `file_save.cpp` / `file_save_asm.asm`: セーブデータ関連。
+        -   [ ] `options.cpp`: 設定ファイル (`plugin.ini`) 読み込み。
+        -   [ ] `dll_main.cpp`, `version.cpp`: DLLエントリーポイント、バージョン管理。
 -   [ ] Linux環境でのパッチ適用方法を `LD_PRELOAD` を利用した手法に移行する。
     -   `d3d9.dll` プロキシの代わりに、共有オブジェクト（`.so`）を `LD_PRELOAD` でロードする仕組みを実装する。
     -   Windows API (`VirtualProtect` など) に依存しているコードをLinux API (`mprotect(2)`, `dl_iterate_phdr(3)` など) を使用するように書き換える。
