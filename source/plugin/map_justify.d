@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void mapJustifyProc1();
@@ -56,8 +58,8 @@ DllError mapJustifyProc1Injector(RunOptions options) {
                 // cmp     word ptr [rdi+6], 0
                 mapJustifyProc1ReturnAddress1 = address + 0x1B;
 
-                // Injector::MakeJMP(address, cast(size_t)mapJustifyProc1, true);
-                writeln("Dummy JMP for mapJustifyProc1Injector called.");
+                PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapJustifyProc1));
+                writeln("JMP for mapJustifyProc1Injector created.");
             }
             else {
                 e.unmatchdMapJustifyProc1Injector = true;
@@ -103,8 +105,8 @@ DllError mapJustifyProc2Injector(RunOptions options) {
                 // cvtdq2ps xmm6, xmm6
                 mapJustifyProc2ReturnAddress = address + 0xF;
 
-                // Injector::MakeJMP(address, cast(size_t)mapJustifyProc2, true);
-                writeln("Dummy JMP for mapJustifyProc2Injector called.");
+                PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapJustifyProc2));
+                writeln("JMP for mapJustifyProc2Injector created.");
             }
             else {
                 e.unmatchdMapJustifyProc2Injector = true;
@@ -150,8 +152,8 @@ DllError mapJustifyProc4Injector(RunOptions options) {
                 // cmp     r13, rax
                 mapJustifyProc4ReturnAddress = address + 0x1E;
 
-                // Injector::MakeJMP(address, cast(size_t)mapJustifyProc4, true);
-                writeln("Dummy JMP for mapJustifyProc4Injector called.");
+                PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapJustifyProc4));
+                writeln("JMP for mapJustifyProc4Injector created.");
             }
             else {
                 e.unmatchdMapJustifyProc4Injector = true;

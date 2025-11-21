@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 // SDL_Rectに相当する構造体
 struct SDL_Rect {
@@ -67,18 +69,18 @@ DllError imeProc1Injector(RunOptions options) {
             // call {sub_xxxxx}
             // FIXME: Injector::GetBranchDestination に相当するD言語でのアドレス取得処理を実装する
             // imeProc1CallAddress = Injector.GetBranchDestination(address + 0x6).as_int();
-            imeProc1CallAddress = address + 0x07; // 仮のアドレス
+            imeProc1CallAddress = address + 0x06 + get_branch_destination_offset(cast(void*)(address + 0x06), 4); // 仮のアドレス
 
             // cmp     r13d, 0FFh
             imeProc1ReturnAddress1 = address + 0x13;
 
             // jz {xxxxx}
             // imeProc1ReturnAddress2 = Injector.GetBranchDestination(address - 0x19).as_int();
-            imeProc1ReturnAddress2 = address - 0x19; // 仮のアドレス
+            imeProc1ReturnAddress2 = address - 0x19 + get_branch_destination_offset(cast(void*)(address - 0x19), 4); // 仮のアドレス
 
-            // FIXME: Injector::MakeJMP に相当するD言語でのフック処理を実装する
-            // Injector.MakeJMP(address, cast(size_t)imeProc1, true);
-            writeln("Dummy JMP for imeProc1Injector called.");
+            // Injector::MakeJMP に相当するD言語でのフック処理を実装する
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)imeProc1));
+            writeln("JMP for imeProc1Injector created.");
         }
         else {
             e.unmatchdImeProc1Injector = true;
@@ -138,13 +140,13 @@ DllError imeProc2Injector(RunOptions options) {
 
             // jz {loc_xxxxx}
             // imeProc2ReturnAddress1 = Injector.GetBranchDestination(address + 0x6).as_int();
-            imeProc2ReturnAddress1 = address + 0x07; // 仮のアドレス
+            imeProc2ReturnAddress1 = address + 0x06 + get_branch_destination_offset(cast(void*)(address + 0x06), 4); // 仮のアドレス
 
             // jnz loc_xxxxx
             imeProc2ReturnAddress2 = address + 15;
 
-            // Injector::MakeJMP(address, cast(size_t)imeProc2, true);
-            writeln("Dummy JMP for imeProc2Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)imeProc2));
+            writeln("JMP for imeProc2Injector created.");
         }
         else {
             e.unmatchdImeProc2Injector = true;
@@ -155,11 +157,10 @@ DllError imeProc2Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("4D 89 39 48 8B 74 24 40");
         if (BytePattern.tempInstance().hasSize(1, "SDL_windowskeyboard.cの修正")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
-            // FIXME: Injector::WriteMemory に相当するD言語でのメモリ書き換え処理を実装する
-            // Injector.WriteMemory!ubyte(address, 0x90, true);
-            // Injector.WriteMemory!ubyte(address+1, 0x90, true);
-            // Injector.WriteMemory!ubyte(address+2, 0x90, true);
-            writeln("Dummy WriteMemory for imeProc2Injector (1) called.");
+            // Injector::WriteMemory に相当するD言語でのメモリ書き換え処理を実装する
+            // 0x90 は NOP 命令
+            PatchManager.instance().addPatch(cast(void*)address, [0x90, 0x90, 0x90]);
+            writeln("WriteMemory for imeProc2Injector (1) called.");
         }
         else {
             e.unmatchdImeProc2Injector = true;
@@ -173,9 +174,8 @@ DllError imeProc2Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "SDL_windowskeyboard.cの修正")) {
             // jz xxx -> jmp xxx
             size_t address = BytePattern.tempInstance().getFirst().address;
-            // Injector::WriteMemory!ubyte(address - 2, 0xEB, true);
-            // Injector::WriteMemory!ubyte(address - 1, 0x49, true);
-            writeln("Dummy WriteMemory for imeProc2Injector (2) called.");
+            PatchManager.instance().addPatch(cast(void*)(address - 2), [0xEB, 0x49]);
+            writeln("WriteMemory for imeProc2Injector (2) called.");
         }
         else {
             e.unmatchdImeProc2Injector = true;
@@ -223,29 +223,29 @@ DllError imeProc3Injector(RunOptions options) {
 
             // call {sub_xxxxx} / WindowsScanCodeToSDLScanCode
             // imeProc3CallAddress1 = Injector.GetBranchDestination(address + 0xA).as_int();
-            imeProc3CallAddress1 = address + 0x0B; // 仮のアドレス
+            imeProc3CallAddress1 = address + 0x0A + get_branch_destination_offset(cast(void*)(address + 0x0A), 4); // 仮のアドレス
 
             // call {sub_xxxxx} / SDL_GetKeyboardState
             // imeProc3CallAddress2 = Injector.GetBranchDestination(address + 0x13).as_int();
-            imeProc3CallAddress2 = address + 0x14; // 仮のアドレス
+            imeProc3CallAddress2 = address + 0x13 + get_branch_destination_offset(cast(void*)(address + 0x13), 4); // 仮のアドレス
 
             // call {sub_xxxxx} / ShouldGenerateWindowCloseOnAltF4
             // imeProc3CallAddress3 = Injector.GetBranchDestination(address + 0x36).as_int();
-            imeProc3CallAddress3 = address + 0x37; // 仮のアドレス
+            imeProc3CallAddress3 = address + 0x36 + get_branch_destination_offset(cast(void*)(address + 0x36), 4); // 仮のアドレス
 
             // call {sub_xxxxx} / SDL_SendWindowEvent
             // imeProc3CallAddress4 = Injector.GetBranchDestination(address + 0x50).as_int();
-            imeProc3CallAddress4 = address + 0x51; // 仮のアドレス
+            imeProc3CallAddress4 = address + 0x50 + get_branch_destination_offset(cast(void*)(address + 0x50), 4); // 仮のアドレス
 
             // call {sub_xxxxx} / SDL_SendKeyboardKey
             // imeProc3CallAddress5 = Injector.GetBranchDestination(address + 0x61).as_int();
-            imeProc3CallAddress5 = address + 0x62; // 仮のアドレス
+            imeProc3CallAddress5 = address + 0x61 + get_branch_destination_offset(cast(void*)(address + 0x61), 4); // 仮のアドレス
 
             // xor     edi, edi
             imeProc3ReturnAddress = address + 0x66;
 
-            // Injector::MakeJMP(address, cast(size_t)imeProc3, true);
-            writeln("Dummy JMP for imeProc3Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)imeProc3));
+            writeln("JMP for imeProc3Injector created.");
         }
         else {
             e.unmatchdImeProc3Injector = true;

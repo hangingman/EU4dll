@@ -24,21 +24,39 @@
         -   [x] `options.cpp`: 設定ファイル (`plugin.ini`) 読み込み。
         -   [x] `dll_main.cpp`, `version.cpp`: DLLエントリーポイント、バージョン管理。
 -   [ ] Linux環境でのパッチ適用方法を `LD_PRELOAD` を利用した手法に移行する。
-    -   `d3d9.dll` プロキシの代わりに、共有オブジェクト（`.so`）を `LD_PRELOAD` でロードする仕組みを実装する。
-    -   Windows API (`VirtualProtect` など) に依存しているコードをLinux API (`mprotect(2)`, `dl_iterate_phdr(3)` など) を使用するように書き換える。
-    -   パッチ実行の起点として `__attribute__((constructor))` を利用する。
-    -   `version/` プロジェクトの機能（DLLインジェクションの起点）を `LD_PRELOAD` 方式に適合させる。
+    -   [ ] `d3d9.dll` プロキシの代わりに、共有オブジェクト（`.so`）を `LD_PRELOAD` でロードする仕組みを実装する。
+    -   [ ] Windows API (`VirtualProtect` など) に依存しているコードをLinux API (`mprotect(2)`, `dl_iterate_phdr(3)` など) を使用するように書き換える。
+    -   [ ] パッチ実行の起点として `__attribute__((constructor))` を利用する。
+    -   [ ] `version/` プロジェクトの機能（DLLインジェクションの起点）を `LD_PRELOAD` 方式に適合させる。
     -   **計画**:
-        -   既存の `plugin.input`, `plugin.ime` などの `init` 関数における `Injector::MakeJMP` 相当のダミー実装を、`plugin.patcher.patcher.ScopedPatch` を利用した実際のパッチ適用に置き換える。
-        -   `plugin.byte_pattern.BytePattern` を使用して、Linux環境のELFバイナリから適切なアドレスを検索する。
-        -   `plugin.process.process.get_executable_memory_range` を活用し、必要に応じて実行可能ファイルのメモリ範囲を取得する。
+        -   [x] 既存の `plugin.input`, `plugin.ime` などの `init` 関数における `Injector::MakeJMP` 相当のダミー実装を、`plugin.patcher.patcher.ScopedPatch` を利用した実際のパッチ適用に置き換える。 (input.d は完了)
+        -   [ ] `plugin.byte_pattern.BytePattern` を使用して、Linux環境のELFバイナリから適切なアドレスを検索する。
+        -   [ ] `plugin.process.process.get_executable_memory_range` を活用し、必要に応じて実行可能ファイルのメモリ範囲を取得する。
+        -   [x] `plugin.ime.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.font.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.main_text.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.list_field_adjustment.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.date.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.localization.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.map_view.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.map_adjustment.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.map_justify.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.map_popup.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.tooltip_and_button.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.event_dialog.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.file_save.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.options.d` のダミー実装を `ScopedPatch` に置き換える。
+        -   [x] `plugin.plugin_version.d` のダミー実装を `ScopedPatch` に置き換える。
 -   [ ] Linux環境での動作検証とデバッグ。
-    -   `mprotect(2)` を利用したメモリパッチの安定性確認。
+    -   [ ] `mprotect(2)` を利用したメモリパッチの安定性確認。
+    -   [ ] `dub build` コマンドでプロジェクトをビルドし、エラーがないことを確認する。
+    -   [ ] `LD_PRELOAD` を使用してパッチが正しく適用され、ゲームが動作することを確認する。
+    -   [ ] 各機能が期待通りに動作することを確認する。
 -   [ ] **翻訳ファイルダウンローダーのPoC作成**
-    -   `tests/poc/downloader.d` の作成。
-    -   `std.net.curl` を使用したファイルのダウンロード機能の実装。
-    -   OSごとの適切な保存先パス（Linux: `~/.local/share/...`, Windows: `Documents/...`）の解決ロジック実装。
-    -   既存の `mod_download.cpp` / `claes.exe` 依存からの脱却準備。
+    -   [ ] `tests/poc/downloader.d` の作成。
+    -   [ ] `std.net.curl` を使用したファイルのダウンロード機能の実装。
+    -   [ ] OSごとの適切な保存先パス（Linux: `~/.local/share/...`, Windows: `Documents/...`）の解決ロジック実装。
+    -   [ ] 既存の `mod_download.cpp` / `claes.exe` 依存からの脱却準備。
 
 ## 優先度: 中
 

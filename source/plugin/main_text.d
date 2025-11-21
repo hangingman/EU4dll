@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void mainTextProc1();
@@ -51,8 +53,8 @@ DllError mainTextProc1Injector(RunOptions options) {
             // movss dword ptr [rpb+108h], xmm3
             mainTextProc1ReturnAddress = address + 0x1B;
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc1, true);
-            writeln("Dummy JMP for mainTextProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc1));
+            writeln("JMP for mainTextProc1Injector created.");
         }
         else {
             e.unmatchdMainTextProc1Injector = true;
@@ -90,11 +92,10 @@ DllError mainTextProc2Injector(RunOptions options) {
             mainTextProc2ReturnAddress = address + 0x1D;
 
             // lea r9, {unk_XXXXX}
-            // mainTextProc2BufferAddress = Injector::GetBranchDestination(address + 0x0F).as_int();
-            mainTextProc2BufferAddress = address + 0x10; // 仮のアドレス
+            mainTextProc2BufferAddress = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc2_v131, true);
-            writeln("Dummy JMP for mainTextProc2Injector (v131) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc2_v131));
+            writeln("JMP for mainTextProc2Injector (v131) created.");
         }
         else {
             e.unmatchdMainTextProc2Injector = true;
@@ -119,11 +120,10 @@ DllError mainTextProc2Injector(RunOptions options) {
             mainTextProc2ReturnAddress = address + 0x1E;
 
             // lea r9, {unk_XXXXX}
-            // mainTextProc2BufferAddress = Injector::GetBranchDestination(address + 0x10).as_int();
-            mainTextProc2BufferAddress = address + 0x11; // 仮のアドレス
+            mainTextProc2BufferAddress = address + 0x10 + get_branch_destination_offset(cast(void*)(address + 0x10), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc2, true);
-            writeln("Dummy JMP for mainTextProc2Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc2));
+            writeln("JMP for mainTextProc2Injector created.");
         }
         else {
             e.unmatchdMainTextProc2Injector = true;
@@ -163,8 +163,8 @@ DllError mainTextProc3Injector(RunOptions options) {
             // cvtdq2ps xmm1,xmm1
             mainTextProc3ReturnAddress1 = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc3, true);
-            writeln("Dummy JMP for mainTextProc3Injector (v133) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc3));
+            writeln("JMP for mainTextProc3Injector (v133) created.");
         }
         else {
             e.unmatchdMainTextProc3Injector = true;
@@ -195,8 +195,8 @@ DllError mainTextProc3Injector(RunOptions options) {
             // cvtdq2ps xmm1,xmm1
             mainTextProc3ReturnAddress1 = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc3, true);
-            writeln("Dummy JMP for mainTextProc3Injector (v131) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc3));
+            writeln("JMP for mainTextProc3Injector (v131) created.");
         }
         else {
             e.unmatchdMainTextProc3Injector = true;
@@ -229,8 +229,8 @@ DllError mainTextProc3Injector(RunOptions options) {
             // cvtdq2ps xmm1,xmm1
             mainTextProc3ReturnAddress1 = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc3, true);
-            writeln("Dummy JMP for mainTextProc3Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc3));
+            writeln("JMP for mainTextProc3Injector created.");
         }
         else {
             e.unmatchdMainTextProc3Injector = true;
@@ -276,8 +276,8 @@ DllError mainTextProc4Injector(RunOptions options) {
             // jz loc_xxxxx
             mainTextProc4ReturnAddress = address + 0x10;
 
-            // Injector::MakeJMP(address, cast(size_t)mainTextProc4, true);
-            writeln("Dummy JMP for mainTextProc4Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mainTextProc4));
+            writeln("JMP for mainTextProc4Injector created.");
         }
         else {
             e.unmatchdMainTextProc4Injector = true;

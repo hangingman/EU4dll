@@ -4,6 +4,8 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void listFieldAdjustmentProc1();
@@ -41,8 +43,8 @@ DllError listFieldAdjustmentProc1Injector(RunOptions options) {
             // jz loc_xxxxx
             listFieldAdjustmentProc1ReturnAddress = address + 0x18;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc1_v1315, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc1Injector (v1_31_5+) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc1_v1315));
+            writeln("JMP for listFieldAdjustmentProc1Injector (v1_31_5+) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc1Injector = true;
@@ -60,8 +62,8 @@ DllError listFieldAdjustmentProc1Injector(RunOptions options) {
             // jz loc_xxxxx
             listFieldAdjustmentProc1ReturnAddress = address + 0x18;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc1_v131, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc1Injector (v1_31_1-4) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc1_v131));
+            writeln("JMP for listFieldAdjustmentProc1Injector (v1_31_1-4) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc1Injector = true;
@@ -83,8 +85,8 @@ DllError listFieldAdjustmentProc1Injector(RunOptions options) {
             // jz loc_xxxxx
             listFieldAdjustmentProc1ReturnAddress = address + 0x19;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc1, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc1Injector (v1_29/30) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc1));
+            writeln("JMP for listFieldAdjustmentProc1Injector (v1_29/30) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc1Injector = true;
@@ -119,13 +121,12 @@ DllError listFieldAdjustmentProc2Injector(RunOptions options) {
             // 0F 8D 20 02 00 00 is JGE rel32. 
             // address+9 is where the JGE instruction starts.
             // We need to read the offset and add it.
-            // For now, just a placeholder or dummy value as we are not executing.
+            listFieldAdjustmentProc2V1315ReturnAddress = address + 0x09 + get_branch_destination_offset(cast(void*)(address + 0x09), 4);
             
-            // 
             listFieldAdjustmentProc2ReturnAddress = address + 0x0F;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc2_v1315, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc2Injector (v1_31_5+) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc2_v1315));
+            writeln("JMP for listFieldAdjustmentProc2Injector (v1_31_5+) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc2Injector = true;
@@ -143,8 +144,8 @@ DllError listFieldAdjustmentProc2Injector(RunOptions options) {
             // jge     loc_xxxxx
             listFieldAdjustmentProc2ReturnAddress = address + 0x10;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc2_v131, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc2Injector (v1_31_1-4) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc2_v131));
+            writeln("JMP for listFieldAdjustmentProc2Injector (v1_31_1-4) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc2Injector = true;
@@ -166,8 +167,8 @@ DllError listFieldAdjustmentProc2Injector(RunOptions options) {
             // jge     loc_xxxxx
             listFieldAdjustmentProc2ReturnAddress = address + 0x10;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc2, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc2Injector (v1_29/30) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc2));
+            writeln("JMP for listFieldAdjustmentProc2Injector (v1_29/30) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc2Injector = true;
@@ -197,8 +198,8 @@ DllError listFieldAdjustmentProc3Injector(RunOptions options) {
             // call sub_xxxxx
             listFieldAdjustmentProc3ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc3_v1315, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc3Injector (v1_31_5+) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc3_v1315));
+            writeln("JMP for listFieldAdjustmentProc3Injector (v1_31_5+) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc3Injector = true;
@@ -224,8 +225,8 @@ DllError listFieldAdjustmentProc3Injector(RunOptions options) {
             // call sub_xxxxx
             listFieldAdjustmentProc3ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, listFieldAdjustmentProc3, true);
-            writeln("Dummy JMP for listFieldAdjustmentProc3Injector (v1_29-31_4) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)listFieldAdjustmentProc3));
+            writeln("JMP for listFieldAdjustmentProc3Injector (v1_29-31_4) created.");
         }
         else {
             e.unmatchdListFieldAdjustmentProc3Injector = true;

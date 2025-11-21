@@ -4,6 +4,8 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void eventDialogProc1();
@@ -46,8 +48,8 @@ DllError eventDialog1Injector(RunOptions options) {
             // jz      loc_xxxxx
             eventDialogProc1ReturnAddress = address + 0x14;
 
-            // Injector::MakeJMP(address, eventDialogProc1, true);
-            writeln("Dummy JMP for eventDialog1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc1));
+            writeln("JMP for eventDialog1Injector created.");
         }
         else {
             e.unmatchdEventDialog1Injector = true;
@@ -64,8 +66,8 @@ DllError eventDialog1Injector(RunOptions options) {
             // jz      loc_xxxxx
             eventDialogProc1ReturnAddress = address + 0x14;
 
-            // Injector::MakeJMP(address, eventDialogProc1V132, true);
-            writeln("Dummy JMP for eventDialog1Injector (v1_32_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc1V132));
+            writeln("JMP for eventDialog1Injector (v1_32_plus) created.");
         }
         else {
             e.unmatchdEventDialog1Injector = true;
@@ -114,8 +116,8 @@ DllError eventDialog2Injector(RunOptions options) {
             // movd    xmm0, [rsp+378h+arg_8]
             eventDialogProc2ReturnAddress1 = address + 0x0F;
 
-            // Injector::MakeJMP(address, eventDialogProc2, true);
-            writeln("Dummy JMP for eventDialog2Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc2));
+            writeln("JMP for eventDialog2Injector created.");
         }
         else {
             e.unmatchdEventDialog2Injector = true;
@@ -141,8 +143,8 @@ DllError eventDialog2Injector(RunOptions options) {
             // movd    xmm0, [rsp+11158h+arg_8]
             eventDialogProc2ReturnAddress1 = address + 0x0F;
 
-            // Injector::MakeJMP(address, eventDialogProc2, true);
-            writeln("Dummy JMP for eventDialog2Injector (v1_32_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc2));
+            writeln("JMP for eventDialog2Injector (v1_32_plus) created.");
         }
         else {
             e.unmatchdEventDialog2Injector = true;
@@ -169,8 +171,8 @@ DllError eventDialog3Injector(RunOptions options) {
             //  mov     r11, 0BFFFFFF43FFFFFFh
             eventDialogProc3ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, eventDialogProc3, true);
-            writeln("Dummy JMP for eventDialog3Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc3));
+            writeln("JMP for eventDialog3Injector created.");
         }
         else {
             e.unmatchdEventDialog3Injector = true;
@@ -195,8 +197,8 @@ DllError eventDialog3Injector(RunOptions options) {
             //  mov     r11, 0BFFFFFF43FFFFFFh
             eventDialogProc3ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, eventDialogProc3V130, true);
-            writeln("Dummy JMP for eventDialog3Injector (v1_30_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc3V130));
+            writeln("JMP for eventDialog3Injector (v1_30_plus) created.");
         }
         else {
             e.unmatchdEventDialog3Injector = true;
@@ -213,8 +215,8 @@ DllError eventDialog3Injector(RunOptions options) {
             //  mov     r11, 0BFFFFFF43FFFFFFh
             eventDialogProc3ReturnAddress = address + 0x14;
 
-            // Injector::MakeJMP(address, eventDialogProc3V132, true);
-            writeln("Dummy JMP for eventDialog3Injector (v1_32_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc3V132));
+            writeln("JMP for eventDialog3Injector (v1_32_plus) created.");
         }
         else {
             e.unmatchdEventDialog3Injector = true;

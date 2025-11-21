@@ -4,6 +4,9 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 // FIXME: escape_tool.d を後で作成し、インポートする
 
@@ -449,9 +452,9 @@ DllError inputProc1Injector(RunOptions options)
                 // mov     rax, [r13+0]
                 inputProc1ReturnAddress1 = address + 0x1E;
 
-                // FIXME: Injector::MakeJMP に相当するD言語でのフック処理を実装する
-                // Injector.MakeJMP(address, cast(size_t)inputProc1, true);
-                writeln("Dummy JMP for inputProc1Injector (1) called.");
+                // Injector::MakeJMP に相当するD言語でのフック処理を実装する
+                PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)inputProc1));
+                writeln("JMP for inputProc1Injector (1) created using ScopedPatch.");
             }
             else
             {
@@ -466,8 +469,8 @@ DllError inputProc1Injector(RunOptions options)
                 // jmp     loc_{xxxxx}
                 // FIXME: Injector::GetBranchDestination に相当するD言語でのアドレス取得処理を実装する
                 // inputProc1ReturnAddress2 = Injector.GetBranchDestination(address + 0x3).as_int();
-                writeln("Dummy GetBranchDestination for inputProc1Injector (2) called.");
-                inputProc1ReturnAddress2 = address + 0x07; // 仮のアドレス
+                inputProc1ReturnAddress2 = address + 0x07 + get_branch_destination_offset(cast(void*)(address + 0x03), 4); // 仮のアドレス
+                writeln("GetBranchDestination for inputProc1Injector (2) called.");
             }
             else
             {
@@ -502,9 +505,9 @@ DllError inputProc1Injector(RunOptions options)
                 // mov     rax, [r13+0]
                 inputProc1ReturnAddress1 = address + 0x1E;
 
-                // FIXME: Injector::MakeJMP に相当するD言語でのフック処理を実装する
-                // Injector.MakeJMP(address, cast(size_t)inputProc1V130, true);
-                writeln("Dummy JMP for inputProc1Injector (2) called.");
+                // Injector::MakeJMP に相当するD言語でのフック処理を実装する
+                PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)inputProc1));
+                writeln("JMP for inputProc1Injector (2) created using ScopedPatch.");
             }
             else
             {
@@ -518,8 +521,8 @@ DllError inputProc1Injector(RunOptions options)
                 size_t address = BytePattern.tempInstance().getFirst().address;
                 // jmp     loc_{xxxxx}
                 // inputProc1ReturnAddress2 = Injector.GetBranchDestination(address + 0x3).as_int();
-                writeln("Dummy GetBranchDestination for inputProc1Injector (2) called.");
-                inputProc1ReturnAddress2 = address + 0x07; // 仮のアドレス
+                inputProc1ReturnAddress2 = address + 0x07 + get_branch_destination_offset(cast(void*)(address + 0x03), 4); // 仮のアドレス
+                writeln("GetBranchDestination for inputProc1Injector (2) called.");
             }
             else
             {
@@ -571,9 +574,9 @@ DllError inputProc2Injector(RunOptions options)
                 // movzx   r8d, word ptr [rdi+56h]
                 inputProc2ReturnAddress = address + 0x18;
 
-                // FIXME: Injector::MakeJMP に相当するD言語でのフック処理を実装する
-                // Injector.MakeJMP(address, cast(size_t)inputProc2, true);
-                writeln("Dummy JMP for inputProc2Injector called.");
+                // Injector::MakeJMP に相当するD言語でのフック処理を実装する
+                PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)inputProc2));
+                writeln("JMP for inputProc2Injector created using ScopedPatch.");
             }
             else
             {

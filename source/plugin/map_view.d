@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void mapViewProc1();
@@ -48,8 +50,8 @@ DllError mapViewProc1Injector(RunOptions options) {
             // test    r11, r11
             mapViewProc1ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mapViewProc1, true);
-            writeln("Dummy JMP for mapViewProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapViewProc1));
+            writeln("JMP for mapViewProc1Injector created.");
         }
         else {
             e.unmatchdMapViewProc1Injector = true;
@@ -81,8 +83,8 @@ DllError mapViewProc2Injector(RunOptions options) {
             // test    r12, r12
             mapViewProc2ReturnAddress = address + 0x11;
 
-            // Injector::MakeJMP(address, cast(size_t)mapViewProc2, true);
-            writeln("Dummy JMP for mapViewProc2Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapViewProc2));
+            writeln("JMP for mapViewProc2Injector (v1_29_X) created.");
         }
         else {
             e.unmatchdMapViewProc2Injector = true;
@@ -111,8 +113,8 @@ DllError mapViewProc2Injector(RunOptions options) {
             // test    r12, r12
             mapViewProc2ReturnAddress = address + 0x11;
 
-            // Injector::MakeJMP(address, cast(size_t)mapViewProc2V130, true);
-            writeln("Dummy JMP for mapViewProc2Injector (v1_30_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapViewProc2V130));
+            writeln("JMP for mapViewProc2Injector (v1_30_X_plus) created.");
         }
         else {
             e.unmatchdMapViewProc2Injector = true;
@@ -156,14 +158,13 @@ DllError mapViewProc3Injector(RunOptions options) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             // call {sub_xxxxx}
-            // mapViewProc3CallAddress = Injector::GetBranchDestination(address + 0x0F).as_int();
-            mapViewProc3CallAddress = address + 0x10; // 仮のアドレス
+            mapViewProc3CallAddress = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
 
             // nop
             mapViewProc3ReturnAddress = address + 0x14;
 
-            // Injector::MakeJMP(address, cast(size_t)mapViewProc3, true);
-            writeln("Dummy JMP for mapViewProc3Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapViewProc3));
+            writeln("JMP for mapViewProc3Injector created.");
         }
         else {
             e.unmatchdMapViewProc3Injector = true;

@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void dateProc2();
@@ -47,8 +49,8 @@ DllError dateProc1Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "右上の表記を変更")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // Injector::WriteMemory<DateFormat>(address, isoFormat, true);
-            writeln("Dummy WriteMemory for dateProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, cast(ubyte[])isoFormat.text);
+            writeln("WriteMemory for dateProc1Injector called.");
         }
         else {
             e.unmatchdDateProc1Injector = true;
