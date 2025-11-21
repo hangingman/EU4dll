@@ -83,11 +83,11 @@
 
 ## 優先度: 中
 
--   [ ] D言語コードのリファクタリング: `source/plugin/localization.d` (1347行), `source/plugin/file_save.d` (624行), `source/plugin/input.d` (597行), `source/plugin/tooltip_and_button.d` (516行) を同名のサブディレクトリに分割する。
-    -   [ ] `source/plugin/localization/` ディレクトリの作成とファイル分割。
-    -   [ ] `source/plugin/file_save/` ディレクトリの作成とファイル分割。
-    -   [ ] `source/plugin/input/` ディレクトリの作成とファイル分割。
-    -   [ ] `source/plugin/tooltip_and_button/` ディレクトリの作成とファイル分割。
+-   [x] D言語コードのリファクタリング: `source/plugin/localization.d` (1347行), `source/plugin/file_save.d` (624行), `source/plugin/input.d` (597行), `source/plugin/tooltip_and_button.d` (516行) を同名のサブディレクトリに分割する。
+    -   [x] `source/plugin/localization/` ディレクトリの作成とファイル分割。
+    -   [x] `source/plugin/file_save/` ディレクトリの作成とファイル分割。
+    -   [x] `source/plugin/input/` ディレクトリの作成とファイル分割。
+    -   [x] `source/plugin/tooltip_and_button/` ディレクトリの作成とファイル分割。
 -   [ ] 移植されたD言語コードのパフォーマンス最適化。
 -   [ ] D言語のユニットテストカバレッジの拡充。
 -   [ ] CI/CDパイプラインのD言語ビルドプロセスへの適応。
