@@ -64,9 +64,30 @@
     -   [ ] `validator.cpp` (バージョンチェック、エラー表示) を `plugin.validator.d` に移植する（Linux環境向けにログ/コンソール出力で代替）。
     -   [ ] `debug.cpp` / `debug_asm.asm` (デバッグ用フック) を `plugin.debug.d` に移植する。
         -   **備考**: `program.cpp` と `mod_download.cpp` は、`mod_download` は既存タスクがあるため、`program.cpp` は空なので除外。
+-   [ ] 削除されたアセンブリファイル (`*_asm.asm`) の機能がD言語で正しく代替されているか確認する。
+    -   [ ] `date_asm.asm` (日付フォーマット関連) のD言語側での代替を確認。
+    -   [ ] `event_dialog_asm.asm` (イベントダイアログ関連) のD言語側での代替を確認。
+    -   [ ] `file_save_asm.asm` (ファイルセーブ関連) のD言語側での代替を確認。
+    -   [ ] `font_asm.asm` (フォント関連) のD言語側での代替を確認。
+    -   [ ] `ime_asm.asm` (IME制御関連) のD言語側での代替を確認。
+    -   [ ] `input_asm.asm` (テキスト入力フック関連) のD言語側での代替を確認。
+    -   [ ] `list_field_adjustment_asm.asm` (リストビュー調整関連) のD言語側での代替を確認。
+    -   [ ] `localization_asm.asm` (ローカライズ関連) のD言語側での代替を確認。
+    -   [ ] `main_text_asm.asm` (メインテキスト描画関連) のD言語側での代替を確認。
+    -   [ ] `map_adjustment_asm.asm` (マップ文字位置調整関連) のD言語側での代替を確認。
+    -   [ ] `map_justify_asm.asm` (マップ文字均等割付関連) のD言語側での代替を確認。
+    -   [ ] `map_popup_asm.asm` (マップポップアップ関連) のD言語側での代替を確認。
+    -   [ ] `map_view_asm.asm` (マップ文字表示関連) のD言語側での代替を確認。
+    -   [ ] `tooltip_and_button_asm.asm` (ツールチップとボタン関連) のD言語側での代替を確認。
+    -   [ ] `version/hook.asm` (DLLインジェクションフック) のD言語側での代替 (`__attribute__((constructor))` とパッチングロジック) を確認。
 
 ## 優先度: 中
 
+-   [ ] D言語コードのリファクタリング: `source/plugin/localization.d` (1347行), `source/plugin/file_save.d` (624行), `source/plugin/input.d` (597行), `source/plugin/tooltip_and_button.d` (516行) を同名のサブディレクトリに分割する。
+    -   [ ] `source/plugin/localization/` ディレクトリの作成とファイル分割。
+    -   [ ] `source/plugin/file_save/` ディレクトリの作成とファイル分割。
+    -   [ ] `source/plugin/input/` ディレクトリの作成とファイル分割。
+    -   [ ] `source/plugin/tooltip_and_button/` ディレクトリの作成とファイル分割。
 -   [ ] 移植されたD言語コードのパフォーマンス最適化。
 -   [ ] D言語のユニットテストカバレッジの拡充。
 -   [ ] CI/CDパイプラインのD言語ビルドプロセスへの適応。

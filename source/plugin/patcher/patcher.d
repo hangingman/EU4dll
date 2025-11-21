@@ -1,4 +1,5 @@
 module plugin.patcher.patcher;
+import plugin.constant;
 
 import core.sys.linux.sys.mman;
 import std.stdio;

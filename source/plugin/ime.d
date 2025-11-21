@@ -2,9 +2,9 @@ module plugin.ime;
 
 import std.stdio;
 import plugin.byte_pattern;
-import plugin.constant;
+import plugin.constant; // RunOptionsを使用するためインポート
 import plugin.misc; // get_branch_destination_offset を使用するためインポート
-import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.input; // DllErrorとRunOptionsを使用するためインポート // 修正: :DllError を削除
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
