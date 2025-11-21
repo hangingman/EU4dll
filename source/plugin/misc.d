@@ -64,3 +64,21 @@ static:
         return ver;
     };
 };
+
+// 相対アドレスを解決するヘルパー関数
+size_t get_branch_destination_offset(void* address, int offset_size)
+{
+    // オフセットサイズに基づいて相対オフセットを読み取る
+    // 通常は4バイト (int) が使われる
+    if (offset_size == 4)
+    {
+        int relative_offset = *cast(int*)address;
+        return cast(size_t)relative_offset;
+    }
+    // その他のオフセットサイズが必要な場合はここに追加
+    else
+    {
+        // 未対応のオフセットサイズ
+        return 0; // またはエラーをスロー
+    }
+}

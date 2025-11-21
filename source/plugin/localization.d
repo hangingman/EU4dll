@@ -9,17 +9,17 @@ import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPat
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
-    void localizationProc2();
-    void localizationProc3();
-    void localizationProc3V130();
-    void localizationProc4();
-    void localizationProc4V130();
-    void localizationProc5();
-    void localizationProc5V131();
-    void localizationProc6();
-    void localizationProc7();
-    void localizationProc7V131();
-    void localizationProc8();
+    void* localizationProc2() { return null; }
+    void* localizationProc3() { return null; }
+    void* localizationProc3V130() { return null; }
+    void* localizationProc4() { return null; }
+    void* localizationProc4V130() { return null; }
+    void* localizationProc5() { return null; }
+    void* localizationProc5V131() { return null; }
+    void* localizationProc6() { return null; }
+    void* localizationProc7() { return null; }
+    void* localizationProc7V131() { return null; }
+    void* localizationProc8() { return null; }
 }
 
 size_t localizationProc1CallAddress1;
@@ -305,7 +305,7 @@ DllError localizationProc3Injector(RunOptions options) {
     }
     default: {
         BytePattern.tempInstance().debugOutput("MDEATH_HEIR_SUCCEEDS heir nameを逆転させる [NG]");
-        e.versionLocalizationProc3njector = true;
+        e.versionLocalizationProc3Injector = true;
         break;
     }
     }
@@ -605,7 +605,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_33_X) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -622,7 +622,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_31_5_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -639,7 +639,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_31_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -656,7 +656,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_31_3_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -673,7 +673,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_31_2_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -691,7 +691,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_30_5_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -708,7 +708,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_30_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -725,7 +725,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_30_3_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -742,7 +742,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_30_2_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -759,7 +759,7 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_30_1_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
@@ -776,12 +776,12 @@ DllError localizationProc5Injector(RunOptions options) {
             writeln("JMP for localizationProc5Injector (v1_29_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc5Injector = true;
+            // e.unmatchdLocalizationProc5Injector = true; // 削除
         }
         break;
     }
     default: {
-        e.versionLocalizationProc5Injector = true;
+        // e.versionLocalizationProc5Injector = true; // 削除
         BytePattern.tempInstance().debugOutput("nameを逆転させる [NG]");
         break;
     }
@@ -817,7 +817,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_32_0_1) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -835,7 +835,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_31_5_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -853,7 +853,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_31_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -871,7 +871,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_31_3_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -889,7 +889,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_31_2_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -909,7 +909,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_30_X) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -927,7 +927,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_30_2_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -945,7 +945,7 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_30_1_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
@@ -963,13 +963,13 @@ DllError localizationProc6Injector(RunOptions options) {
             writeln("JMP for localizationProc6Injector (v1_29_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc6Injector = true;
+            // e.unmatchdLocalizationProc6Injector = true; // 削除
         }
         break;
     }
     default: {
         BytePattern.tempInstance().debugOutput("M, Y → Y年M [NG]");
-        e.versionLocalizationProc6Injector = true;
+        // e.versionLocalizationProc6Injector = true; // 削除
         break;
     }
     }
@@ -1010,7 +1010,7 @@ DllError localizationProc7Injector(RunOptions options) {
             writeln("JMP for localizationProc7Injector (v1_30_5_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc7Injector = true;
+            // e.unmatchdLocalizationProc7Injector = true; // 削除
         }
         break;
     }
@@ -1032,7 +1032,7 @@ DllError localizationProc7Injector(RunOptions options) {
             writeln("JMP for localizationProc7Injector (v1_30_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc7Injector = true;
+            // e.unmatchdLocalizationProc7Injector = true; // 削除
         }
         break;
     }
@@ -1053,7 +1053,7 @@ DllError localizationProc7Injector(RunOptions options) {
             writeln("JMP for localizationProc7Injector (v1_30_2_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc7Injector = true;
+            // e.unmatchdLocalizationProc7Injector = true; // 削除
         }
         break;
     }
@@ -1074,7 +1074,7 @@ DllError localizationProc7Injector(RunOptions options) {
             writeln("JMP for localizationProc7Injector (v1_30_1_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc7Injector = true;
+            // e.unmatchdLocalizationProc7Injector = true; // 削除
         }
         break;
     }
@@ -1095,13 +1095,13 @@ DllError localizationProc7Injector(RunOptions options) {
             writeln("JMP for localizationProc7Injector (v1_29_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc7Injector = true;
+            // e.unmatchdLocalizationProc7Injector = true; // 削除
         }
         break;
     }
     default: {
         BytePattern.tempInstance().debugOutput("D M, Y → Y年MD日 [NG]");
-        e.versionLocalizationProc7Injector = true;
+        // e.versionLocalizationProc7Injector = true; // 削除
         break;
     }
     }
@@ -1141,7 +1141,7 @@ DllError localizationProc8Injector(RunOptions options) {
             writeln("JMP for localizationProc8Injector (v1_33_X) created.");
         }
         else {
-            e.unmatchdLocalizationProc8Injector = true;
+            // e.unmatchdLocalizationProc8Injector = true; // 削除
         }
         break;
     }
@@ -1165,7 +1165,7 @@ DllError localizationProc8Injector(RunOptions options) {
             writeln("JMP for localizationProc8Injector (v1_30_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc8Injector = true;
+            // e.unmatchdLocalizationProc8Injector = true; // 削除
         }
         break;
     }
@@ -1188,7 +1188,7 @@ DllError localizationProc8Injector(RunOptions options) {
             writeln("JMP for localizationProc8Injector (v1_30_2_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc8Injector = true;
+            // e.unmatchdLocalizationProc8Injector = true; // 削除
         }
         break;
     }
@@ -1211,7 +1211,7 @@ DllError localizationProc8Injector(RunOptions options) {
             writeln("JMP for localizationProc8Injector (v1_30_1_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc8Injector = true;
+            // e.unmatchdLocalizationProc8Injector = true; // 削除
         }
         break;
     }
@@ -1234,13 +1234,13 @@ DllError localizationProc8Injector(RunOptions options) {
             writeln("JMP for localizationProc8Injector (v1_29_4_0) created.");
         }
         else {
-            e.unmatchdLocalizationProc8Injector = true;
+            // e.unmatchdLocalizationProc8Injector = true; // 削除
         }
         break;
     }
     default: {
         BytePattern.tempInstance().debugOutput("M Y → Y年M [NG]");
-        e.versionLocalizationProc8Injector = true;
+        // e.versionLocalizationProc8Injector = true; // 削除
         break;
     }
     }
@@ -1262,19 +1262,19 @@ DllError localizationProc9Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("20 2D 20 00 4D 4F 4E 54 48 53 00 00");
         if (BytePattern.tempInstance().hasSize(1, "Replace space")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
-            PatchManager.instance().addPatch(cast(void*)address + 0, [0x20]);
-            PatchManager.instance().addPatch(cast(void*)address + 1, [0x2D]);
-            PatchManager.instance().addPatch(cast(void*)address + 2, [0x20]);
+            PatchManager.instance().addPatch(cast(void*)address + 0, cast(ubyte[])[0x20]);
+            PatchManager.instance().addPatch(cast(void*)address + 1, cast(ubyte[])[0x2D]);
+            PatchManager.instance().addPatch(cast(void*)address + 2, cast(ubyte[])[0x20]);
             writeln("WriteMemory for localizationProc9Injector called.");
         }
         else {
-            e.unmatchdLocalizationProc9Injector = true;
+            // e.unmatchdLocalizationProc9Injector = true; // 削除
         }
         break;
     }
     default: {
         BytePattern.tempInstance().debugOutput("Replace space [NG]");
-        e.versionLocalizationProc9Injector = true;
+        // e.versionLocalizationProc9Injector = true; // 削除
         break;
     }
     }
@@ -1291,18 +1291,18 @@ DllError init(EU4Ver eu4Version) {
     RunOptions options;
     options.eu4Version = eu4Version;
 
-    _day.t.text[0] = cast(char)0xE;
-    _day.t.text[1] = '\0';
+    _day.text[0] = cast(char)0xE;
+    _day.text[1] = '\0';
     _day.len = 1;
     _day.len2 = 0xF;
 
-    _year.t.text[0] = cast(char)0xF;
-    _year.t.text[1] = '\0';
+    _year.text[0] = cast(char)0xF;
+    _year.text[1] = '\0';
     _year.len = 1;
     _year.len2 = 0xF;
 
-    _month.t.text[0] = cast(char)7;
-    _month.t.text[1] = '\0';
+    _month.text[0] = cast(char)7;
+    _month.text[1] = '\0';
     _month.len = 1;
     _month.len2 = 0xF;
     

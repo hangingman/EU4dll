@@ -9,11 +9,11 @@ import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPat
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
-    void mainTextProc1();
-    void mainTextProc2();
-    void mainTextProc2_v131();
-    void mainTextProc3();
-    void mainTextProc4();
+    void* mainTextProc1() { return null; }
+    void* mainTextProc2() { return null; }
+    void* mainTextProc2_v131() { return null; }
+    void* mainTextProc3() { return null; }
+    void* mainTextProc4() { return null; }
 }
 
 size_t mainTextProc1ReturnAddress;

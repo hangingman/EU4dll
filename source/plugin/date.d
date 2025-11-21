@@ -9,7 +9,7 @@ import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPat
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
-    void dateProc2();
+    void* dateProc2() { return null; }
 }
 
 size_t dateProc2ReturnAddress;

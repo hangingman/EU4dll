@@ -4,21 +4,22 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.misc; // get_branch_destination_offset を使用するためにインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
-    void tooltipAndButtonProc1();
-    void tooltipAndButtonProc1V133();
-    void tooltipAndButtonProc2();
-    void tooltipAndButtonProc2V133();
-    void tooltipAndButtonProc3();
-    void tooltipAndButtonProc4();
-    void tooltipAndButtonProc4V133();
-    void tooltipAndButtonProc5();
-    void tooltipAndButtonProc5V130();
-    void tooltipAndButtonProc7();
-    void tooltipAndButtonProc7V133();
+    void* tooltipAndButtonProc1() { return null; }
+    void* tooltipAndButtonProc1V133() { return null; }
+    void* tooltipAndButtonProc2() { return null; }
+    void* tooltipAndButtonProc2V133() { return null; }
+    void* tooltipAndButtonProc3() { return null; }
+    void* tooltipAndButtonProc4() { return null; }
+    void* tooltipAndButtonProc4V133() { return null; }
+    void* tooltipAndButtonProc5() { return null; }
+    void* tooltipAndButtonProc5V130() { return null; }
+    void* tooltipAndButtonProc7() { return null; }
+    void* tooltipAndButtonProc7V133() { return null; }
 }
 
 size_t tooltipAndButtonProc1ReturnAddress;
@@ -401,7 +402,7 @@ DllError tooltipAndButtonProc6Injector(RunOptions options) {
         // inc edx
         BytePattern.tempInstance().findPattern("A7 52 2D 20 00 00 00 00");
         if (BytePattern.tempInstance().hasSize(1, "空白をノーブレークスペースに変換")) {
-            PatchManager.instance().addPatch(BytePattern.tempInstance().getFirst().address + 3, [0xA0]);
+            PatchManager.instance().addPatch(cast(void*)(BytePattern.tempInstance().getFirst().address + 3), cast(ubyte[])[0xA0]);
             writeln("WriteMemory for tooltipAndButtonProc6Injector called.");
         }
         else {

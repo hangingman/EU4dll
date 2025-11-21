@@ -9,7 +9,7 @@ import plugin.process.process : get_executable_memory_range; // get_executable_m
 
 // C++のoptions.cppに対応するダミー関数群
 extern(C) {
-    void optionsProc1();
+    void* optionsProc1() { return null; }
     // 他のoptions関連のextern(C)関数があればここに追加
 }
 
@@ -23,42 +23,10 @@ DllError optionsProc1Injector(RunOptions options) {
     DllError e;
 
     switch (options.eu4Version) {
-    // 既存のバージョンケースをここに追加
-    case EU4Ver.v1_29_1_0:
-    case EU4Ver.v1_29_2_0:
-    case EU4Ver.v1_29_3_0:
-    case EU4Ver.v1_29_4_0:
-    case EU4Ver.v1_30_1_0:
-    case EU4Ver.v1_30_2_0:
-    case EU4Ver.v1_30_3_0:
-    case EU4Ver.v1_30_4_0:
-    case EU4Ver.v1_30_5_0:
-    case EU4Ver.v1_31_1_0:
-    case EU4Ver.v1_31_2_0:
-    case EU4Ver.v1_31_3_0:
-    case EU4Ver.v1_31_4_0:
-    case EU4Ver.v1_31_5_0:
-    case EU4Ver.v1_31_6_0:
-    case EU4Ver.v1_32_0_1:
-    case EU4Ver.v1_33_0_0:
-    case EU4Ver.v1_33_3_0:
-    case EU4Ver.v1_33_0_0:
-    case EU4Ver.v1_32_0_1:
-    case EU4Ver.v1_31_6_0:
-    case EU4Ver.v1_31_5_0:
-    case EU4Ver.v1_31_4_0:
-    case EU4Ver.v1_31_3_0:
-    case EU4Ver.v1_31_2_0:
-    case EU4Ver.v1_31_1_0:
-    case EU4Ver.v1_30_5_0:
-    case EU4Ver.v1_30_4_0:
-    case EU4Ver.v1_30_3_0:
-    case EU4Ver.v1_30_2_0:
-    case EU4Ver.v1_30_1_0:
-    case EU4Ver.v1_29_4_0:
-    case EU4Ver.v1_29_3_0:
-    case EU4Ver.v1_29_2_0:
-    case EU4Ver.v1_29_1_0:
+    case EU4Ver.v1_29_1_0, EU4Ver.v1_29_2_0, EU4Ver.v1_29_3_0, EU4Ver.v1_29_4_0,
+         EU4Ver.v1_30_1_0, EU4Ver.v1_30_2_0, EU4Ver.v1_30_3_0, EU4Ver.v1_30_4_0, EU4Ver.v1_30_5_0,
+         EU4Ver.v1_31_1_0, EU4Ver.v1_31_2_0, EU4Ver.v1_31_3_0, EU4Ver.v1_31_4_0, EU4Ver.v1_31_5_0, EU4Ver.v1_31_6_0,
+         EU4Ver.v1_32_0_1, EU4Ver.v1_33_0_0, EU4Ver.v1_33_3_0:
         // FIXME: 実際のバイトパターンに置き換える必要があります。options.cppを参照してください。
         // 現状はダミーのパターンで、マッチしない可能性が高いです。
         BytePattern.tempInstance().findPattern("48 8D 45 00 48 8D 15 ? ? ? ? 48 8D 4C 24 70 E8 ? ? ? ? 90"); // Placeholder pattern
