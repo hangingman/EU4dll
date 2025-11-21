@@ -16,18 +16,22 @@
         -   `map_view.cpp` / `map_view_asm.asm`: マップ上のテキスト表示。
         -   `map_adjustment.cpp` / `map_adjustment_asm.asm`: マップ文字位置調整。
         -   `map_justify.cpp` / `map_justify_asm.asm`: マップ文字均等割付。
-        -   [ ] `map_popup.cpp` / `map_popup_asm.asm`: ポップアップ表示調整。
-        -   [ ] `tooltip_and_button.cpp` / `tooltip_and_button_asm.asm`: ツールチップとボタンのUI調整。
-        -   [ ] `event_dialog.cpp` / `event_dialog_asm.asm`: イベントダイアログ修正。
+        -   [x] `map_popup.cpp` / `map_popup_asm.asm`: ポップアップ表示調整。
+        -   [x] `tooltip_and_button.cpp` / `tooltip_and_button_asm.asm`: ツールチップとボタンのUI調整。
+        -   [x] `event_dialog.cpp` / `event_dialog_asm.asm`: イベントダイアログ修正。
     -   **システム・その他機能モジュール**
-        -   [ ] `file_save.cpp` / `file_save_asm.asm`: セーブデータ関連。
-        -   [ ] `options.cpp`: 設定ファイル (`plugin.ini`) 読み込み。
-        -   [ ] `dll_main.cpp`, `version.cpp`: DLLエントリーポイント、バージョン管理。
+        -   [x] `file_save.cpp` / `file_save_asm.asm`: セーブデータ関連。
+        -   [x] `options.cpp`: 設定ファイル (`plugin.ini`) 読み込み。
+        -   [x] `dll_main.cpp`, `version.cpp`: DLLエントリーポイント、バージョン管理。
 -   [ ] Linux環境でのパッチ適用方法を `LD_PRELOAD` を利用した手法に移行する。
     -   `d3d9.dll` プロキシの代わりに、共有オブジェクト（`.so`）を `LD_PRELOAD` でロードする仕組みを実装する。
     -   Windows API (`VirtualProtect` など) に依存しているコードをLinux API (`mprotect(2)`, `dl_iterate_phdr(3)` など) を使用するように書き換える。
     -   パッチ実行の起点として `__attribute__((constructor))` を利用する。
     -   `version/` プロジェクトの機能（DLLインジェクションの起点）を `LD_PRELOAD` 方式に適合させる。
+    -   **計画**:
+        -   既存の `plugin.input`, `plugin.ime` などの `init` 関数における `Injector::MakeJMP` 相当のダミー実装を、`plugin.patcher.patcher.ScopedPatch` を利用した実際のパッチ適用に置き換える。
+        -   `plugin.byte_pattern.BytePattern` を使用して、Linux環境のELFバイナリから適切なアドレスを検索する。
+        -   `plugin.process.process.get_executable_memory_range` を活用し、必要に応じて実行可能ファイルのメモリ範囲を取得する。
 -   [ ] Linux環境での動作検証とデバッグ。
     -   `mprotect(2)` を利用したメモリパッチの安定性確認。
 -   [ ] **翻訳ファイルダウンローダーのPoC作成**

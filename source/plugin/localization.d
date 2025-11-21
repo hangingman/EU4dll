@@ -44,9 +44,7 @@ size_t day;
 // ParadoxTextObjectに相当する構造体（仮）
 // 実際の定義はplugin_64.hにあるはずだが、ここでは簡易的に定義
 struct ParadoxTextObject {
-    struct Text {
-        char[11] text;
-    } t;
+    char[11] text; // C++のParadoxTextObjectはchar配列を直接持つため、それに合わせる
     size_t len;
     size_t len2;
 }
@@ -161,7 +159,7 @@ DllError localizationProc2Injector(RunOptions options) {
     }
     default: {
         BytePattern.tempInstance().debugOutput("Battle of areaを逆転させる [NG]");
-        e.versionLocalizationProc2njector = true;
+        e.versionLocalizationProc2Injector = true;
         break;
     }
     }
