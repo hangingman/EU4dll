@@ -8,6 +8,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 // FIXME: escape_tool.d を後で作成し、インポートする
 
 extern(C) {
@@ -57,13 +59,13 @@ DllError mapAdjustmentProc1Injector(RunOptions options) {
 
             // call {sub_xxxxx}
             // mapAdjustmentProc1CallAddress = Injector::GetBranchDestination(address + 0x04).as_int();
-            mapAdjustmentProc1CallAddress = address + 0x05; // 仮のアドレス
+            mapAdjustmentProc1CallAddress = address + 0x04 + get_branch_destination_offset(cast(void*)(address + 0x04), 4); // 仮のアドレス
 
             // cmp byte ptr [rdi + r14] , 0
             mapAdjustmentProc1ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc1, true);
-            writeln("Dummy JMP for mapAdjustmentProc1Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc1));
+            writeln("JMP for mapAdjustmentProc1Injector (v1_29_X) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc1Injector = true;
@@ -91,13 +93,13 @@ DllError mapAdjustmentProc1Injector(RunOptions options) {
 
             // call {sub_xxxxx}
             // mapAdjustmentProc1CallAddress = Injector::GetBranchDestination(address + 0x04).as_int();
-            mapAdjustmentProc1CallAddress = address + 0x05; // 仮のアドレス
+            mapAdjustmentProc1CallAddress = address + 0x04 + get_branch_destination_offset(cast(void*)(address + 0x04), 4); // 仮のアドレス
 
             // cmp byte ptr [rdi + r14] , 0
             mapAdjustmentProc1ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc1, true);
-            writeln("Dummy JMP for mapAdjustmentProc1Injector (v1_30_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc1));
+            writeln("JMP for mapAdjustmentProc1Injector (v1_30_X_plus) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc1Injector = true;
@@ -129,8 +131,8 @@ DllError mapAdjustmentProc2Injector(RunOptions options) {
             // lea     rdx, [rbp+1F0h+var_1F0]
             mapAdjustmentProc2ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc2, true);
-            writeln("Dummy JMP for mapAdjustmentProc2Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc2));
+            writeln("JMP for mapAdjustmentProc2Injector (v1_29_X) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc2Injector = true;
@@ -156,8 +158,8 @@ DllError mapAdjustmentProc2Injector(RunOptions options) {
             // lea     rdx, [rbp+200h+var_200]
             mapAdjustmentProc2ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc2V130, true);
-            writeln("Dummy JMP for mapAdjustmentProc2Injector (v1_30_X_v131) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc2V130));
+            writeln("JMP for mapAdjustmentProc2Injector (v1_30_X_v131) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc2Injector = true;
@@ -176,8 +178,8 @@ DllError mapAdjustmentProc2Injector(RunOptions options) {
             // lea     rdx, [rbp+200h+var_200]
             mapAdjustmentProc2ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc2V130, true);
-            writeln("Dummy JMP for mapAdjustmentProc2Injector (v1_32_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc2V130));
+            writeln("JMP for mapAdjustmentProc2Injector (v1_32_X_plus) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc2Injector = true;
@@ -209,8 +211,8 @@ DllError mapAdjustmentProc3Injector(RunOptions options) {
             // call    sub_xxxxx
             mapAdjustmentProc3ReturnAddress1 = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc3, true);
-            writeln("Dummy JMP for mapAdjustmentProc3Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc3));
+            writeln("JMP for mapAdjustmentProc3Injector (v1_29_X) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc3Injector = true;
@@ -220,7 +222,7 @@ DllError mapAdjustmentProc3Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("49 8B 4C 24 30 48 8B 01 C6 44 24 30 01");
         if (BytePattern.tempInstance().hasSize(2, "文字チェックの後のコピー処理の戻り先２")) {
             mapAdjustmentProc3ReturnAddress2 = BytePattern.tempInstance().getSecond().address;
-            writeln("Dummy GetSecondAddress for mapAdjustmentProc3Injector (v1_29_X) called.");
+            writeln("GetSecondAddress for mapAdjustmentProc3Injector (v1_29_X) called.");
         }
         else {
             e.unmatchdMapAdjustmentProc3Injector = true;
@@ -249,8 +251,8 @@ DllError mapAdjustmentProc3Injector(RunOptions options) {
             // call    sub_xxxxx
             mapAdjustmentProc3ReturnAddress1 = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc3V130, true);
-            writeln("Dummy JMP for mapAdjustmentProc3Injector (v1_30_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc3V130));
+            writeln("JMP for mapAdjustmentProc3Injector (v1_30_X_plus) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc3Injector = true;
@@ -260,7 +262,7 @@ DllError mapAdjustmentProc3Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("49 8B 4C 24 30 48 8B 01 C6 44 24 30 01");
         if (BytePattern.tempInstance().hasSize(2, "文字チェックの後のコピー処理の戻り先２")) {
             mapAdjustmentProc3ReturnAddress2 = BytePattern.tempInstance().getSecond().address;
-            writeln("Dummy GetSecondAddress for mapAdjustmentProc3Injector (v1_30_X_plus) called.");
+            writeln("GetSecondAddress for mapAdjustmentProc3Injector (v1_30_X_plus) called.");
         }
         else {
             e.unmatchdMapAdjustmentProc3Injector = true;
@@ -292,8 +294,8 @@ DllError mapAdjustmentProc4Injector(RunOptions options) {
             // mov     rdx, [r15+rax*8]
             mapAdjustmentProc4ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc4, true);
-            writeln("Dummy JMP for mapAdjustmentProc4Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc4));
+            writeln("JMP for mapAdjustmentProc4Injector (v1_29_X) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc4Injector = true;
@@ -322,8 +324,8 @@ DllError mapAdjustmentProc4Injector(RunOptions options) {
             // mov     rdx, [r15+rax*8]
             mapAdjustmentProc4ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc4V130, true);
-            writeln("Dummy JMP for mapAdjustmentProc4Injector (v1_30_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc4V130));
+            writeln("JMP for mapAdjustmentProc4Injector (v1_30_X_plus) created.");
         }
         else {
             e.unmatchdMapAdjustmentProc4Injector = true;
@@ -372,6 +374,14 @@ DllError mapAdjustmentProc5Injector(RunOptions options) {
             
             // D言語の動的配列に置き換え
             // mapAdjustmentProc5InjectorSeparateBuffer = new char[lenWithNull](); // D言語の配列で初期化
+            // FIXME: convertWideTextToEscapedText は現在ダミー実装
+            // char* escapedChar = null;
+            // convertWideTextToEscapedText(cast(wchar_t*)x.ptr, &escapedChar); 
+            // size_t len = strlen(escapedChar);
+            // size_t lenWithNull = len + 1;
+            
+            // D言語の動的配列に置き換え
+            // mapAdjustmentProc5InjectorSeparateBuffer = new char[lenWithNull](); // D言語の配列で初期化
             // mapAdjustmentProc5InjectorSeparateBuffer = cast(char*) malloc(lenWithNull);
             // if (mapAdjustmentProc5InjectorSeparateBuffer is null) {
             //     // エラー処理
@@ -383,11 +393,10 @@ DllError mapAdjustmentProc5Injector(RunOptions options) {
 
             // mapAdjustmentProc5SeparatorAddress = cast(size_t)mapAdjustmentProc5InjectorSeparateBuffer;
 
-            // call sub_xxxxx
             mapAdjustmentProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)mapAdjustmentProc5, true);
-            writeln("Dummy JMP for mapAdjustmentProc5Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapAdjustmentProc5));
+            writeln("JMP for mapAdjustmentProc5Injector created.");
         }
         else {
             e.unmatchdMapAdjustmentProc5Injector = true;

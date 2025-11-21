@@ -4,8 +4,11 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
-extern(C) {
+extern (C)
+{
     void fileSaveProc1();
     void fileSaveProc2();
     void fileSaveProc3();
@@ -40,15 +43,27 @@ size_t fileSaveProc7CallAddress;
 
 // Helper functions (placeholders for now, need actual implementation or import)
 // In C++ these are imported from escape_tool.h
-extern(C) void escapedStrToUtf8() { writeln("Dummy escapedStrToUtf8 called"); }
-extern(C) void utf8ToEscapedStr() { writeln("Dummy utf8ToEscapedStr called"); }
-extern(C) void utf8ToEscapedStr2() { writeln("Dummy utf8ToEscapedStr2 called"); }
+extern (C) void escapedStrToUtf8()
+{
+    writeln("Dummy escapedStrToUtf8 called");
+}
 
+extern (C) void utf8ToEscapedStr()
+{
+    writeln("Dummy utf8ToEscapedStr called");
+}
 
-DllError fileSaveProc1Injector(RunOptions options) {
+extern (C) void utf8ToEscapedStr2()
+{
+    writeln("Dummy utf8ToEscapedStr2 called");
+}
+
+DllError fileSaveProc1Injector(RunOptions options)
+{
     DllError e;
 
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_29_2_0:
     case EU4Ver.v1_29_3_0:
     case EU4Ver.v1_29_4_0:
@@ -67,18 +82,23 @@ DllError fileSaveProc1Injector(RunOptions options) {
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_33_3_0:
         // mov     eax, [rcx+10h]
-        BytePattern.tempInstance().findPattern("8B 41 10 85 C0 0F 84 31 01 00 00");
-        if (BytePattern.tempInstance().hasSize(1, "ファイル名を安全にしている場所を短絡する")) {
+        BytePattern.tempInstance()
+            .findPattern("8B 41 10 85 C0 0F 84 31 01 00 00");
+        if (BytePattern.tempInstance().hasSize(1, "ファイル名を安全にしている場所を短絡する"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             // fileSaveProc1ReturnAddress = Injector::GetBranchDestination(address + 0x5).as_int();
-            fileSaveProc1ReturnAddress = address + 0x06; // Placeholder
+            fileSaveProc1ReturnAddress = address + 0x05 + get_branch_destination_offset(
+                cast(void*)(address + 0x05), 4); // Placeholder
 
-            // Injector::MakeJMP(address, fileSaveProc1, true);
-            writeln("Dummy JMP for fileSaveProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc1));
+            writeln("JMP for fileSaveProc1Injector created.");
         }
-        else {
-            e.unmatchdFileSaveProc1Injector = true;
+        else
+        {
+            e.unmatchdFileSaveProc1Injector = true; // 修正: Proc2InjectorではなくProc1Injectorのエラーフラグを立てる
         }
         break;
     default:
@@ -88,12 +108,14 @@ DllError fileSaveProc1Injector(RunOptions options) {
     return e;
 }
 
-DllError fileSaveProc2Injector(RunOptions options) {
+DllError fileSaveProc2Injector(RunOptions options)
+{
     DllError e;
     string pattern;
     int offset = 0;
 
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_33_3_0:
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_32_0_1:
@@ -138,7 +160,8 @@ DllError fileSaveProc2Injector(RunOptions options) {
     }
 
     BytePattern.tempInstance().findPattern(pattern);
-    if (BytePattern.tempInstance().hasSize(1, "ファイル名をUTF-8に変換して保存できるようにする")) {
+    if (BytePattern.tempInstance().hasSize(1, "ファイル名をUTF-8に変換して保存できるようにする"))
+    {
         size_t address = BytePattern.tempInstance().getFirst().address + offset;
 
         fileSaveProc2CallAddress = cast(size_t)&escapedStrToUtf8;
@@ -146,26 +169,30 @@ DllError fileSaveProc2Injector(RunOptions options) {
         // jnz     short loc_xxxxx
         fileSaveProc2ReturnAddress = address + 0x14 + 0x1B;
 
-        // cmp word ptr [rax+18h], 10h
-        // Injector::MakeJMP(address + 0x14, fileSaveProc2, true);
-        writeln("Dummy JMP for fileSaveProc2Injector called.");
+        PatchManager.instance().addPatch(cast(void*)(address + 0x14), makeJmp(
+                cast(void*)(address + 0x14), cast(void*) fileSaveProc2));
+        writeln("JMP for fileSaveProc2Injector created.");
     }
-    else {
+    else
+    {
         e.unmatchdFileSaveProc2Injector = true;
     }
 
     return e;
 }
 
-DllError fileSaveProc3Injector(RunOptions options) {
+DllError fileSaveProc3Injector(RunOptions options)
+{
     DllError e;
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_29_3_0:
     case EU4Ver.v1_29_2_0:
     case EU4Ver.v1_29_4_0:
         //  jmp     short loc_xxxxx
         BytePattern.tempInstance().findPattern("EB 6E 48 8D 15 ? ? ? ? FF 90 98 00 00 00 48");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのタイトルを表示できるようにする")) {
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのタイトルを表示できるようにする"))
+        {
             //  lea     rdx, aSave_game_titl ; "save_game_title"
             size_t address = BytePattern.tempInstance().getFirst().address + 0x2;
 
@@ -174,10 +201,12 @@ DllError fileSaveProc3Injector(RunOptions options) {
             // call sub_xxxxx
             fileSaveProc3ReturnAddress = address + 0x1A;
 
-            // Injector::MakeJMP(address, fileSaveProc3, true);
-            writeln("Dummy JMP for fileSaveProc3Injector called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc3));
+            writeln("JMP for fileSaveProc3Injector created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc3Injector = true;
         }
         break;
@@ -192,8 +221,10 @@ DllError fileSaveProc3Injector(RunOptions options) {
     case EU4Ver.v1_31_4_0:
     case EU4Ver.v1_31_5_0:
         //  jmp     short loc_xxxxx
-        BytePattern.tempInstance().findPattern("EB 6E 48 8D 15 ? ? ? ? FF 90 98 00 00 00 48");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのタイトルを表示できるようにする")) {
+        BytePattern.tempInstance()
+            .findPattern("EB 6E 48 8D 15 ? ? ? ? FF 90 98 00 00 00 48");
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのタイトルを表示できるようにする"))
+        {
             //  lea     rdx, aSave_game_titl ; "save_game_title"
             size_t address = BytePattern.tempInstance().getFirst().address + 0x2;
 
@@ -202,10 +233,12 @@ DllError fileSaveProc3Injector(RunOptions options) {
             // call sub_xxxxx
             fileSaveProc3ReturnAddress = address + 0x1A;
 
-            // Injector::MakeJMP(address, fileSaveProc3V130, true);
-            writeln("Dummy JMP for fileSaveProc3Injector (v1_30_plus) called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc3V130));
+            writeln("JMP for fileSaveProc3Injector (v1_30_plus) created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc3Injector = true;
         }
         break;
@@ -214,7 +247,8 @@ DllError fileSaveProc3Injector(RunOptions options) {
     case EU4Ver.v1_32_0_1:
     case EU4Ver.v1_31_6_0:
         BytePattern.tempInstance().findPattern("45 33 C0 48 8D 93 80 05 00 00 49 8B CE");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのタイトルを表示できるようにする")) {
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのタイトルを表示できるようにする"))
+        {
             //  xor     r8d, r8d
             size_t address = BytePattern.tempInstance().getFirst().address;
 
@@ -222,15 +256,18 @@ DllError fileSaveProc3Injector(RunOptions options) {
 
             // call {xxxxx}
             // fileSaveProc3CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            fileSaveProc3CallAddress2 = address + 0x0E; // Placeholder
+            fileSaveProc3CallAddress2 = address + 0x0D + get_branch_destination_offset(
+                cast(void*)(address + 0x0D), 4); // Placeholder
 
             // test rsi,rsi
             fileSaveProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, fileSaveProc3V1316, true);
-            writeln("Dummy JMP for fileSaveProc3Injector (v1_31_6_plus) called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc3V1316));
+            writeln("JMP for fileSaveProc3Injector (v1_31_6_plus) created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc3Injector = true;
         }
         break;
@@ -241,10 +278,12 @@ DllError fileSaveProc3Injector(RunOptions options) {
     return e;
 }
 
-DllError fileSaveProc4Injector(RunOptions options) {
+DllError fileSaveProc4Injector(RunOptions options)
+{
     DllError e;
 
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_29_2_0:
     case EU4Ver.v1_29_3_0:
     case EU4Ver.v1_29_4_0:
@@ -263,23 +302,28 @@ DllError fileSaveProc4Injector(RunOptions options) {
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_33_3_0:
         // lea     r8, [rbp+0]
-        BytePattern.tempInstance().findPattern("4C 8D 45 00 48 8D 15 ? ? ? ? 48 8D 4C 24 70 E8 ? ? ? ? 90");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする1")) {
+        BytePattern.tempInstance()
+            .findPattern("4C 8D 45 00 48 8D 15 ? ? ? ? 48 8D 4C 24 70 E8 ? ? ? ? 90");
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする1"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc4CallAddress = cast(size_t)&utf8ToEscapedStr2;
 
             // lea rdx, {aZy}
             // fileSaveProc4MarkerAddress = Injector::GetBranchDestination(address + 4).as_int();
-            fileSaveProc4MarkerAddress = address + 0x05; // Placeholder
+            fileSaveProc4MarkerAddress = address + 0x04 + get_branch_destination_offset(
+                cast(void*)(address + 0x04), 4); // Placeholder
 
             // call sub_xxxxx
             fileSaveProc4ReturnAddress = address + 0x10;
 
-            // Injector::MakeJMP(address, fileSaveProc4, true);
-            writeln("Dummy JMP for fileSaveProc4Injector called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc4));
+            writeln("JMP for fileSaveProc4Injector created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc4Injector = true;
         }
         break;
@@ -290,31 +334,38 @@ DllError fileSaveProc4Injector(RunOptions options) {
     return e;
 }
 
-DllError fileSaveProc5Injector(RunOptions options) {
+DllError fileSaveProc5Injector(RunOptions options)
+{
     DllError e;
 
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_29_2_0:
     case EU4Ver.v1_29_3_0:
     case EU4Ver.v1_29_4_0:
         // lea     r8, [r14+598h]
-        BytePattern.tempInstance().findPattern("4D 8D 86 98 05 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 50");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする2")) {
+        BytePattern.tempInstance()
+            .findPattern("4D 8D 86 98 05 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 50");
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする2"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc5CallAddress = cast(size_t)&utf8ToEscapedStr2;
 
             // lea rdx, {aZy}
             // fileSaveProc5MarkerAddress = Injector::GetBranchDestination(address + 7).as_int();
-            fileSaveProc5MarkerAddress = address + 0x08; // Placeholder
+            fileSaveProc5MarkerAddress = address + 0x07 + get_branch_destination_offset(
+                cast(void*)(address + 0x07), 4); // Placeholder
 
             // call sub_xxxxx
             fileSaveProc5ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, fileSaveProc5, true);
-            writeln("Dummy JMP for fileSaveProc5Injector called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc5));
+            writeln("JMP for fileSaveProc5Injector created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc5Injector = true;
         }
         break;
@@ -329,23 +380,28 @@ DllError fileSaveProc5Injector(RunOptions options) {
     case EU4Ver.v1_31_4_0:
     case EU4Ver.v1_31_5_0:
         // lea     r8, [r14+5C0h]
-        BytePattern.tempInstance().findPattern("4D 8D 86 C0 05 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 50");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする2")) {
+        BytePattern.tempInstance()
+            .findPattern("4D 8D 86 C0 05 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 50");
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする2"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc5CallAddress = cast(size_t)&utf8ToEscapedStr2;
 
             // lea rdx, {aZy}
             // fileSaveProc5MarkerAddress = Injector::GetBranchDestination(address + 7).as_int();
-            fileSaveProc5MarkerAddress = address + 0x08; // Placeholder
+            fileSaveProc5MarkerAddress = address + 0x07 + get_branch_destination_offset(
+                cast(void*)(address + 0x07), 4); // Placeholder
 
             // call sub_xxxxx
             fileSaveProc5ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, fileSaveProc5V130, true);
-            writeln("Dummy JMP for fileSaveProc5Injector (v1_30_plus) called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc5V130));
+            writeln("JMP for fileSaveProc5Injector (v1_30_plus) created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc5Injector = true;
         }
         break;
@@ -354,23 +410,28 @@ DllError fileSaveProc5Injector(RunOptions options) {
     case EU4Ver.v1_32_0_1:
     case EU4Ver.v1_31_6_0:
         // lea     r8, [r14+5C0h]
-        BytePattern.tempInstance().findPattern("4D 8D 86 C0 05 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 60");
-        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする2")) {
+        BytePattern.tempInstance()
+            .findPattern("4D 8D 86 C0 05 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 60");
+        if (BytePattern.tempInstance().hasSize(1, "ダイアログでのセーブエントリのツールチップを表示できるようにする2"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc5CallAddress = cast(size_t)&utf8ToEscapedStr2;
 
             // lea rdx, {aZy}
             // fileSaveProc5MarkerAddress = Injector::GetBranchDestination(address + 7).as_int();
-            fileSaveProc5MarkerAddress = address + 0x08; // Placeholder
+            fileSaveProc5MarkerAddress = address + 0x07 + get_branch_destination_offset(
+                cast(void*)(address + 0x07), 4); // Placeholder
 
             // call sub_xxxxx
             fileSaveProc5ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, fileSaveProc5V1316, true);
-            writeln("Dummy JMP for fileSaveProc5Injector (v1_31_6_plus) called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc5V1316));
+            writeln("JMP for fileSaveProc5Injector (v1_31_6_plus) created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc5Injector = true;
         }
         break;
@@ -381,30 +442,37 @@ DllError fileSaveProc5Injector(RunOptions options) {
     return e;
 }
 
-DllError fileSaveProc6Injector(RunOptions options) {
+DllError fileSaveProc6Injector(RunOptions options)
+{
     DllError e;
 
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_29_3_0:
     case EU4Ver.v1_29_4_0:
         // lea     r8, [rbp+380h]
-        BytePattern.tempInstance().findPattern("4C 8D 85 80 03 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 30");
-        if (BytePattern.tempInstance().hasSize(1, "スタート画面でのコンティニューのツールチップ")) {
+        BytePattern.tempInstance()
+            .findPattern("4C 8D 85 80 03 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 30");
+        if (BytePattern.tempInstance().hasSize(1, "スタート画面でのコンティニューのツールチップ"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc6CallAddress = cast(size_t)&utf8ToEscapedStr2;
 
             // lea r8, {aZy}
             // fileSaveProc6MarkerAddress = Injector::GetBranchDestination(address + 7).as_int();
-            fileSaveProc6MarkerAddress = address + 0x08; // Placeholder
+            fileSaveProc6MarkerAddress = address + 0x07 + get_branch_destination_offset(
+                cast(void*)(address + 0x07), 4); // Placeholder
 
             // call sub_xxxxx
             fileSaveProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, fileSaveProc6, true);
-            writeln("Dummy JMP for fileSaveProc6Injector called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc6));
+            writeln("JMP for fileSaveProc6Injector created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc6Injector = true;
         }
         break;
@@ -423,23 +491,28 @@ DllError fileSaveProc6Injector(RunOptions options) {
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_33_3_0:
         // lea     r8, [rbp+730h+var_3A0]
-        BytePattern.tempInstance().findPattern("4C 8D 85 90 03 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 30");
-        if (BytePattern.tempInstance().hasSize(1, "スタート画面でのコンティニューのツールチップ")) {
+        BytePattern.tempInstance()
+            .findPattern("4C 8D 85 90 03 00 00 48 8D 15 ? ? ? ? 48 8D 4C 24 30");
+        if (BytePattern.tempInstance().hasSize(1, "スタート画面でのコンティニューのツールチップ"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc6CallAddress = cast(size_t)&utf8ToEscapedStr2;
 
             // lea r8, {aZy}
             // fileSaveProc6MarkerAddress = Injector::GetBranchDestination(address + 7).as_int();
-            fileSaveProc6MarkerAddress = address + 0x08; // Placeholder
+            fileSaveProc6MarkerAddress = address + 0x07 + get_branch_destination_offset(
+                cast(void*)(address + 0x07), 4); // Placeholder
 
             // call sub_xxxxx
             fileSaveProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, fileSaveProc6V130, true);
-            writeln("Dummy JMP for fileSaveProc6Injector (v1_30_plus) called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc6V130));
+            writeln("JMP for fileSaveProc6Injector (v1_30_plus) created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc6Injector = true;
         }
         break;
@@ -450,15 +523,19 @@ DllError fileSaveProc6Injector(RunOptions options) {
     return e;
 }
 
-DllError fileSaveProc7Injector(RunOptions options) {
+DllError fileSaveProc7Injector(RunOptions options)
+{
     DllError e;
 
-    switch (options.eu4Version) {
+    switch (options.eu4Version)
+    {
     case EU4Ver.v1_29_3_0:
     case EU4Ver.v1_29_4_0:
         // lea     rcx, [rbx+0C8h]
-        BytePattern.tempInstance().findPattern("48 8D 8B C8 00 00 00 48 8B 01 48 8D 54 24 28");
-        if (BytePattern.tempInstance().hasSize(1, "セーブダイアログでのインプットテキストエリア")) {
+        BytePattern.tempInstance()
+            .findPattern("48 8D 8B C8 00 00 00 48 8B 01 48 8D 54 24 28");
+        if (BytePattern.tempInstance().hasSize(1, "セーブダイアログでのインプットテキストエリア"))
+        {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             fileSaveProc7CallAddress = cast(size_t)&utf8ToEscapedStr2;
@@ -466,10 +543,12 @@ DllError fileSaveProc7Injector(RunOptions options) {
             // call    qword ptr [rax+80h]
             fileSaveProc7ReturnAddress = address + 0xF;
 
-            // Injector::MakeJMP(address, fileSaveProc7, true);
-            writeln("Dummy JMP for fileSaveProc7Injector called.");
+            PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                    void*) fileSaveProc7));
+            writeln("JMP for fileSaveProc7Injector created.");
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc7Injector = true;
         }
         break;
@@ -492,14 +571,17 @@ DllError fileSaveProc7Injector(RunOptions options) {
 
         // epic
         BytePattern.tempInstance().findPattern("48 8D 8B C8 00 00 00 48 8B 01 48 8D 54 24 28");
-        if (BytePattern.tempInstance().hasSize(1, "セーブダイアログでのインプットテキストエリア")) {
+        if (BytePattern.tempInstance().hasSize(1, "セーブダイアログでのインプットテキストエリア"))
+        {
             address = BytePattern.tempInstance().getFirst().address;
         }
         // steam
-        else if (BytePattern.tempInstance().hasSize(2, "セーブダイアログでのインプットテキストエリア")) {
+        else if (BytePattern.tempInstance().hasSize(2, "セーブダイアログでのインプットテキストエリア"))
+        {
             address = BytePattern.tempInstance().getSecond().address;
         }
-        else {
+        else
+        {
             e.unmatchdFileSaveProc7Injector = true;
             break;
         }
@@ -509,8 +591,9 @@ DllError fileSaveProc7Injector(RunOptions options) {
         // call    qword ptr [rax+80h]
         fileSaveProc7ReturnAddress = address + 0xF;
 
-        // Injector::MakeJMP(address, fileSaveProc7, true);
-        writeln("Dummy JMP for fileSaveProc7Injector (v1_30_plus) called.");
+        PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
+                void*) fileSaveProc7));
+        writeln("JMP for fileSaveProc7Injector (v1_30_plus) created.");
 
         break;
     default:
@@ -520,7 +603,8 @@ DllError fileSaveProc7Injector(RunOptions options) {
     return e;
 }
 
-DllError init(EU4Ver eu4Version) {
+DllError init(EU4Ver eu4Version)
+{
     DllError result;
     RunOptions options;
     options.eu4Version = eu4Version;

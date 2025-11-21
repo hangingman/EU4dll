@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void mapPopupProc1();
@@ -46,11 +48,10 @@ DllError mapPopupProc1Injector(RunOptions options) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             // call {sub_xxxxx}
-            // mapPopupProc1CallAddress = Injector::GetBranchDestination(address + 14).as_int();
-            mapPopupProc1CallAddress = address + 14; // 仮のアドレス
+            mapPopupProc1CallAddress = address + 0x0E + get_branch_destination_offset(cast(void*)(address + 0x0E), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, mapPopupProc1, true);
-            writeln("Dummy JMP for mapPopupProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapPopupProc1));
+            writeln("JMP for mapPopupProc1Injector created.");
 
             // nop
             mapPopupProc1ReturnAddress = address + 19;
@@ -81,8 +82,8 @@ DllError mapPopupProc2Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "ループ１の文字取得")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // Injector::MakeJMP(address, mapPopupProc2, true);
-            writeln("Dummy JMP for mapPopupProc2Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapPopupProc2));
+            writeln("JMP for mapPopupProc2Injector (v1_29_X) created.");
 
             // jz xxxxx
             mapPopupProc2ReturnAddress = address + 15;
@@ -111,8 +112,8 @@ DllError mapPopupProc2Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "ループ１の文字取得")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // Injector::MakeJMP(address, mapPopupProc2V130, true);
-            writeln("Dummy JMP for mapPopupProc2Injector (v1_30_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapPopupProc2V130));
+            writeln("JMP for mapPopupProc2Injector (v1_30_X_plus) created.");
 
             // jz xxxxx
             mapPopupProc2ReturnAddress = address + 15;
@@ -143,8 +144,8 @@ DllError mapPopupProc3Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "ループ２の文字取得")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // Injector::MakeJMP(address, mapPopupProc3, true);
-            writeln("Dummy JMP for mapPopupProc3Injector (v1_29_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapPopupProc3));
+            writeln("JMP for mapPopupProc3Injector (v1_29_X) created.");
 
             //  movss   dword ptr [rbp+88h], xmm3
             mapPopupProc3ReturnAddress = address + 0x13;
@@ -173,8 +174,8 @@ DllError mapPopupProc3Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "ループ２の文字取得")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // Injector::MakeJMP(address, mapPopupProc3V130, true);
-            writeln("Dummy JMP for mapPopupProc3Injector (v1_30_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)mapPopupProc3V130));
+            writeln("JMP for mapPopupProc3Injector (v1_30_X_plus) created.");
 
             //  movss   dword ptr [rbp+88h], xmm3
             mapPopupProc3ReturnAddress = address + 0x13;

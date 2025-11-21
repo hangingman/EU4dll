@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void localizationProc2();
@@ -90,7 +92,7 @@ DllError localizationProc1Injector(RunOptions options){
 DllError localizationProc2Injector(RunOptions options) {
     DllError e;
 
-    // if (!options.reversingWordsBattleOfArea) return e; // FIXME: RunOptionsにreversingWordsBattleOfAreaがないためコメントアウト
+        // if (!options.reversingWordsBattleOfArea) return e; // FIXME: RunOptionsにreversingWordsBattleOfAreaがないためコメントアウト
 
     switch (options.eu4Version) {
     case EU4Ver.v1_29_4_0: {
@@ -102,8 +104,8 @@ DllError localizationProc2Injector(RunOptions options) {
             // nop
             localizationProc2ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc2, true);
-            writeln("Dummy JMP for localizationProc2Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc2));
+            writeln("JMP for localizationProc2Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc2Injector = true;
@@ -124,8 +126,8 @@ DllError localizationProc2Injector(RunOptions options) {
             // nop
             localizationProc2ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc2, true);
-            writeln("Dummy JMP for localizationProc2Injector (v1_30_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc2));
+            writeln("JMP for localizationProc2Injector (v1_30_X) created.");
         }
         else {
             e.unmatchdLocalizationProc2Injector = true;
@@ -149,8 +151,8 @@ DllError localizationProc2Injector(RunOptions options) {
             // nop
             localizationProc2ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc2, true);
-            writeln("Dummy JMP for localizationProc2Injector (v1_31_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc2));
+            writeln("JMP for localizationProc2Injector (v1_31_X) created.");
         }
         else {
             e.unmatchdLocalizationProc2Injector = true;
@@ -181,8 +183,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3));
+            writeln("JMP for localizationProc3Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -208,8 +210,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3V130, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_31_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3V130));
+            writeln("JMP for localizationProc3Injector (v1_31_X) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -225,8 +227,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3V130, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_30_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3V130));
+            writeln("JMP for localizationProc3Injector (v1_30_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -242,8 +244,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3V130, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_30_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3V130));
+            writeln("JMP for localizationProc3Injector (v1_30_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -259,8 +261,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3V130, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_30_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3V130));
+            writeln("JMP for localizationProc3Injector (v1_30_3_0) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -276,8 +278,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3V130, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_30_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3V130));
+            writeln("JMP for localizationProc3Injector (v1_30_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -293,8 +295,8 @@ DllError localizationProc3Injector(RunOptions options) {
             // nop
             localizationProc3ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc3V130, true);
-            writeln("Dummy JMP for localizationProc3Injector (v1_30_1_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc3V130));
+            writeln("JMP for localizationProc3Injector (v1_30_1_0) created.");
         }
         else {
             e.unmatchdLocalizationProc3Injector = true;
@@ -327,11 +329,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)wordOrderProc4, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4));
+            writeln("JMP for localizationProc4Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -352,11 +353,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_33_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_33_X) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -373,11 +373,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_31_6_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_31_6_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -394,11 +393,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_31_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_31_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -416,11 +414,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_31_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_31_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -438,11 +435,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_31_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_31_3_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -460,11 +456,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_31_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_31_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -482,11 +477,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_30_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_30_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -504,11 +498,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_30_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_30_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -526,11 +519,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_30_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_30_3_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -548,11 +540,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_30_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_30_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -570,11 +561,10 @@ DllError localizationProc4Injector(RunOptions options) {
             localizationProc4ReturnAddress = address + 0x12;
 
             // call {xxxxx} std::basic_string<char>#appendをフック。直接はバイナリパターンが多すぎでフックできなかった
-            // localizationProc1CallAddress2 = Injector::GetBranchDestination(address + 0xD).as_int();
-            localizationProc1CallAddress2 = address + 0x0E; // 仮のアドレス
+            localizationProc1CallAddress2 = address + 0x0D + get_branch_destination_offset(cast(void*)(address + 0x0D), 4); // 仮のアドレス
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc4V130, true);
-            writeln("Dummy JMP for localizationProc4Injector (v1_30_1_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc4V130));
+            writeln("JMP for localizationProc4Injector (v1_30_1_0) created.");
         }
         else {
             e.unmatchdLocalizationProc4Injector = true;
@@ -611,8 +601,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5V131, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_33_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5V131));
+            writeln("JMP for localizationProc5Injector (v1_33_X) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -628,8 +618,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5V131, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_31_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5V131));
+            writeln("JMP for localizationProc5Injector (v1_31_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -645,8 +635,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5V131, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_31_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5V131));
+            writeln("JMP for localizationProc5Injector (v1_31_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -662,8 +652,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5V131, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_31_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5V131));
+            writeln("JMP for localizationProc5Injector (v1_31_3_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -679,8 +669,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5V131, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_31_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5V131));
+            writeln("JMP for localizationProc5Injector (v1_31_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -697,8 +687,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_30_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5));
+            writeln("JMP for localizationProc5Injector (v1_30_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -714,8 +704,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_30_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5));
+            writeln("JMP for localizationProc5Injector (v1_30_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -731,8 +721,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_30_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5));
+            writeln("JMP for localizationProc5Injector (v1_30_3_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -748,8 +738,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_30_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5));
+            writeln("JMP for localizationProc5Injector (v1_30_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -765,8 +755,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_30_1_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5));
+            writeln("JMP for localizationProc5Injector (v1_30_1_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -782,8 +772,8 @@ DllError localizationProc5Injector(RunOptions options) {
             // nop
             localizationProc5ReturnAddress = address + 0x12;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc5, true);
-            writeln("Dummy JMP for localizationProc5Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc5));
+            writeln("JMP for localizationProc5Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc5Injector = true;
@@ -823,8 +813,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_32_0_1) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_32_0_1) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -841,8 +831,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_31_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_31_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -859,8 +849,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_31_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_31_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -877,8 +867,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_31_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_31_3_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -895,8 +885,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_31_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_31_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -915,8 +905,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_30_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_30_X) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -933,8 +923,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_30_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_30_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -951,8 +941,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_30_1_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_30_1_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -969,8 +959,8 @@ DllError localizationProc6Injector(RunOptions options) {
             // nop
             localizationProc6ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc6, true);
-            writeln("Dummy JMP for localizationProc6Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc6));
+            writeln("JMP for localizationProc6Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc6Injector = true;
@@ -1010,16 +1000,14 @@ DllError localizationProc7Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "D M, Y → Y年MD日")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // localizationProc7CallAddress1 = Injector::GetBranchDestination(address + 0xF).as_int();
-            localizationProc7CallAddress1 = address + 0x10; // 仮のアドレス
-            // localizationProc7CallAddress2 = Injector::GetBranchDestination(address + 0x20).as_int();
-            localizationProc7CallAddress2 = address + 0x21; // 仮のアドレス
+            localizationProc7CallAddress1 = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
+            localizationProc7CallAddress2 = address + 0x20 + get_branch_destination_offset(cast(void*)(address + 0x20), 4); // 仮のアドレス
 
             // nop
             localizationProc7ReturnAddress = address + 0x5E;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc7, true);
-            writeln("Dummy JMP for localizationProc7Injector (v1_30_5_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc7));
+            writeln("JMP for localizationProc7Injector (v1_30_5_0) created.");
         }
         else {
             e.unmatchdLocalizationProc7Injector = true;
@@ -1034,16 +1022,14 @@ DllError localizationProc7Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "D M, Y → Y年MD日")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // localizationProc7CallAddress1 = Injector::GetBranchDestination(address + 0xF).as_int();
-            localizationProc7CallAddress1 = address + 0x10; // 仮のアドレス
-            // localizationProc7CallAddress2 = Injector::GetBranchDestination(address + 0x20).as_int();
-            localizationProc7CallAddress2 = address + 0x21; // 仮のアドレス
+            localizationProc7CallAddress1 = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
+            localizationProc7CallAddress2 = address + 0x20 + get_branch_destination_offset(cast(void*)(address + 0x20), 4); // 仮のアドレス
 
             // nop
             localizationProc7ReturnAddress = address + 0x5E;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc7, true);
-            writeln("Dummy JMP for localizationProc7Injector (v1_30_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc7));
+            writeln("JMP for localizationProc7Injector (v1_30_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc7Injector = true;
@@ -1057,16 +1043,14 @@ DllError localizationProc7Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "D M, Y → Y年MD日")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // localizationProc7CallAddress1 = Injector::GetBranchDestination(address + 0xF).as_int();
-            localizationProc7CallAddress1 = address + 0x10; // 仮のアドレス
-            // localizationProc7CallAddress2 = Injector::GetBranchDestination(address + 0x20).as_int();
-            localizationProc7CallAddress2 = address + 0x21; // 仮のアドレス
+            localizationProc7CallAddress1 = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
+            localizationProc7CallAddress2 = address + 0x20 + get_branch_destination_offset(cast(void*)(address + 0x20), 4); // 仮のアドレス
 
             // nop
             localizationProc7ReturnAddress = address + 0x5E;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc7, true);
-            writeln("Dummy JMP for localizationProc7Injector (v1_30_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc7));
+            writeln("JMP for localizationProc7Injector (v1_30_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc7Injector = true;
@@ -1080,16 +1064,14 @@ DllError localizationProc7Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "D M, Y → Y年MD日")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // localizationProc7CallAddress1 = Injector::GetBranchDestination(address + 0xF).as_int();
-            localizationProc7CallAddress1 = address + 0x10; // 仮のアドレス
-            // localizationProc7CallAddress2 = Injector::GetBranchDestination(address + 0x20).as_int();
-            localizationProc7CallAddress2 = address + 0x21; // 仮のアドレス
+            localizationProc7CallAddress1 = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
+            localizationProc7CallAddress2 = address + 0x20 + get_branch_destination_offset(cast(void*)(address + 0x20), 4); // 仮のアドレス
 
             // nop
             localizationProc7ReturnAddress = address + 0x5E;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc7, true);
-            writeln("Dummy JMP for localizationProc7Injector (v1_30_1_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc7));
+            writeln("JMP for localizationProc7Injector (v1_30_1_0) created.");
         }
         else {
             e.unmatchdLocalizationProc7Injector = true;
@@ -1103,16 +1085,14 @@ DllError localizationProc7Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "D M, Y → Y年MD日")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // localizationProc7CallAddress1 = Injector::GetBranchDestination(address + 0xF).as_int();
-            localizationProc7CallAddress1 = address + 0x10; // 仮のアドレス
-            // localizationProc7CallAddress2 = Injector::GetBranchDestination(address + 0x20).as_int();
-            localizationProc7CallAddress2 = address + 0x21; // 仮のアドレス
+            localizationProc7CallAddress1 = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // 仮のアドレス
+            localizationProc7CallAddress2 = address + 0x20 + get_branch_destination_offset(cast(void*)(address + 0x20), 4); // 仮のアドレス
 
             // nop
             localizationProc7ReturnAddress = address + 0x5E;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc7, true);
-            writeln("Dummy JMP for localizationProc7Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc7));
+            writeln("JMP for localizationProc7Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc7Injector = true;
@@ -1150,18 +1130,15 @@ DllError localizationProc8Injector(RunOptions options) {
             // mov     r8d, 1
             size_t address = BytePattern.tempInstance().getFirst().address - 0x16;
 
-            // generateCString = Injector::GetBranchDestination(address + 0x11).as_int();
-            generateCString = address + 0x12; // 仮のアドレス
-            // concatCString = Injector::GetBranchDestination(address + 0x23).as_int();
-            concatCString = address + 0x24; // 仮のアドレス
-            // concat2CString = Injector::GetBranchDestination(address + 0x33).as_int();
-            concat2CString = address + 0x34; // 仮のアドレス
+            generateCString = address + 0x11 + get_branch_destination_offset(cast(void*)(address + 0x11), 4); // 仮のアドレス
+            concatCString = address + 0x23 + get_branch_destination_offset(cast(void*)(address + 0x23), 4); // 仮のアドレス
+            concat2CString = address + 0x33 + get_branch_destination_offset(cast(void*)(address + 0x33), 4); // 仮のアドレス
 
             // nop
             localizationProc8ReturnAddress = address + 0x38;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc8, true);
-            writeln("Dummy JMP for localizationProc8Injector (v1_33_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc8));
+            writeln("JMP for localizationProc8Injector (v1_33_X) created.");
         }
         else {
             e.unmatchdLocalizationProc8Injector = true;
@@ -1177,18 +1154,15 @@ DllError localizationProc8Injector(RunOptions options) {
             // mov     r8d, 1
             size_t address = BytePattern.tempInstance().getFirst().address - 0x16;
 
-            // generateCString = Injector::GetBranchDestination(address + 0x11).as_int();
-            generateCString = address + 0x12; // 仮のアドレス
-            // concatCString = Injector::GetBranchDestination(address + 0x23).as_int();
-            concatCString = address + 0x24; // 仮のアドレス
-            // concat2CString = Injector::GetBranchDestination(address + 0x33).as_int();
-            concat2CString = address + 0x34; // 仮のアドレス
+            generateCString = address + 0x11 + get_branch_destination_offset(cast(void*)(address + 0x11), 4); // 仮のアドレス
+            concatCString = address + 0x23 + get_branch_destination_offset(cast(void*)(address + 0x23), 4); // 仮のアドレス
+            concat2CString = address + 0x33 + get_branch_destination_offset(cast(void*)(address + 0x33), 4); // 仮のアドレス
 
             // nop
             localizationProc8ReturnAddress = address + 0x38;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc8, true);
-            writeln("Dummy JMP for localizationProc8Injector (v1_30_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc8));
+            writeln("JMP for localizationProc8Injector (v1_30_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc8Injector = true;
@@ -1203,18 +1177,15 @@ DllError localizationProc8Injector(RunOptions options) {
             // mov     r8d, 1
             size_t address = BytePattern.tempInstance().getFirst().address - 0x16;
 
-            // generateCString = Injector::GetBranchDestination(address + 0x11).as_int();
-            generateCString = address + 0x12; // 仮のアドレス
-            // concatCString = Injector::GetBranchDestination(address + 0x23).as_int();
-            concatCString = address + 0x24; // 仮のアドレス
-            // concat2CString = Injector::GetBranchDestination(address + 0x33).as_int();
-            concat2CString = address + 0x34; // 仮のアドレス
+            generateCString = address + 0x11 + get_branch_destination_offset(cast(void*)(address + 0x11), 4); // 仮のアドレス
+            concatCString = address + 0x23 + get_branch_destination_offset(cast(void*)(address + 0x23), 4); // 仮のアドレス
+            concat2CString = address + 0x33 + get_branch_destination_offset(cast(void*)(address + 0x33), 4); // 仮のアドレス
 
             // nop
             localizationProc8ReturnAddress = address + 0x38;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc8, true);
-            writeln("Dummy JMP for localizationProc8Injector (v1_30_2_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc8));
+            writeln("JMP for localizationProc8Injector (v1_30_2_0) created.");
         }
         else {
             e.unmatchdLocalizationProc8Injector = true;
@@ -1229,18 +1200,15 @@ DllError localizationProc8Injector(RunOptions options) {
             // mov     r8d, 1
             size_t address = BytePattern.tempInstance().getFirst().address - 0x16;
 
-            // generateCString = Injector::GetBranchDestination(address + 0x11).as_int();
-            generateCString = address + 0x12; // 仮のアドレス
-            // concatCString = Injector::GetBranchDestination(address + 0x23).as_int();
-            concatCString = address + 0x24; // 仮のアドレス
-            // concat2CString = Injector::GetBranchDestination(address + 0x33).as_int();
-            concat2CString = address + 0x34; // 仮のアドレス
+            generateCString = address + 0x11 + get_branch_destination_offset(cast(void*)(address + 0x11), 4); // 仮のアドレス
+            concatCString = address + 0x23 + get_branch_destination_offset(cast(void*)(address + 0x23), 4); // 仮のアドレス
+            concat2CString = address + 0x33 + get_branch_destination_offset(cast(void*)(address + 0x33), 4); // 仮のアドレス
 
             // nop
             localizationProc8ReturnAddress = address + 0x38;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc8, true);
-            writeln("Dummy JMP for localizationProc8Injector (v1_30_1_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc8));
+            writeln("JMP for localizationProc8Injector (v1_30_1_0) created.");
         }
         else {
             e.unmatchdLocalizationProc8Injector = true;
@@ -1255,18 +1223,15 @@ DllError localizationProc8Injector(RunOptions options) {
             // mov     r8d, 1
             size_t address = BytePattern.tempInstance().getFirst().address - 0x16;
 
-            // generateCString = Injector::GetBranchDestination(address + 0x11).as_int();
-            generateCString = address + 0x12; // 仮のアドレス
-            // concatCString = Injector::GetBranchDestination(address + 0x23).as_int();
-            concatCString = address + 0x24; // 仮のアドレス
-            // concat2CString = Injector::GetBranchDestination(address + 0x33).as_int();
-            concat2CString = address + 0x34; // 仮のアドレス
+            generateCString = address + 0x11 + get_branch_destination_offset(cast(void*)(address + 0x11), 4); // 仮のアドレス
+            concatCString = address + 0x23 + get_branch_destination_offset(cast(void*)(address + 0x23), 4); // 仮のアドレス
+            concat2CString = address + 0x33 + get_branch_destination_offset(cast(void*)(address + 0x33), 4); // 仮のアドレス
 
             // nop
             localizationProc8ReturnAddress = address + 0x38;
 
-            // Injector::MakeJMP(address, cast(size_t)localizationProc8, true);
-            writeln("Dummy JMP for localizationProc8Injector (v1_29_4_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)localizationProc8));
+            writeln("JMP for localizationProc8Injector (v1_29_4_0) created.");
         }
         else {
             e.unmatchdLocalizationProc8Injector = true;
@@ -1297,10 +1262,10 @@ DllError localizationProc9Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("20 2D 20 00 4D 4F 4E 54 48 53 00 00");
         if (BytePattern.tempInstance().hasSize(1, "Replace space")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
-            // Injector::WriteMemory!ubyte(address+0, 0x20,true);
-            // Injector::WriteMemory!ubyte(address+1, 0x2D, true);
-            // Injector::WriteMemory!ubyte(address+2, 0x20, true);
-            writeln("Dummy WriteMemory for localizationProc9Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address + 0, [0x20]);
+            PatchManager.instance().addPatch(cast(void*)address + 1, [0x2D]);
+            PatchManager.instance().addPatch(cast(void*)address + 2, [0x20]);
+            writeln("WriteMemory for localizationProc9Injector called.");
         }
         else {
             e.unmatchdLocalizationProc9Injector = true;

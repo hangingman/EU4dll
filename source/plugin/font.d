@@ -5,6 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void fontBufferHeapZeroClear();
@@ -45,9 +47,9 @@ DllError charCodePointLimiterPatchInjector(RunOptions options) {
         BytePattern.tempInstance().findPattern("81 FF FF 00 00 00 0F 87 2C 01 00 00 83");
         if (BytePattern.tempInstance().hasSize(1, "Char Code Point Limiter")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
-            // FIXME: Injector::WriteMemory に相当するD言語でのメモリ書き換え処理を実装する
-            // Injector.WriteMemory!ubyte(address + 3, 0xFF, true);
-            writeln("Dummy WriteMemory for charCodePointLimiterPatchInjector called.");
+            // Injector::WriteMemory に相当するD言語でのメモリ書き換え処理を実装する
+            PatchManager.instance().addPatch(cast(void*)(address + 3), [0xFF]);
+            writeln("WriteMemory for charCodePointLimiterPatchInjector called.");
         }
         else {
             e.unmatchdCharCodePointLimiterPatchInjector = true;
@@ -92,17 +94,15 @@ DllError fontBufferHeapZeroClearInjector(RunOptions options) {
             size_t address = BytePattern.tempInstance().getFirst().address;
             
             // mov rcx, {cs:hHeap}
-            // FIXME: Injector::GetBranchDestination に相当するD言語でのアドレス取得処理を実装する
-            // fontBufferHeapZeroClearHeapJmpAddress = Injector.GetBranchDestination(address + 0x0).as_int();
+            // FIXME: Injector::GetBranchDestination に相当するD言語でのアドレス取得処理を実装する (必要であれば実装する)
             fontBufferHeapZeroClearHeapJmpAddress = address + 0x01; // 仮のアドレス
-            // call {{cs:HeapAlloc}}
-            // fontBufferHeapZeroClearHeepAllocJmpAddress = Injector.GetBranchDestination(address + 0xC).as_int();
+
             fontBufferHeapZeroClearHeepAllocJmpAddress = address + 0x0D; // 仮のアドレス
             // jz short loc_xxxxx
             fontBufferHeapZeroClearReturnAddress = address + 0x15;
 
-            // Injector::MakeJMP(address, cast(size_t)fontBufferHeapZeroClear, true);
-            writeln("Dummy JMP for fontBufferHeapZeroClearInjector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)fontBufferHeapZeroClear));
+            writeln("JMP for fontBufferHeapZeroClearInjector called.");
         } else {
             e.unmatchdFontBufferHeapZeroClearInjector = true;
         }
@@ -143,8 +143,8 @@ DllError fontBufferClear1Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("BA 88 3D 00 00 48 8B CF");
         if (BytePattern.tempInstance().hasSize(1, "Font buffer clear")) {
             // mov edx, 3D88h
-            // Injector::WriteMemory!ubyte(BytePattern.tempInstance().getFirst().address(0x3), 0x10, true);
-            writeln("Dummy WriteMemory for fontBufferClear1Injector called.");
+            PatchManager.instance().addPatch(BytePattern.tempInstance().getFirst().address + 0x3, [0x10]);
+            writeln("WriteMemory for fontBufferClear1Injector called.");
         }
         else {
             e.unmatchdFontBufferClear1Injector = true;
@@ -186,8 +186,8 @@ DllError fontBufferClear2Injector(RunOptions options) {
         BytePattern.tempInstance().findPattern("BA 88 3D 00 00 48 8B 4D 28");
         if (BytePattern.tempInstance().hasSize(1, "Font buffer clear")) {
             // mov edx, 3D88h
-            // Injector::WriteMemory!ubyte(BytePattern.tempInstance().getFirst().address(0x3), 0x10, true);
-            writeln("Dummy WriteMemory for fontBufferClear2Injector called.");
+            PatchManager.instance().addPatch(BytePattern.tempInstance().getFirst().address + 0x3, [0x10]);
+            writeln("WriteMemory for fontBufferClear2Injector called.");
         }
         else {
             e.unmatchdFontBufferClear2Injector = true;
@@ -229,8 +229,8 @@ DllError fontBufferExpansionInjector(RunOptions options) {
         BytePattern.tempInstance().findPattern("B9 88 3D 00 00");
         if (BytePattern.tempInstance().hasSize(1, "Font buffer expansion")) {
             // mov ecx, 3D88h
-            // Injector::WriteMemory!ubyte(BytePattern.tempInstance().getFirst().address(0x3), 0x10, true);
-            writeln("Dummy WriteMemory for fontBufferExpansionInjector called.");
+            PatchManager.instance().addPatch(BytePattern.tempInstance().getFirst().address + 0x3, [0x10]);
+            writeln("WriteMemory for fontBufferExpansionInjector called.");
         } else {
             e.unmatchdFontBufferExpansionInjector = true;
         }
@@ -271,8 +271,8 @@ DllError fontSizeLimitInjector(RunOptions options) {
         BytePattern.tempInstance().findPattern("41 81 FE 00 00 00 01");
         if (BytePattern.tempInstance().hasSize(1, "Font size limit")) {
             // cmp r14d, 1000000h
-            // Injector::WriteMemory!ubyte(BytePattern.tempInstance().getFirst().address(0x6), 0x04, true);
-            writeln("Dummy WriteMemory for fontSizeLimitInjector called.");
+            PatchManager.instance().addPatch(BytePattern.tempInstance().getFirst().address + 0x6, [0x04]);
+            writeln("WriteMemory for fontSizeLimitInjector called.");
         } else {
             e.unmatchdFontSizeLimitInjector = true;
         }

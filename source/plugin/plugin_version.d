@@ -4,11 +4,13 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 // C++のversion.cppに対応するダミー関数群
 extern(C) {
     // 例: バージョン情報取得関数など
-    // uint GetPluginVersion();
+    void GetPluginVersion();
 }
 
 // 必要に応じて、C++版のグローバル変数や構造体をD言語で再定義
@@ -42,17 +44,17 @@ DllError versionProc1Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "versionProc1のダミーパターン")) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
-            // Injector::MakeJMP(address, versionProc1, true); // ダミー
-            writeln("Dummy JMP for versionProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
+            writeln("JMP for versionProc1Injector created.");
 
             // versionProc1ReturnAddress = address + 0x05; // 適当なリターンアドレス
         }
         else {
-            e.unmatchdVersionProc1Injector = true; // 新しいエラーフラグが必要
+            e.unmatchdVersionProc1Injector = true;
         }
         break;
     default:
-        e.versionVersionProc1Injector = true; // 新しいエラーフラグが必要
+        e.versionVersionProc1Injector = true;
     }
 
     return e;
@@ -64,8 +66,7 @@ DllError init(EU4Ver eu4Version) {
     RunOptions options;
     options.eu4Version = eu4Version;
 
-    // TODO: ここにversion関連のフック処理を追加
-    // result = result | versionProc1Injector(options);
+    result = result | versionProc1Injector(options);
 
     return result;
 }

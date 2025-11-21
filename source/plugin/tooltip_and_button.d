@@ -4,6 +4,8 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
     void tooltipAndButtonProc1();
@@ -42,13 +44,13 @@ DllError tooltipAndButtonProc1Injector(RunOptions options) {
 
             // call {sub_xxxxx}
             // tooltipAndButtonProc1CallAddress = Injector::GetBranchDestination(address + 0x0F).as_int();
-            tooltipAndButtonProc1CallAddress = address + 0x10; // Placeholder
+            tooltipAndButtonProc1CallAddress = address + 0x0F + get_branch_destination_offset(cast(void*)(address + 0x0F), 4); // Placeholder
 
             // nop
             tooltipAndButtonProc1ReturnAddress = address + 0x14;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc1V133, true);
-            writeln("Dummy JMP for tooltipAndButtonProc1Injector (v1_33_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc1V133));
+            writeln("JMP for tooltipAndButtonProc1Injector (v1_33_3_0) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc1Injector = true;
@@ -78,13 +80,13 @@ DllError tooltipAndButtonProc1Injector(RunOptions options) {
 
             // call {sub_xxxxx}
             // tooltipAndButtonProc1CallAddress = Injector::GetBranchDestination(address + 0x0E).as_int();
-            tooltipAndButtonProc1CallAddress = address + 0x0F; // Placeholder
+            tooltipAndButtonProc1CallAddress = address + 0x0E + get_branch_destination_offset(cast(void*)(address + 0x0E), 4); // Placeholder
             
             // nop
             tooltipAndButtonProc1ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc1, true);
-            writeln("Dummy JMP for tooltipAndButtonProc1Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc1));
+            writeln("JMP for tooltipAndButtonProc1Injector created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc1Injector = true;
@@ -110,8 +112,8 @@ DllError tooltipAndButtonProc2Injector(RunOptions options) {
             // test rcx,rcx
             tooltipAndButtonProc2ReturnAddress = address + 0xE;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc2V133, true);
-            writeln("Dummy JMP for tooltipAndButtonProc2Injector (v1_33_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc2V133));
+            writeln("JMP for tooltipAndButtonProc2Injector (v1_33_3_0) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc2Injector = true;
@@ -142,8 +144,8 @@ DllError tooltipAndButtonProc2Injector(RunOptions options) {
             // test rcx,rcx
             tooltipAndButtonProc2ReturnAddress = address + 0x11;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc2, true);
-            writeln("Dummy JMP for tooltipAndButtonProc2Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc2));
+            writeln("JMP for tooltipAndButtonProc2Injector created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc2Injector = true;
@@ -186,8 +188,8 @@ DllError tooltipAndButtonProc3Injector(RunOptions options) {
             // test r11, r11
             tooltipAndButtonProc3ReturnAddress = address + 0x13;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc3, true);
-            writeln("Dummy JMP for tooltipAndButtonProc3Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc3));
+            writeln("JMP for tooltipAndButtonProc3Injector created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc3Injector = true;
@@ -226,13 +228,13 @@ DllError tooltipAndButtonProc4Injector(RunOptions options) {
 
             // jnz {loc_xxxxx} / inc ebx
             // tooltipAndButtonProc4ReturnAddress1 = Injector::GetBranchDestination(address + 0x5).as_int();
-            tooltipAndButtonProc4ReturnAddress1 = address + 0x06; // Placeholder
+            tooltipAndButtonProc4ReturnAddress1 = address + 0x05 + get_branch_destination_offset(cast(void*)(address + 0x05), 4); // Placeholder
 
             // jz loc_xxxxx
             tooltipAndButtonProc4ReturnAddress2 = address + 15;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc4, true);
-            writeln("Dummy JMP for tooltipAndButtonProc4Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc4));
+            writeln("JMP for tooltipAndButtonProc4Injector created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc4Injector = true;
@@ -247,13 +249,13 @@ DllError tooltipAndButtonProc4Injector(RunOptions options) {
 
             // jnz {loc_xxxxx} / inc ebx
             // tooltipAndButtonProc4ReturnAddress1 = Injector::GetBranchDestination(address + 0x5).as_int();
-            tooltipAndButtonProc4ReturnAddress1 = address + 0x06; // Placeholder
+            tooltipAndButtonProc4ReturnAddress1 = address + 0x05 + get_branch_destination_offset(cast(void*)(address + 0x05), 4); // Placeholder
 
             // jz loc_xxxxx
             tooltipAndButtonProc4ReturnAddress2 = address + 15;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc4, true);
-            writeln("Dummy JMP for tooltipAndButtonProc4Injector (v1_32/33) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc4));
+            writeln("JMP for tooltipAndButtonProc4Injector (v1_32/33) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc4Injector = true;
@@ -267,13 +269,13 @@ DllError tooltipAndButtonProc4Injector(RunOptions options) {
 
             // jnz {loc_xxxxx} / inc ebx
             // tooltipAndButtonProc4ReturnAddress1 = Injector::GetBranchDestination(address + 0x5).as_int();
-            tooltipAndButtonProc4ReturnAddress1 = address + 0x06; // Placeholder
+            tooltipAndButtonProc4ReturnAddress1 = address + 0x05 + get_branch_destination_offset(cast(void*)(address + 0x05), 4); // Placeholder
 
             // jz loc_xxxxx
             tooltipAndButtonProc4ReturnAddress2 = address + 15;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc4V133, true);
-            writeln("Dummy JMP for tooltipAndButtonProc4Injector (v1_33_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc4V133));
+            writeln("JMP for tooltipAndButtonProc4Injector (v1_33_3_0) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc4Injector = true;
@@ -311,8 +313,8 @@ DllError tooltipAndButtonProc5Injector(RunOptions options) {
             // jz short loc_xxxxx
             tooltipAndButtonProc5ReturnAddress1 = address + 0x14;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc5, true);
-            writeln("Dummy JMP for tooltipAndButtonProc5Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc5));
+            writeln("JMP for tooltipAndButtonProc5Injector created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc5Injector = true;
@@ -340,8 +342,8 @@ DllError tooltipAndButtonProc5Injector(RunOptions options) {
             // jz short loc_xxxxx
             tooltipAndButtonProc5ReturnAddress1 = address + 0x14;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc5V130, true);
-            writeln("Dummy JMP for tooltipAndButtonProc5Injector (v1_30_X) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc5V130));
+            writeln("JMP for tooltipAndButtonProc5Injector (v1_30_X) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc5Injector = true;
@@ -373,8 +375,8 @@ DllError tooltipAndButtonProc5Injector(RunOptions options) {
             // jz short loc_xxxxx
             tooltipAndButtonProc5ReturnAddress1 = address + 0x14;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc5V130, true);
-            writeln("Dummy JMP for tooltipAndButtonProc5Injector (v1_31_X_plus) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc5V130));
+            writeln("JMP for tooltipAndButtonProc5Injector (v1_31_X_plus) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc5Injector = true;
@@ -399,8 +401,8 @@ DllError tooltipAndButtonProc6Injector(RunOptions options) {
         // inc edx
         BytePattern.tempInstance().findPattern("A7 52 2D 20 00 00 00 00");
         if (BytePattern.tempInstance().hasSize(1, "空白をノーブレークスペースに変換")) {
-            // Injector::WriteMemory(BytePattern.tempInstance().getFirst().address() + 3, 0xA0, true);
-            writeln("Dummy WriteMemory for tooltipAndButtonProc6Injector called.");
+            PatchManager.instance().addPatch(BytePattern.tempInstance().getFirst().address + 3, [0xA0]);
+            writeln("WriteMemory for tooltipAndButtonProc6Injector called.");
         }
         else {
             e.unmatchdTooltipAndButtonProc6Injector = true;
@@ -425,13 +427,13 @@ DllError tooltipAndButtonProc7Injector(RunOptions options) {
 
             // jmp loc_xxxxx
             // tooltipAndButtonProc7ReturnAddress1 = Injector::GetBranchDestination(address + 0x7).as_int();
-            tooltipAndButtonProc7ReturnAddress1 = address + 0x08; // Placeholder
+            tooltipAndButtonProc7ReturnAddress1 = address + 0x07 + get_branch_destination_offset(cast(void*)(address + 0x07), 4); // Placeholder
 
             // mov	edi, dword ptr [rsp+22D0h+var_2290]
             tooltipAndButtonProc7ReturnAddress2 = address + 0x24;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc7V133, true);
-            writeln("Dummy JMP for tooltipAndButtonProc7Injector (v1_33_3_0) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc7V133));
+            writeln("JMP for tooltipAndButtonProc7Injector (v1_33_3_0) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc7Injector = true;
@@ -446,13 +448,13 @@ DllError tooltipAndButtonProc7Injector(RunOptions options) {
 
             // jmp loc_xxxxx
             // tooltipAndButtonProc7ReturnAddress1 = Injector::GetBranchDestination(address + 0x7).as_int();
-            tooltipAndButtonProc7ReturnAddress1 = address + 0x08; // Placeholder
+            tooltipAndButtonProc7ReturnAddress1 = address + 0x07 + get_branch_destination_offset(cast(void*)(address + 0x07), 4); // Placeholder
 
             // mov	edi, dword ptr [rbp+6E0h+38h]
             tooltipAndButtonProc7ReturnAddress2 = address + 0x24;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc7, true);
-            writeln("Dummy JMP for tooltipAndButtonProc7Injector called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc7));
+            writeln("JMP for tooltipAndButtonProc7Injector created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc7Injector = true;
@@ -479,11 +481,11 @@ DllError tooltipAndButtonProc7Injector(RunOptions options) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             // tooltipAndButtonProc7ReturnAddress1 = Injector::GetBranchDestination(address + 0x7).as_int();
-            tooltipAndButtonProc7ReturnAddress1 = address + 0x08; // Placeholder
+            tooltipAndButtonProc7ReturnAddress1 = address + 0x07 + get_branch_destination_offset(cast(void*)(address + 0x07), 4); // Placeholder
             tooltipAndButtonProc7ReturnAddress2 = address + 0x24;
 
-            // Injector::MakeJMP(address, tooltipAndButtonProc7, true);
-            writeln("Dummy JMP for tooltipAndButtonProc7Injector (v1_29-31) called.");
+            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)tooltipAndButtonProc7));
+            writeln("JMP for tooltipAndButtonProc7Injector (v1_29-31) created.");
         }
         else {
             e.unmatchdTooltipAndButtonProc7Injector = true;
