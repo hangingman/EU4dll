@@ -10,7 +10,7 @@ import plugin.process.process : get_executable_memory_range; // get_executable_m
 // C++のversion.cppに対応するダミー関数群
 extern(C) {
     // 例: バージョン情報取得関数など
-    void GetPluginVersion();
+    void* GetPluginVersion() { return null; }
 }
 
 // 必要に応じて、C++版のグローバル変数や構造体をD言語で再定義

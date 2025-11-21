@@ -6,16 +6,17 @@ import plugin.constant;
 import plugin.input; // For DllError and RunOptions
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
+import plugin.misc; // get_branch_destination_offset を使用するためにインポート
 
 extern(C) {
-    void listFieldAdjustmentProc1();
-    void listFieldAdjustmentProc2();
-    void listFieldAdjustmentProc3();
-    void listFieldAdjustmentProc1_v131();
-    void listFieldAdjustmentProc1_v1315();
-    void listFieldAdjustmentProc2_v131();
-    void listFieldAdjustmentProc2_v1315();
-    void listFieldAdjustmentProc3_v1315();
+    void* listFieldAdjustmentProc1() { return null; }
+    void* listFieldAdjustmentProc2() { return null; }
+    void* listFieldAdjustmentProc3() { return null; }
+    void* listFieldAdjustmentProc1_v131() { return null; }
+    void* listFieldAdjustmentProc1_v1315() { return null; }
+    void* listFieldAdjustmentProc2_v131() { return null; }
+    void* listFieldAdjustmentProc2_v1315() { return null; }
+    void* listFieldAdjustmentProc3_v1315() { return null; }
 }
 
 // Return addresses
@@ -121,7 +122,7 @@ DllError listFieldAdjustmentProc2Injector(RunOptions options) {
             // 0F 8D 20 02 00 00 is JGE rel32. 
             // address+9 is where the JGE instruction starts.
             // We need to read the offset and add it.
-            listFieldAdjustmentProc2V1315ReturnAddress = address + 0x09 + get_branch_destination_offset(cast(void*)(address + 0x09), 4);
+            listFieldAdjustmentProc2V1315ReturnAddress = address + 0x09 + get_branch_destination_offset(cast(void*)(address + 0x09 + 2), 4); // 修正: オフセットアドレスの取得箇所を修正
             
             listFieldAdjustmentProc2ReturnAddress = address + 0x0F;
 

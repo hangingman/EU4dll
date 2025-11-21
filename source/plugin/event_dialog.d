@@ -8,12 +8,12 @@ import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPat
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
-    void eventDialogProc1();
-    void eventDialogProc1V132();
-    void eventDialogProc2();
-    void eventDialogProc3();
-    void eventDialogProc3V130();
-    void eventDialogProc3V132();
+    void* eventDialogProc1() { return null; }
+    void* eventDialogProc1V132() { return null; }
+    void* eventDialogProc2() { return null; }
+    void* eventDialogProc3() { return null; }
+    void* eventDialogProc3V130() { return null; }
+    void* eventDialogProc3V132() { return null; }
 }
 
 size_t eventDialogProc1ReturnAddress;

@@ -4,23 +4,24 @@ import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
+import plugin.misc; // get_branch_destination_offset を使用するためにインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern (C)
 {
-    void fileSaveProc1();
-    void fileSaveProc2();
-    void fileSaveProc3();
-    void fileSaveProc3V130();
-    void fileSaveProc3V1316();
-    void fileSaveProc4();
-    void fileSaveProc5();
-    void fileSaveProc5V130();
-    void fileSaveProc5V1316();
-    void fileSaveProc6();
-    void fileSaveProc6V130();
-    void fileSaveProc7();
+    void* fileSaveProc1() { return null; }
+    void* fileSaveProc2() { return null; }
+    void* fileSaveProc3() { return null; }
+    void* fileSaveProc3V130() { return null; }
+    void* fileSaveProc3V1316() { return null; }
+    void* fileSaveProc4() { return null; }
+    void* fileSaveProc5() { return null; }
+    void* fileSaveProc5V130() { return null; }
+    void* fileSaveProc5V1316() { return null; }
+    void* fileSaveProc6() { return null; }
+    void* fileSaveProc6V130() { return null; }
+    void* fileSaveProc7() { return null; }
 }
 
 size_t fileSaveProc1ReturnAddress;

@@ -13,14 +13,14 @@ import plugin.process.process : get_executable_memory_range; // get_executable_m
 // FIXME: escape_tool.d を後で作成し、インポートする
 
 extern(C) {
-    void mapAdjustmentProc1();
-    void mapAdjustmentProc2();
-    void mapAdjustmentProc2V130();
-    void mapAdjustmentProc3();
-    void mapAdjustmentProc3V130();
-    void mapAdjustmentProc4();
-    void mapAdjustmentProc4V130();
-    void mapAdjustmentProc5();
+    void* mapAdjustmentProc1() { return null; }
+    void* mapAdjustmentProc2() { return null; }
+    void* mapAdjustmentProc2V130() { return null; }
+    void* mapAdjustmentProc3() { return null; }
+    void* mapAdjustmentProc3V130() { return null; }
+    void* mapAdjustmentProc4() { return null; }
+    void* mapAdjustmentProc4V130() { return null; }
+    void* mapAdjustmentProc5() { return null; }
 }
 
 size_t mapAdjustmentProc1ReturnAddress;

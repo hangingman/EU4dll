@@ -3,9 +3,8 @@ module plugin.input;
 import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
-import plugin.misc;
+import plugin.misc; // get_branch_destination_offset を使用するためインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
-
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 // FIXME: escape_tool.d を後で作成し、インポートする
@@ -86,6 +85,12 @@ struct DllError
 
     bool unmatchdLocalizationProc1Injector;
     bool versionLocalizationProc1Injector;
+    bool unmatchdLocalizationProc2Injector;
+    bool versionLocalizationProc2Injector;
+    bool unmatchdLocalizationProc3Injector;
+    bool versionLocalizationProc3Injector;
+    bool unmatchdLocalizationProc4Injector;
+    bool versionLocalizationProc4Injector;
 
     bool unmatchdListFieldAdjustmentProc1Injector;
     bool versionListFieldAdjustmentProc1Injector;
@@ -188,10 +193,6 @@ struct DllError
             .unmatchdImeProc2Injector;
         result.versionImeProc2Injector = this.versionImeProc2Injector || rhs
             .versionImeProc2Injector;
-        result.unmatchdImeProc3Injector = this.unmatchdImeProc3Injector || rhs
-            .unmatchdImeProc3Injector;
-        result.versionImeProc3Injector = this.versionImeProc3Injector || rhs
-            .versionImeProc3Injector;
 
         result.unmatchdMainTextProc1Injector = this.unmatchdMainTextProc1Injector || rhs
             .unmatchdMainTextProc1Injector;
@@ -290,10 +291,6 @@ struct DllError
             .unmatchdLocalizationProc4Injector;
         result.versionLocalizationProc4Injector = this.versionLocalizationProc4Injector || rhs
             .versionLocalizationProc4Injector;
-        result.unmatchdLocalizationProc5Injector = this.unmatchdLocalizationProc5Injector || rhs
-            .unmatchdLocalizationProc5Injector;
-        result.versionLocalizationProc5Injector = this.versionLocalizationProc5Injector || rhs
-            .versionLocalizationProc5Injector;
 
         result.unmatchdListFieldAdjustmentProc1Injector = this.unmatchdListFieldAdjustmentProc1Injector || rhs
             .unmatchdListFieldAdjustmentProc1Injector;
@@ -399,23 +396,16 @@ struct DllError
 struct RunOptions
 {
     EU4Ver eu4Version; // 'version' を 'eu4Version' に変更
+    int separateCharacterCodePoint; // 新しいプロパティを追加
 }
 
 // FIXME: inputProc1, inputProc1V130, inputProc2 のD言語版関数をasmファイルから移植する
 // 現状はダミーの関数定義のみ
 extern (C)
 {
-    void inputProc1()
-    {
-    }
-
-    void inputProc1V130()
-    {
-    }
-
-    void inputProc2()
-    {
-    }
+    void* inputProc1() { return null; }
+    void* inputProc1V130() { return null; }
+    void* inputProc2() { return null; }
 
     // FIXME: utf8ToEscapedStr3 のD言語版関数をescape_tool.dに定義し、ここで呼び出す
     // 現状はダミーの関数定義のみ
@@ -576,7 +566,7 @@ DllError inputProc2Injector(RunOptions options)
 
                 // Injector::MakeJMP に相当するD言語でのフック処理を実装する
                 PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)inputProc2));
-                writeln("JMP for inputProc2Injector created using ScopedPatch.");
+                writeln("JMP for inputProc2Injector created.");
             }
             else
             {

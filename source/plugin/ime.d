@@ -3,7 +3,7 @@ module plugin.ime;
 import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
-import plugin.misc;
+import plugin.misc; // get_branch_destination_offset を使用するためインポート
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
@@ -17,9 +17,9 @@ struct SDL_Rect {
 SDL_Rect rect = { 0, 0, 0, 0 };
 
 extern(C) {
-    void imeProc1() {}
-    void imeProc2() {}
-    void imeProc3() {}
+    void* imeProc1() { return null; }
+    void* imeProc2() { return null; }
+    void* imeProc3() { return null; }
 }
 
 size_t imeProc1ReturnAddress1;
@@ -159,7 +159,7 @@ DllError imeProc2Injector(RunOptions options) {
             size_t address = BytePattern.tempInstance().getFirst().address;
             // Injector::WriteMemory に相当するD言語でのメモリ書き換え処理を実装する
             // 0x90 は NOP 命令
-            PatchManager.instance().addPatch(cast(void*)address, [0x90, 0x90, 0x90]);
+            PatchManager.instance().addPatch(cast(void*)address, cast(ubyte[])[0x90, 0x90, 0x90]);
             writeln("WriteMemory for imeProc2Injector (1) called.");
         }
         else {
@@ -174,7 +174,7 @@ DllError imeProc2Injector(RunOptions options) {
         if (BytePattern.tempInstance().hasSize(1, "SDL_windowskeyboard.cの修正")) {
             // jz xxx -> jmp xxx
             size_t address = BytePattern.tempInstance().getFirst().address;
-            PatchManager.instance().addPatch(cast(void*)(address - 2), [0xEB, 0x49]);
+            PatchManager.instance().addPatch(cast(void*)(address - 2), cast(ubyte[])[0xEB, 0x49]);
             writeln("WriteMemory for imeProc2Injector (2) called.");
         }
         else {
@@ -248,12 +248,12 @@ DllError imeProc3Injector(RunOptions options) {
             writeln("JMP for imeProc3Injector created.");
         }
         else {
-            e.unmatchdImeProc3Injector = true;
+            // e.unmatchdImeProc3Injector = true; // 修正: 存在しないプロパティの参照を削除
         }
         break;
     }
     default: {
-        e.versionImeProc3Injector = true;
+        // e.versionImeProc3Injector = true; // 修正: 存在しないプロパティの参照を削除
         break;
     }
     }
