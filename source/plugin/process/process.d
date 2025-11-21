@@ -1,4 +1,5 @@
 module plugin.process.process;
+import plugin.constant;
 
 import core.sys.elf;
 import core.sys.linux.link;

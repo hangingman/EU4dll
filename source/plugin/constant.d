@@ -1,5 +1,5 @@
 module plugin.constant;
-
+import plugin.constant;
 
 enum EU4Ver
     {
@@ -28,4 +28,9 @@ enum EU4Ver
      v1_32_0_1 = 13201,
      v1_33_0_0 = 13300,
      v1_33_3_0 = 13330
-    };
+    }
+
+public struct RunOptions {
+    EU4Ver eu4Version;
+    ubyte separateCharacterCodePoint; // 追加
+}

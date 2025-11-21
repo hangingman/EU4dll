@@ -3,7 +3,7 @@ module plugin.plugin_version;
 import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
-import plugin.input; // For DllError and RunOptions
+import plugin.input : DllError; // For DllError and RunOptions
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
@@ -50,11 +50,11 @@ DllError versionProc1Injector(RunOptions options) {
             // versionProc1ReturnAddress = address + 0x05; // 適当なリターンアドレス
         }
         else {
-            e.unmatchdVersionProc1Injector = true;
+            e.unmatchdPluginVersionProc1Injector = true;
         }
         break;
     default:
-        e.versionVersionProc1Injector = true;
+        e.versionPluginVersionProc1Injector = true;
     }
 
     return e;

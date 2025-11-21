@@ -1,4 +1,5 @@
 module plugin.memory_pointer;
+import plugin.constant;
 
 
 import core.stdc.stdint;

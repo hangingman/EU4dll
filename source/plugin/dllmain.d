@@ -4,24 +4,24 @@ module plugin.dllmain;
 import std.stdio;
 import core.stdc.stdlib;
 import plugin.byte_pattern;
-import plugin.constant;
+import plugin.constant; // RunOptionsを使うので必要
 import plugin.misc;
-import plugin.input; // For DllError
+import plugin.input : DllError; // DllErrorをインポート
 
 import Font = plugin.font;
 import TextView = plugin.main_text;
 import MapAdj = plugin.map_adjustment;
 import MapJustify = plugin.map_justify;
 import MapView = plugin.map_view;
-import Input = plugin.input;
+import Input = plugin.input.entry; // 修正
 import IME = plugin.ime;
 import PopupCharOnMap = plugin.map_popup;
 import DateFormat = plugin.date;
 import ListFieldAdj = plugin.list_field_adjustment;
-import NameOrder = plugin.localization;
+import NameOrder = plugin.localization.entry; // 修正
 import ButtonAndToolTip = plugin.tooltip_and_button;
 import EventDialog = plugin.event_dialog;
-import FileSave = plugin.file_save;
+import FileSave = plugin.file_save.entry; // 修正
 import Options = plugin.options;
 import PluginVersion = plugin.plugin_version;
 

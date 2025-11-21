@@ -1,4 +1,5 @@
 module plugin.byte_pattern;
+import plugin.constant;
 
 
 import core.stdc.stdint;
@@ -245,6 +246,7 @@ class BytePattern
             {
                 debug {
                     writeln(mixin(interp!"module size: ${contents.length}"));
+import plugin.constant;
                     writeln(mixin(interp!"[${range.fileOffset} .. ${range.fileOffset + range.size}]"));
 
                     writeln("pattern:");

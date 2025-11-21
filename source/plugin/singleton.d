@@ -1,4 +1,5 @@
 module plugin.singleton;
+import plugin.constant;
 
 
 // mixinするとSingletonパターンが実装できる
