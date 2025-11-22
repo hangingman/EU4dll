@@ -36,7 +36,10 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 #
 EU4_DIR := ~/.steam/debian-installation/steamapps/common/Europa\ Universalis\ IV/
 
-run: all ## Copy the built .so to EU4 directory and run EU4 with it.
+run: ## Copy the built .so to EU4 directory and run EU4 with it.
+	dub build --force
+	@echo "--- clean eu4jps.log ---"
+	rm -f $(HOME)/.steam/debian-installation/steamapps/common/pattern_eu4jps.log
 	@echo "--- copy eu4dll.so ---"
 	cp -f ./libeu4dll.so $(EU4_DIR)
 	@echo "--- run eu4 ---"
