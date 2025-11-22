@@ -1,0 +1,107 @@
+# EU4dll Linux LD_PRELOAD パッチ適用 手動テスト手順
+
+このドキュメントは、`LD_PRELOAD` を使用したD言語版EU4dllのパッチ適用が正しく機能し、EU4が正常に起動することを確認するための手動テスト手順を記述します。
+
+## 1. 日本語化Modの準備
+
+このテストでは、EU4dllが動作する環境で日本語化Modが正しく認識されるかを確認します。
+
+*   **手動ダウンロード**:
+    *   ご自身で日本語化Mod（例: Matanki氏のJapanese Language Modなど）を入手してください。通常はSteam Workshop経由で入手できますが、Linux環境での手動テストのため、ファイルとして入手する必要があります。
+    *   Modは `.mod` ファイルと、対応するデータフォルダ（またはzipファイル）で構成されます。
+
+*   **配置場所**:
+    *   メインの翻訳ファイルは、以下のパスに配置されていることを確認してください。
+    *   **翻訳ファイルのパス**: `~/.local/share/Paradox Interactive/Europa Universalis IV/mod/jpmod_ap1_mod/localisation`
+    *   このディレクトリ内に、日本語化Modの翻訳ファイル（多数のYAMLファイル）が存在することを確認してください。
+    *   これらのYAMLファイルは、破壊的な変更を加えない限り、手動テストでそのまま使用できます。
+    *   **注意**: EU4ランチャーを起動し、使用するModが「有効」になっていることを確認してください。
+
+## 2. `dllmain.d` の修正（最小構成化）
+
+このステップでは、D言語版EU4dllの機能を最小限に絞り、ゲームがクラッシュせずに起動することを目指します。
+
+1.  `source/plugin/dllmain.d` を開きます。
+2.  `hijackProcess` 関数内の、`BytePattern.startLog("eu4jps");` 行の直後にあるすべての `init` 呼び出し（`Font.init(eu4Version);`, `TextView.init(eu4Version);` など）をコメントアウトします。
+3.  `PluginVersion.init(eu4Version);` 行のコメントアウトを解除します。
+4.  ファイルの最後のほうにある `if (success == DllError()) { ... } else { ... }` ブロックを見つけ、`exit(-1);` の行をコメントアウトまたは削除します。これにより、パッチ適用に失敗してもゲームが強制終了されず、ログが出力されるのみになります。
+
+    **変更前**:
+    ```d
+    if (success == DllError())
+        {
+            BytePattern.tempInstance().debugOutput("DLL [OK]");
+        }
+    else
+        {
+            BytePattern.tempInstance().debugOutput("DLL [NG]");
+            exit(-1); // この行をコメントアウト
+        }
+    ```
+
+    **変更後**:
+    ```d
+    if (success == DllError())
+        {
+            BytePattern.tempInstance().debugOutput("DLL [OK]");
+        }
+    else
+        {
+            BytePattern.tempInstance().debugOutput("DLL [NG]");
+            // exit(-1); // テスト用にコメントアウト
+        }
+    ```
+
+## 3. `plugin.plugin_version.d` の調整
+
+`plugin.plugin_version.d` 内のバイトパターン検索が意図しないメモリを上書きしてゲームをクラッシュさせる可能性があるため、テスト用に安全な挙動に調整します。
+
+1.  `source/plugin/plugin_version.d` を開きます。
+2.  `versionProc1Injector` 関数内の `BytePattern.tempInstance().findPattern("?? ?? ?? ?? ??");` の行をコメントアウトし、代わりに安全なログメッセージを出力するように変更します。これにより、パッチは適用されませんが、DLLがロードされ、プラグインの初期化が試みられたことを確認できます。
+
+    **変更前**:
+    ```d
+    // ...
+    BytePattern.tempInstance().findPattern("?? ?? ?? ?? ??"); // 実際のパターンに置き換える
+    if (BytePattern.tempInstance().hasSize(1, "versionProc1のダミーパターン")) {
+        size_t address = BytePattern.tempInstance().getFirst().address;
+        PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
+        writeln("JMP for versionProc1Injector created.");
+        // ...
+    }
+    // ...
+    ```
+
+    **変更後**:
+    ```d
+    // ...
+    // BytePattern.tempInstance().findPattern("?? ?? ?? ?? ??"); // 安全なテストのためコメントアウト
+    // if (BytePattern.tempInstance().hasSize(1, "versionProc1のダミーパターン")) {
+    //     size_t address = BytePattern.tempInstance().getFirst().address;
+    //     PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
+    //     writeln("JMP for versionProc1Injector created.");
+    //     // ...
+    // } else {
+    //     e.unmatchdPluginVersionProc1Injector = true;
+    // }
+    BytePattern.tempInstance().debugOutput("PluginVersion.init: パッチ適用をスキップ (安全のため)");
+    // ...
+    ```
+
+## 4. テストの実行と確認
+
+1.  プロジェクトのルートディレクトリで以下のコマンドを実行し、DLLをビルドしてEU4ディレクトリにコピーし、EU4を起動します。
+
+    ```bash
+    make run
+    ```
+
+2.  **確認項目**:
+    *   EU4が正常に起動し、プレイ可能な状態になること。
+    *   ゲーム内に配置した日本語化Modがランチャーで認識され、有効化されていること。
+    *   ゲーム起動後、`~/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4jps.log` ファイルが存在し、以下のログが出力されていること。
+        *   `BytePattern.startLog("eu4jps")` による開始ログ。
+        *   `"DLL [NG]"` のログ（`PluginVersion.init` が意図的にパッチを適用しないため）。
+        *   `"PluginVersion.init: パッチ適用をスキップ (安全のため)"` のログ。
+
+これらの確認が取れれば、`LD_PRELOAD` によるDLLのロード、D言語コードの初期化、そしてログ出力の仕組みが正常に動作していると判断できます。
