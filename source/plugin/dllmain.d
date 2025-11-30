@@ -112,12 +112,12 @@ void hijackProcess()
 
     // TODO: プラグインバージョン情報の初期化
     bool pluginVersionInitResult = PluginVersion.init(eu4Version);
-    if (!pluginVersionInitResult) {
+    if (!pluginVersionInitResult)
+    {
         // PluginVersion.initが失敗した場合、DllErrorにエラーフラグを設定する（ここでは仮に何もしない）
         // success.versionPluginVersionProc1Injector = true; // DllErrorの構造変更が必要になるため、一時的にコメントアウト
         BytePattern.tempInstance().debugOutput("PluginVersion.init failed.");
     }
-
 
     if (pluginVersionInitResult) // PluginVersion.initの結果を直接判定
     {

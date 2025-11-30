@@ -1,0 +1,5 @@
+l_english:
+ GREETING_KEY: "Hello, World!"
+ FAREWELL_KEY: "Goodbye, World!"
+ EMPTY_VALUE_KEY: ""
+ NON_EXISTENT_KEY: "This should not be loaded directly by a separate JSON parsing function if not explicitly handled"
