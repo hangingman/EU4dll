@@ -40,18 +40,16 @@ DllError versionProc1Injector(RunOptions options) {
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_33_3_0:
         // ダミーのバイトパターンを検索
-        BytePattern.tempInstance().findPattern("?? ?? ?? ?? ??"); // 実際のパターンに置き換える
-        if (BytePattern.tempInstance().hasSize(1, "versionProc1のダミーパターン")) {
-            size_t address = BytePattern.tempInstance().getFirst().address;
-
-            PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
-            writeln("JMP for versionProc1Injector created.");
-
-            // versionProc1ReturnAddress = address + 0x05; // 適当なリターンアドレス
-        }
-        else {
-            e.unmatchdPluginVersionProc1Injector = true;
-        }
+        // BytePattern.tempInstance().findPattern("DE AD BE EF"); // 安全なテストのためコメントアウト
+        // if (BytePattern.tempInstance().hasSize(1, "versionProc1のダミーパターン")) {
+        //     size_t address = BytePattern.tempInstance().getFirst().address;
+        //     PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
+        //     writeln("JMP for versionProc1Injector created.");
+        //     // ...
+        // } else {
+        //     e.unmatchdPluginVersionProc1Injector = true;
+        // }
+        BytePattern.tempInstance().debugOutput("PluginVersion.init: パッチ適用をスキップ (安全のため)");
         break;
     default:
         e.versionPluginVersionProc1Injector = true;

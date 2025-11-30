@@ -17,9 +17,9 @@
     *   これらのYAMLファイルは、破壊的な変更を加えない限り、手動テストでそのまま使用できます。
     *   **注意**: EU4ランチャーを起動し、使用するModが「有効」になっていることを確認してください。
 
-## 2. `dllmain.d` の修正（最小構成化）
+## 2. `dllmain.d` の修正（最低限の機能とログ出力）
 
-このステップでは、D言語版EU4dllの機能を最小限に絞り、ゲームがクラッシュせずに起動することを目指します。
+このステップでは、D言語版EU4dllの主要な機能（`PluginVersion.init`）を有効にし、パッチ適用失敗時にもゲームがクラッシュせずログが出力されるように設定します。
 
 1.  `source/plugin/dllmain.d` を開きます。
 2.  `hijackProcess` 関数内の、`BytePattern.startLog("eu4jps");` 行の直後にあるすべての `init` 呼び出し（`Font.init(eu4Version);`, `TextView.init(eu4Version);` など）をコメントアウトします。
@@ -52,7 +52,7 @@
         }
     ```
 
-## 3. `plugin.plugin_version.d` の調整
+## 3. `plugin.plugin_version.d` の調整（パッチ適用をスキップしログ出力）
 
 `plugin.plugin_version.d` 内のバイトパターン検索が意図しないメモリを上書きしてゲームをクラッシュさせる可能性があるため、テスト用に安全な挙動に調整します。
 
@@ -99,7 +99,7 @@
 2.  **確認項目**:
     *   EU4が正常に起動し、プレイ可能な状態になること。
     *   ゲーム内に配置した日本語化Modがランチャーで認識され、有効化されていること。
-    *   ゲーム起動後、`~/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4jps.log` ファイルが存在し、以下のログが出力されていること。
+    *   ゲーム起動後、`~/.steam/debian-installation/steamapps/common/Europa Universalis IV/pattern_eu4jps.log` ファイルが存在し、以下のログが出力されていること。
         *   `BytePattern.startLog("eu4jps")` による開始ログ。
         *   `"DLL [NG]"` のログ（`PluginVersion.init` が意図的にパッチを適用しないため）。
         *   `"PluginVersion.init: パッチ適用をスキップ (安全のため)"` のログ。

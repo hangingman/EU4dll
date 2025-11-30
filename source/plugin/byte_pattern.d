@@ -1,12 +1,11 @@
 module plugin.byte_pattern;
 import plugin.constant;
 
-
 import core.stdc.stdint;
 import core.sys.posix.dlfcn;
 import elf;
-import freck.streams.filestream;
-import freck.streams.stream;
+// import freck.streams.filestream; // freck-streams を削除
+// import freck.streams.stream;     // freck-streams を削除
 import plugin.memory_pointer;
 import plugin.singleton;
 import scriptlike.core;
@@ -16,7 +15,8 @@ import scriptlike.path.extras : Path;
 import std.conv;
 import std.container : Array, SList;
 import std.file : thisExePath;
-import std.stdio;
+import std.stdio; // std.stdio のすべてをインポートし、writeln, File, SeekPos を解決
+import core.stdc.stdio : SEEK_SET; // SEEK_SET をインポート
 import std.typecons;
 import std.array : replicate;
 import std.format;
@@ -45,17 +45,24 @@ class BytePattern
     Array!(MemoryPointer) _results;
     string _literal;
     ptrdiff_t[256] _bmbc;
-    static Stream _stream = null;
+    static File _stream = File.init; // Stream から std.stdio.File に変更
     const string sep = replicate("-", 80);
 
     static typeof(this) tempInstance()
     {
-        return BytePattern();
+        // シングルトンのインスタンスを返す
+        return BytePattern.opCall();
     }
 
     this()
     {
         setModule();
+    }
+
+    // キャッシュをクリアするメソッド
+    static void clearContentsCache()
+    {
+        BytePattern.opCall()._contents.clear();
     }
 
     uint8_t digitToValue(uint8_t ch)
@@ -91,9 +98,13 @@ class BytePattern
             {
                 return *content;
             }
-        auto fstream = new FileStream(binPath, "r");
-        size_t size = fstream.length;
-        _contents[binPath] = fstream.read(size);
+        // freck-streams の FileStream の代わりに std.stdio.File を使用
+        auto f = File(binPath, "r");
+        scope(exit) f.close(); // ファイルを必ず閉じる
+        size_t size = f.size;
+        ubyte[] content = new ubyte[size];
+        f.rawRead(content); // rawRead に引数スライスを渡す
+        _contents[binPath] = content;
         return _contents[binPath];
     }
 
@@ -245,18 +256,19 @@ class BytePattern
         foreach (range ; this._ranges)
             {
                 debug {
-                    writeln(mixin(interp!"module size: ${contents.length}"));
-import plugin.constant;
-                    writeln(mixin(interp!"[${range.fileOffset} .. ${range.fileOffset + range.size}]"));
+                    std.stdio.writeln(mixin(interp!"module size: ${contents.length}"));
+                    // import plugin.constant; // constantは既にインポート済み
 
-                    writeln("pattern:");
-                    writeln(pattern.map!(d => to!string(d.pattern, 16) ));
-                    writeln("mask:");
-                    writeln(pattern.map!(d => to!string(d.mask, 16) ));
+                    std.stdio.writeln(mixin(interp!"[${range.fileOffset} .. ${range.fileOffset + range.size}]"));
+
+                    std.stdio.writeln("pattern:");
+                    std.stdio.writeln(pattern.map!(d => std.conv.to!string(d.pattern, 16) ));
+                    std.stdio.writeln("mask:");
+                    std.stdio.writeln(pattern.map!(d => std.conv.to!string(d.mask, 16) ));
                 }
 
                 auto section = contents[range.fileOffset .. range.fileOffset + range.size];
-                ptrdiff_t index = countUntil!((a, b)
+                ptrdiff_t index = std.algorithm.searching.countUntil!((a, b) // 完全修飾名を使用
                                               {
                                                   return (a & b.mask) == (b.pattern & b.mask);
                                               })(section, pattern);
@@ -266,8 +278,8 @@ import plugin.constant;
                         MemoryPointer m = new MemoryPointer(range.virtualAddress + index, patternLen);
                         this._results.insertBack(m);
                         debug {
-                            writeln((range.virtualAddress + index).format!"Found on: %d");
-                            writeln(section[index .. index + patternLen].map!(d => to!string(d, 16) ));
+                            std.stdio.writeln((range.virtualAddress + index).format!"Found on: %d");
+                            std.stdio.writeln(section[index .. index + patternLen].map!(d => std.conv.to!string(d, 16) ));
                         }
                     }
             }
@@ -292,12 +304,12 @@ import plugin.constant;
         auto m = getFirst();
         const ubyte[] content = binToRange()[m.address() .. m.address(m.byteLength)];
         debug {
-            writeln("-- found --");
-            writeln(m.address().format!("from %d"));
-            writeln(m.address(m.byteLength).format!("to %d"));
-            writeln(content.map!(d => to!string(d, 16) ));
+            std.stdio.writeln("-- found --");
+            std.stdio.writeln(m.address().format!("from %d"));
+            std.stdio.writeln(m.address(m.byteLength).format!("to %d"));
+            std.stdio.writeln(content.map!(d => std.conv.to!string(d, 16) ));
         }
-        T ans = decerealise!T(content);
+        T ans = cerealed.decerealise!T(content); // 完全修飾名を使用
         return ans;
     }
 
@@ -305,14 +317,14 @@ import plugin.constant;
     {
         findPattern(patternLiteral);
         auto m = getFirst();
-        return found!(T);
+        return found!T(); // テンプレートの呼び出しを修正
     }
 
-    static Stream logStream(string logFilePath=null)
+    static File logStream(string logFilePath=null) // std.stdio.File を返す
     {
-        if (this._stream is null)
+        if (this._stream == File.init) // File.init で未初期化を判定
             {
-                this._stream = new FileStream(logFilePath, existsAsFile(logFilePath) ? "a+" : "w+");
+                this._stream = File(logFilePath, "a+");
             }
 
         return this._stream;
@@ -334,48 +346,47 @@ public:
      +/
     void debugOutput()
     {
-        if (this._stream is null)
+        if (this._stream == File.init) // File.init で未初期化を判定
             {
                 return;
             }
 
-        logStream().write(cast(ubyte[]) _literal.format!("Result(s) of pattern: %s"));
-        logStream().write(cast(ubyte[]) "\n");
-        logStream().write(cast(ubyte[]) hexToUTF8(_literal).format!("(%s)"));
-        logStream().write(cast(ubyte[]) "\n");
+    // writeln の代わりに rawWrite と明示的な改行コードを使用
+    _stream.rawWrite(cast(ubyte[])(_literal.format!"Result(s) of pattern: %s"));
+    _stream.rawWrite(cast(ubyte[])"\n");
+    _stream.rawWrite(cast(ubyte[])(hexToUTF8(_literal).format!"(%s)"));
+    _stream.rawWrite(cast(ubyte[])"\n");
 
-        if (count() > 0)
-            {
-                foreach (pointer; _results)
-                    {
-                        logStream().write(cast(ubyte[]) pointer.address().format!("0x%s"));
-                        logStream().write(cast(ubyte[]) "\n");
-                    }
-            }
-        else
-            {
-                logStream().write(cast(ubyte[]) "None");
-                logStream().write(cast(ubyte[]) "\n");
-            }
+    if (count() > 0)
+        {
+            foreach (pointer; _results)
+                {
+                    _stream.rawWrite(cast(ubyte[])(pointer.address().format!("0x%s")));
+                    _stream.rawWrite(cast(ubyte[])"\n");
+                }
+        }
+    else
+        {
+            _stream.rawWrite(cast(ubyte[])"None");
+            _stream.rawWrite(cast(ubyte[])"\n");
+        }
 
-        logStream().write(cast(ubyte[]) sep);
-        logStream().write(cast(ubyte[]) "\n");
-        _stream.seek(0, Seek.set);
+    _stream.rawWrite(cast(ubyte[])sep);
+    _stream.rawWrite(cast(ubyte[])"\n");
+        _stream.seek(0, SEEK_SET); // SEEK_SET を使用
     }
 
     void debugOutput(const string message)
     {
-        if (this._stream is null)
+        if (this._stream == File.init) // File.init で未初期化を判定
             {
                 return;
             }
 
-        logStream().write(cast(ubyte[]) message);
-        logStream().write(cast(ubyte[]) "\n");
-        logStream().write(cast(ubyte[]) sep);
-        logStream().write(cast(ubyte[]) "\n");
+        logStream().writeln(message); // writeln を使用
+        logStream().writeln(sep); // writeln を使用
 
-        _stream.seek(0, Seek.set);
+        _stream.seek(0, SEEK_SET); // SEEK_SET を使用
     }
 
     static void startLog(const string moduleName)
@@ -389,9 +400,10 @@ public:
 
     static void shutdownLog()
     {
-        if (_stream !is null)
+        if (_stream != File.init) // File.init で未初期化を判定
             {
-                _stream = null;
+                _stream.close();
+                _stream = File.init;
             }
     }
 
@@ -408,6 +420,14 @@ public:
     MemoryPointer getSecond()
     {
         return this.get(1);
+    }
+
+    void flushLog()
+    {
+        if (_stream != File.init) // File.init で未初期化を判定
+        {
+            _stream.flush(); // std.stdio.File の flush() を呼び出す
+        }
     }
 
     BytePattern setPattern(string patternLiteral)
