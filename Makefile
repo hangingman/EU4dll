@@ -44,3 +44,20 @@ run: ## Copy the built .so to EU4 directory and run EU4 with it.
 	cp -f ./libeu4dll.so $(EU4_DIR)
 	@echo "--- run eu4 ---"
 	cd $(EU4_DIR) && LD_PRELOAD=./libeu4dll.so ./eu4
+
+MOD_DIR := $(HOME)/.local/share/Paradox Interactive/Europa Universalis IV/mod
+
+deploy_translations: ## Copy generated translation files to the EU4 mod directory.
+	@echo "Deploying YAML translation files..."
+	@SOURCE_DIR="submodules/EU4JPModAppendixI/source/localisation"; \
+	DEST_DIR="$(MOD_DIR)/eu4dll_translations/localisation"; \
+	echo "Source: $${SOURCE_DIR}"; \
+	echo "Destination: $${DEST_DIR}"; \
+	if [ ! -d "$${SOURCE_DIR}" ]; then \
+		echo "Error: Source directory $${SOURCE_DIR} not found."; \
+		echo "Please run the main.py script in the EU4JPModAppendixI submodule first, or ensure the files are present."; \
+		exit 1; \
+	fi; \
+	mkdir -p "$${DEST_DIR}"; \
+	cp -v "$${SOURCE_DIR}"/*.yml "$${DEST_DIR}"/; \
+	echo "Deployment complete. Files are assumed to be in UTF-8."
