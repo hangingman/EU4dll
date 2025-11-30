@@ -6,6 +6,7 @@ import plugin.byte_pattern;
 import plugin.constant; // RunOptionsを使うので必要
 import plugin.misc;
 import plugin.input : DllError; // DllErrorをインポート
+import plugin.mod; // 翻訳MOD読み込みのために追加
 
 // import freck.streams.filestream; // freck-streams を削除
 
@@ -50,6 +51,9 @@ void hijackProcess()
 
     // versionを文字列から取得
     EU4Ver eu4Version = Misc.getVersion(); // 今回のテストでコメントアウトを解除
+
+    // 翻訳MODの読み込み
+    loadTranslationMods();
 
     // TODO: フォント関連の修正
     // success = success | Font.init(eu4Version);
@@ -107,15 +111,21 @@ void hijackProcess()
     // success = success | NameOrder.init(eu4Version);
 
     // TODO: プラグインバージョン情報の初期化
-    // success = success | PluginVersion.init(eu4Version); // 今回のテストでコメントアウト
+    bool pluginVersionInitResult = PluginVersion.init(eu4Version);
+    if (!pluginVersionInitResult) {
+        // PluginVersion.initが失敗した場合、DllErrorにエラーフラグを設定する（ここでは仮に何もしない）
+        // success.versionPluginVersionProc1Injector = true; // DllErrorの構造変更が必要になるため、一時的にコメントアウト
+        BytePattern.tempInstance().debugOutput("PluginVersion.init failed.");
+    }
 
-    if (success == DllError())
+
+    if (pluginVersionInitResult) // PluginVersion.initの結果を直接判定
     {
         BytePattern.tempInstance().debugOutput("DLL [OK]");
     }
     else
     {
-        BytePattern.tempInstance().debugOutput("DLL [NG]");
+        BytePattern.tempInstance().debugOutput("DLL [NG] (PluginVersion.init failed)");
         exit(-1);
     }
     BytePattern.tempInstance().flushLog(); // ログバッファを強制的にフラッシュ

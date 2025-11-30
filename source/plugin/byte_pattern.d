@@ -48,6 +48,20 @@ class BytePattern
     static File _stream = File.init; // Stream から std.stdio.File に変更
     const string sep = replicate("-", 80);
 
+    // 仮想アドレスをファイルオフセットに変換するヘルパー関数
+    size_t virtualAddressToFileOffset(uintptr_t virtualAddress)
+    {
+        foreach (range; _ranges) {
+            if (virtualAddress >= range.virtualAddress && virtualAddress < range.virtualAddress + range.size) {
+                // 仮想アドレスからセクション内のオフセットを計算
+                size_t offsetInSection = virtualAddress - range.virtualAddress;
+                // ファイルオフセットを計算
+                return range.fileOffset + offsetInSection;
+            }
+        }
+        throw new Exception(format("Virtual address 0x%x not found in any section ranges.", virtualAddress));
+    }
+
     static typeof(this) tempInstance()
     {
         // シングルトンのインスタンスを返す
@@ -302,14 +316,18 @@ class BytePattern
     T found(T)()
     {
         auto m = getFirst();
-        const ubyte[] content = binToRange()[m.address() .. m.address(m.byteLength)];
+        // 仮想アドレスをファイルオフセットに変換し、バイト列を取得
+        size_t fileOffset = virtualAddressToFileOffset(m.address());
+        const ubyte[] content = binToRange()[fileOffset .. fileOffset + m.byteLength];
         debug {
             std.stdio.writeln("-- found --");
-            std.stdio.writeln(m.address().format!("from %d"));
-            std.stdio.writeln(m.address(m.byteLength).format!("to %d"));
+            std.stdio.writeln(m.address().format!("from 0x%x (virtual)"));
+            std.stdio.writeln((fileOffset).format!("from 0x%x (file offset)")); // ファイルオフセットもログに出力
+            std.stdio.writeln(m.address(m.byteLength).format!("to 0x%x (virtual)"));
+            std.stdio.writeln((fileOffset + m.byteLength).format!("to 0x%x (file offset)")); // ファイルオフセットもログに出力
             std.stdio.writeln(content.map!(d => std.conv.to!string(d, 16) ));
         }
-        T ans = cerealed.decerealise!T(content); // 完全修飾名を使用
+        T ans = cerealed.decerealise!T(content);
         return ans;
     }
 

@@ -3,6 +3,8 @@ module plugin.plugin_version;
 import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
+import std.format; // format関数を使うために追加
+import std.conv; // std.conv.to!stringを使うために追加
 import plugin.input : DllError; // For DllError and RunOptions
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
@@ -16,8 +18,10 @@ extern(C) {
 // 必要に応じて、C++版のグローバル変数や構造体をD言語で再定義
 
 // 各フック処理のダミー実装 (version.cppにはフックは少ないかもしれません)
-DllError versionProc1Injector(RunOptions options) {
-    DllError e;
+bool versionProc1Injector(RunOptions options) { // 戻り値をDllErrorからboolに変更
+    // DllError e; // DllErrorを使用しないためコメントアウト
+
+    BytePattern.tempInstance().debugOutput(format("PluginVersion.init: EU4 Version detected: %s", std.conv.to!string(options.eu4Version)));
 
     switch (options.eu4Version) {
     // 既存のバージョンケースをここに追加
@@ -39,32 +43,40 @@ DllError versionProc1Injector(RunOptions options) {
     case EU4Ver.v1_32_0_1:
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_33_3_0:
-        // ダミーのバイトパターンを検索
-        // BytePattern.tempInstance().findPattern("DE AD BE EF"); // 安全なテストのためコメントアウト
-        // if (BytePattern.tempInstance().hasSize(1, "versionProc1のダミーパターン")) {
-        //     size_t address = BytePattern.tempInstance().getFirst().address;
-        //     PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
-        //     writeln("JMP for versionProc1Injector created.");
-        //     // ...
-        // } else {
-        //     e.unmatchdPluginVersionProc1Injector = true;
-        // }
-        BytePattern.tempInstance().debugOutput("PluginVersion.init: パッチ適用をスキップ (安全のため)");
+    case EU4Ver.v1_37_5: // v1.37.5を追加
+        // EU4のバージョン文字列を検索するパターン
+        BytePattern.tempInstance().findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
+        if (BytePattern.tempInstance().hasSize(1, "EU4 Version String Pattern")) {
+            size_t address = BytePattern.tempInstance().getFirst().address;
+            BytePattern.tempInstance().debugOutput("PluginVersion.init: Before logging EU4 Version String address.");
+            BytePattern.tempInstance().debugOutput(format("PluginVersion.init: EU4 Version String found at 0x%x", address));
+            BytePattern.tempInstance().debugOutput("PluginVersion.init: After logging EU4 Version String address.");
+            // 実際にパッチを適用する場合は以下のコメントアウトを解除するが、安全のため今回はスキップ
+            // PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)GetPluginVersion));
+            // writeln("JMP for versionProc1Injector created.");
+            return true; // 成功
+        } else {
+            BytePattern.tempInstance().debugOutput("PluginVersion.init: EU4 Version String pattern not found.");
+            // e.unmatchdPluginVersionProc1Injector = true; // DllErrorを使用しないためコメントアウト
+            return false; // 失敗
+        }
         break;
     default:
-        e.versionPluginVersionProc1Injector = true;
+        BytePattern.tempInstance().debugOutput(format("PluginVersion.init: Unknown EU4 Version: %s", std.conv.to!string(options.eu4Version)));
+        // e.versionPluginVersionProc1Injector = true; // DllErrorを使用しないためコメントアウト
+        return false; // 失敗
     }
-
-    return e;
+    // ここに到達しないはずだが、もし到達したら失敗とみなす
+    return false;
 }
 
 // 全てのフック処理を初期化する関数
-DllError init(EU4Ver eu4Version) {
-    DllError result;
+bool init(EU4Ver eu4Version) { // 戻り値をDllErrorからboolに変更
+    // DllError result; // DllErrorを使用しないためコメントアウト
     RunOptions options;
     options.eu4Version = eu4Version;
 
-    result = result | versionProc1Injector(options);
+    // result = result | versionProc1Injector(options); // DllErrorを使用しないためコメントアウト
 
-    return result;
+    return versionProc1Injector(options); // boolの戻り値を直接返す
 }

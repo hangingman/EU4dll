@@ -11,7 +11,8 @@ import std.conv;
 
 struct Misc
 {
-    struct EU4Version {
+    // C++構造体との互換性のため、アライメントを1バイトにする
+    pragma(pack, 1) struct EU4Version {
         // EU4 v1.30.4
         char[7] versionPrefix;
         ubyte ascii1;
@@ -30,14 +31,19 @@ static:
     EU4Ver getVersion()
     {
         BytePattern b = BytePattern.tempInstance();
+        // EU4の実行ファイルパスを設定する
+        // TODO: EU4_DIRを動的に取得するように修正する
+        b.setModule("/home/hiroyuki/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4");
         b.findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
         EU4Ver ver = EU4Ver.UNKNOWN;
 
         if (b.count() > 0)
             {
                 const EU4Version minor = b.found!(EU4Version)();
+                int calculatedVer = minor.calVer();
+                b.debugOutput(format("Misc.getVersion: Calculated version number: %s", calculatedVer));
 
-                switch (minor.calVer()) {
+                switch (calculatedVer) {
                 case 250:
                     ver = EU4Ver.v1_25_X;
                     break;
@@ -54,13 +60,20 @@ static:
                 case 283:
                     ver = EU4Ver.v1_28_3;
                     break;
+                case 375: // EU4 v1.37.5に対応
+                    ver = EU4Ver.v1_37_5;
+                    break;
                 default:
+                    b.debugOutput(format("Misc.getVersion: No matching case for calculated version: %s, returning UNKNOWN", calculatedVer));
                     ver = EU4Ver.UNKNOWN;
                     break;
                 }
             }
+        else {
+            b.debugOutput("Misc.getVersion: Pattern for EU4 version not found, returning UNKNOWN");
+        }
 
-        b.debugOutput(std.conv.to!string(ver));
+        b.debugOutput(format("Misc.getVersion: Final EU4Ver result: %s", std.conv.to!string(ver)));
         return ver;
     };
 };
