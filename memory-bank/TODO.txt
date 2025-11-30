@@ -53,11 +53,11 @@
     -   [x] `make test` コマンドでテストを実行し、PASSすることを確認する。
     -   [ ] `LD_PRELOAD` を使用してパッチが正しく適用され、ゲームが動作することを確認する。
     -   [ ] 各機能が期待通りに動作することを確認する。
--   [ ] **翻訳ファイルダウンローダーのPoC作成**
-    -   [ ] `tests/poc/downloader.d` の作成。
-    -   [ ] `std.net.curl` を使用したファイルのダウンロード機能の実装。
-    -   [ ] OSごとの適切な保存先パス（Linux: `~/.local/share/...`, Windows: `Documents/...`）の解決ロジック実装。
-    -   [ ] 既存の `mod_download.cpp` / `claes.exe` 依存からの脱却準備。
+-   [x] **翻訳ファイルダウンローダーのPoC作成** (Gitサブモジュール EU4JPModAppendixI の統合により実現)
+    -   [x] `tests/poc/downloader.d` の作成。
+    -   [x] `std.net.curl` を使用したファイルのダウンロード機能の実装。
+    -   [x] OSごとの適切な保存先パス（Linux: `~/.local/share/...`, Windows: `Documents/...`）の解決ロジック実装。
+    -   [x] 既存の `mod_download.cpp` / `claes.exe` 依存からの脱却準備。
 -   [ ] `Plugin64/` のC++ファイルをD言語に移植する。
     -   [ ] `map_nudge_view.cpp` / `map_nudge_view_asm.asm` (マップナッジビュー関連のフック) を `plugin.map_nudge_view.d` に移植する。
     -   [ ] `escape_tool.cpp` / `escape_tool.h` (文字コード変換、Paradoxテキストオブジェクト処理) を `plugin.escape_tool.d` に移植する。
