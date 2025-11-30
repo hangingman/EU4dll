@@ -2,76 +2,62 @@
 
 このドキュメントでは、プロジェクトの開発環境のセットアップ方法について説明します。
 
-## D言語およびDubのセットアップ
+## 1. D言語コンパイラとGitのインストール
 
-このプロジェクトはD言語で記述されており、パッケージ管理にはDubを使用しています。
-以下の手順でD言語コンパイラとDubをセットアップします。
+### D言語コンパイラ (LDC)
 
-### 1. D言語コンパイラのインストール
+本プロジェクトでは、DMDではなくLDC (LLVM D Compiler) の使用を必須とします。LDCは大規模なプロジェクトにおいて、より優れた最適化と安定性を提供します。
 
-D言語コンパイラにはDMD, GDC, LDCがありますが、本プロジェクトではDMDを推奨します。
-以下のコマンドでDMDをインストールします。
-
+以下のコマンドでLDCをインストールします。
 ```bash
-curl -fsSL https://dlang.org/install.sh | bash -s dmd
+curl -fsSL https://dlang.org/install.sh | bash -s ldc
 ```
 
 インストール後、環境変数を設定するためにシェルを再起動するか、以下のコマンドを実行します。
+```bash
+source ~/dlang/ldc-x.y.z/activate
+```
+(`x.y.z` はインストールされたLDCのバージョンに置き換えてください)
+
+### Git
+
+バージョン管理システムとしてGitが必要です。お使いのディストリビューションのパッケージマネージャでインストールしてください。
+
+## 2. リポジトリのセットアップ
+
+### リポジトリのクローンとサブモジュールの初期化
+
+本プロジェクトはGitのサブモジュールを利用しています。リポジトリをクローンする際は、`--recursive`オプションを使用してください。
 
 ```bash
-source ~/dlang/dmd-2.x.x/activate
+git clone --recursive https://github.com/hangingman/EU4dll.git
+cd EU4dll
 ```
-(2.x.x はインストールされたDMDのバージョンに置き換えてください)
 
-### 2. Dubのインストール
-
-Dubは通常、DMDのインストール時に一緒にインストールされます。
-もしDubがインストールされていない場合は、以下のコマンドでインストールできます。
-
+すでにクローン済みの場合は、以下のコマンドでサブモジュールを初期化・更新できます。
 ```bash
-curl -fsSL https://dlang.org/install.sh | bash -s dub
+git submodule update --init --recursive
 ```
 
-### 3. バージョンの確認
+## 3. プロジェクトのビルド
 
-インストール後、以下のコマンドでDMDとDubのバージョンを確認します。
-
-#### DMDのバージョン
-
-```bash
-dmd --version
-```
-
-**現在の環境での確認結果:**
-```
-DMD64 D Compiler v2.111.0
-Copyright (C) 1999-2025 by The D Language Foundation, All Rights Reserved written by Walter Bright
-```
-
-#### Dubのバージョン
-
-```bash
-dub --version
-```
-
-**現在の環境での確認結果:**
-```
-DUB version 1.40.0-1, built on May  3 2025
-```
-
-### 4. プロジェクトのビルド
-
-プロジェクトのルートディレクトリで以下のコマンドを実行すると、Dubが依存関係を解決し、プロジェクトをビルドします。
-
-```bash
-dub build
-```
-
-**ビルドの確認:**
-`Makefile` の `all` ターゲットを実行することでビルドが可能です。
+プロジェクトのルートディレクトリで以下のコマンドを実行すると、LDCを使用してプロジェクトがビルドされます。
 
 ```bash
 make all
 ```
 
-上記コマンド実行後、エラーが表示されずに完了すれば、ビルドは成功です。
+`Makefile`は内部で`dub build --compiler=ldc2`を実行します。エラーが表示されずに完了すれば、ビルドは成功です。
+
+## 4. 翻訳ファイルの展開 (オプション)
+
+本リポジトリは、`EU4JPModAppendixI`サブモジュールを利用して、翻訳ソースから翻訳MODファイルを生成できます。
+
+`Makefile`には、生成されたYAML翻訳ファイルをEU4のMODディレクトリにコピーするための`deploy_translations`ターゲットが含まれています。
+
+```bash
+make deploy_translations
+```
+
+**前提条件:**
+このコマンドを実行する前に、`submodules/EU4JPModAppendixI/`ディレクトリ内で`main.py`スクリプトを実行し、翻訳ファイル (`submodules/EU4JPModAppendixI/source/localisation/`内) を生成しておく必要があります。`main.py`の実行にはPython環境と`PARATRANZ_SECRET`環境変数が必要です。詳細はサブモジュールのドキュメントを参照してください。
