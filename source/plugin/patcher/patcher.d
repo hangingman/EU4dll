@@ -67,8 +67,8 @@ void patch_memory(void* address, const ubyte[] data)
     enforce(mprotect(pageAddress, len, PROT_READ | PROT_EXEC) == 0, "mprotect for execute failed");
 }
 
-/// RAIIでメモリパッチを管理するクラス
-class ScopedPatch
+/// RAIIでメモリパッチを管理する構造体
+struct ScopedPatch
 {
 private:
     void* _address; // パッチ対象のアドレス
@@ -95,7 +95,7 @@ public:
         _applied = true;
     }
 
-    /// デストラクタ：オブジェクトがGCで解放される前に元のデータを復元
+    /// デストラクタ：オブジェクトがスコープを抜ける前に元のデータを復元
     ~this()
     {
         if (_applied && _address !is null)
@@ -134,7 +134,7 @@ public:
     /// パッチを適用し、管理リストに追加する
     void addPatch(void* address, const ubyte[] patchData)
     {
-        _patches ~= new ScopedPatch(address, patchData); // クラスなので new で生成して追加
+        _patches ~= ScopedPatch(address, patchData); // struct なので new は不要
     }
 
     // 必要に応じて、内部配列へのアクセスを提供する
@@ -165,7 +165,7 @@ unittest
     writeln("makeJmp/makeCall tests passed.");
 
     writeln("Starting ScopedPatch unittest...");
-    
+
     ubyte[] dummyFunc = [
         0x55, 0x48, 0x89, 0xE5, 0xC3
     ]; // Original
@@ -178,12 +178,12 @@ unittest
 
     // ブロックスコープを作成
     {
-        // クラスなので new を使って生成する
-        auto patch = new ScopedPatch(mem, patchData);
+        // struct なので new は不要
+        auto patch = ScopedPatch(mem, patchData);
 
         // パッチが当たっていることを確認
         assert((cast(ubyte*) mem)[0 .. 5] == patchData);
-        
+
         // patch のスコープを抜ける前に明示的に null にして、GC に回収させる
         // D言語のGCは確定的なデストラクタ呼び出しを保証しないため、
         // RAIIの性質を持つクラスの場合、必要に応じて明示的に操作するか、
@@ -204,7 +204,9 @@ unittest
     writeln("Expected:           ", dummyFunc);
 
     // GCによるデストラクタ呼び出しは保証されないため、このassertは不安定になる可能性がある
-    assert(currentMem == patchData); // パッチが当たったままの状態であることを確認する
+    // 今回は、もしデストラクタが呼ばれていれば元のデータに戻っていることを確認
+    import std.algorithm; // equal を使用するため
+    assert(currentMem.equal(dummyFunc)); // 元のデータに戻っていることを確認する
 
     // メモリを解放
     munmap(mem, dummyFunc.length);
