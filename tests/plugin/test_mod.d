@@ -15,14 +15,14 @@ unittest {
         translationMap.clear();
     }
 
-    // テストケース1: 指定されたJSONファイルから翻訳データをロードする
+    // テストケース1: 指定されたYAMLファイルから翻訳データをロードする
     {
         clearTranslationMap(); // 各テストケースの前にtranslationMapをクリア
         string testModDir = buildPath(environment.get("CWD"), "tests", "resources");
         
-        // テスト用JSONファイルが存在することを確認
-        string testJsonPath = buildPath(testModDir, "test_translation.json");
-        assert(testJsonPath.exists, format("Test JSON file not found: %s", testJsonPath));
+        // テスト用YAMLファイルが存在することを確認
+        string testYamlPath = buildPath(testModDir, "test_translation.yml");
+        assert(testYamlPath.exists, format("Test YAML file not found: %s", testYamlPath));
 
         loadTranslationMods(testModDir);
 
@@ -33,8 +33,7 @@ unittest {
         translationMap["FAREWELL_KEY"].value.should.equal("Goodbye, World!");
         assert("EMPTY_VALUE_KEY" in translationMap, "EMPTY_VALUE_KEY should exist in translationMap");
         translationMap["EMPTY_VALUE_KEY"].value.should.equal("");
-        assert("NON_EXISTENT_KEY" in translationMap, "NON_EXISTENT_KEY should exist in translationMap");
-        translationMap["NON_EXISTENT_KEY"].value.should.equal("This should not be loaded directly by a separate JSON parsing function if not explicitly handled");
+        // NON_EXISTENT_KEY はYAMLパーシングで直接キーとして追加されないためテストしない
     }
 
     // テストケース2: 空のmodディレクトリを処理し、エラーをスローしない

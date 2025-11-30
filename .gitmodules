@@ -1,0 +1,3 @@
+[submodule "submodules/EU4JPModAppendixI"]
+	path = submodules/EU4JPModAppendixI
+	url = https://github.com/matanki-saito/EU4JPModAppendixI

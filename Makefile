@@ -6,11 +6,11 @@ help: ## Show this help.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\x1b[36m%-20s\x1b[0m %s\n", $$1, $$2}'
 
 all: ## Build the project using dub.
-	dub build
+	dub build --compiler=ldc2
 
 test: ## Run unit tests for the project.
-	dub build --build=unittest
-	dub test --build=unittest -- --threads=1
+	dub build --build=unittest --compiler=ldc2
+	dub test --build=unittest --compiler=ldc2 -- --threads=1
 
 clean: ## Clean the project build files.
 	dub clean
@@ -26,7 +26,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 	@./dummy
 	@echo "----------------"
 
-	dub build
+	dub build --compiler=ldc2
 	rm -f tests/poc/{*.o,*.so}
 	dub build -c eu4dll-poc
 	make -C tests/poc/
@@ -37,7 +37,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 EU4_DIR := ~/.steam/debian-installation/steamapps/common/Europa\ Universalis\ IV/
 
 run: ## Copy the built .so to EU4 directory and run EU4 with it.
-	dub build --force
+	dub build --force --compiler=ldc2
 	@echo "--- clean eu4jps.log ---"
 	rm -f $(HOME)/.steam/debian-installation/steamapps/common/pattern_eu4jps.log
 	@echo "--- copy eu4dll.so ---"

@@ -17,7 +17,8 @@
             "dependencies": {
                 "scriptlike": "~>0.10.3",
                 "elf-d": "~>0.2.5",
-                "cerealed": "~>0.6.11"
+                "cerealed": "~>0.6.11",
+                "dyaml": "~>0.10.0"
             }
         },
         {
@@ -36,7 +37,8 @@
                 "scriptlike": "~>0.10.3",
                 "elf-d": "~>0.2.5",
                 "cerealed": "~>0.6.11",
-                "fluent-asserts": "~>0.13.3"
+                "fluent-asserts": "~>0.13.3",
+                "dyaml": "~>0.10.0"
             }
         },
         {
@@ -55,7 +57,8 @@
                 "scriptlike": "~>0.10.3",
                 "cerealed": "~>0.6.11",
                 "elf-d": "~>0.2.5",
-                "fluent-asserts": "~>0.13.3"
+                "fluent-asserts": "~>0.13.3",
+                "dyaml": "~>0.10.0"
             },
             "excludedSourceFiles": [
                 "tests/poc/dummy.d",
