@@ -1,0 +1,14 @@
+{
+    "GREETING_KEY": {
+        "text": "Hello, World!"
+    },
+    "FAREWELL_KEY": {
+        "text": "Goodbye, World!"
+    },
+    "EMPTY_VALUE_KEY": {
+        "text": ""
+    },
+    "NON_EXISTENT_KEY": {
+        "text": "This should not be loaded directly by a separate JSON parsing function if not explicitly handled"
+    }
+}
