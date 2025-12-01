@@ -49,11 +49,59 @@ make all
 
 `Makefile`は内部で`dub build --compiler=ldc2`を実行します。エラーが表示されずに完了すれば、ビルドは成功です。
 
-## 4. 翻訳ファイルの展開 (オプション)
+## 4. 翻訳ファイルの展開とMODとしての配置 (オプション)
 
-本リポジトリは、`EU4JPModAppendixI`サブモジュールを利用して、翻訳ソースから翻訳MODファイルを生成できます。
+本プロジェクトでは、`EU4JPModAppendixI`サブモジュールを利用して翻訳ソースから翻訳MODファイルを生成し、EU4のランチャーに認識される形式で配置できます。
 
-`Makefile`には、生成されたYAML翻訳ファイルをEU4のMODディレクトリにコピーするための`deploy_translations`ターゲットが含まれています。
+### MODのフォルダ構成と配置
+
+EU4のランチャーに翻訳ファイルを認識させるには、`ドキュメント/Paradox Interactive/Europa Universalis IV/mod/` フォルダ内に、以下の2つを配置する必要があります。
+
+1.  **`.mod` ファイル**（目次ファイル）: ランチャーが最初に読み込むファイルです。「このMODはここにありますよ」という情報が書かれています。
+2.  **MOD本体のフォルダ**: この中に実際の翻訳データ（`localisation`フォルダ）を入れます。
+
+**構成例:**
+
+```text
+ドキュメント/Paradox Interactive/Europa Universalis IV/mod/
+ │
+ ├─ my_japanese_mod.mod  <-- (A) ランチャーが読む目次
+ │
+ └─ my_japanese_mod/     <-- (B) MODの中身
+     └─ localisation/
+         └─ replace/     <-- (任意) バニラの訳を完全に上書きしたい場合
+             └─ jp_text_l_english.yml  <-- (C) 実際の翻訳ファイル
+```
+
+### `.mod` ファイルの記述例
+
+`my_japanese_mod.mod` の中身は以下のようになります。`name`はランチャーに表示されるMOD名、`path`はMOD本体フォルダへの相対パスです。
+
+```ini
+name="EU4dll Japanese Translation"
+path="mod/eu4dll_translations" # EU4ゲームディレクトリからの相対パス（「mod/」プレフィックスを含む）
+supported_version="1.37.5" # 完全一致のバージョン番号を二重引用符で指定
+```
+
+### `.yml` 翻訳ファイルの記述ルール
+
+実際の翻訳データ (`jp_text_l_english.yml`など) は、以下のルールに従って記述する必要があります。
+
+*   **文字コード**: UTF-8 (BOMなしで推奨、ただし環境によってはBOM付きが必要な場合あり) で保存してください。
+*   **ヘッダー**: 1行目はほとんど言語タグ（例: `l_english:`）で始める必要があります。
+*   **キー**: `元の英語のキー:0 "翻訳した日本語"` という形式で書きます。
+
+**記述例:**
+
+```yaml
+l_english:
+ CORE_PROVINCE:0 "中核州"
+ MDEATH_HEIR_SUCCEEDS:0 "[Root.Heir.GetName]が[Root.Monarch.GetName]の後を継承した。"
+```
+
+### `deploy_translations` ターゲットの実行
+
+`Makefile`には、上記MOD構成を自動で作成・配置する`deploy_translations`ターゲットが含まれています。
 
 ```bash
 make deploy_translations
