@@ -1,5 +1,11 @@
 .PHONY: all test clean hijack run help
 
+# MOD configuration
+MOD_ID := eu4dll_translations
+MOD_NAME := EU4dll Japanese Translation
+MOD_PATH := mod/$(MOD_ID)
+MOD_SUPPORTED_VERSION := 1.37
+
 .DEFAULT_GOAL := help
 
 help: ## Show this help.
@@ -32,7 +38,7 @@ hijack: ## Build a dummy executable and test .so file hijacking.
 	make -C tests/poc/
 
 #
-# EU4にdllをかませて起動、dll.soっておかしいので後で変えたい
+# EU4にdllをかませて起動する
 #
 EU4_DIR := ~/.steam/debian-installation/steamapps/common/Europa\ Universalis\ IV/
 
@@ -47,10 +53,16 @@ run: ## Copy the built .so to EU4 directory and run EU4 with it.
 
 MOD_DIR := $(HOME)/.local/share/Paradox Interactive/Europa Universalis IV/mod
 
-deploy_translations: ## Copy generated translation files to the EU4 mod directory.
-	@echo "Deploying YAML translation files..."
+translations: ## Create .mod file and copy generated translation files to the EU4 mod directory.
+	@echo "Deploying MOD: $(MOD_NAME)..."
+
+	# 1. Create .mod file
+	@echo "Creating $(MOD_DIR)/$(MOD_ID).mod"
+	@printf 'name="%s"\npath="%s"\nsupported_version="%s"\n' "$(MOD_NAME)" "$(MOD_PATH)" "$(MOD_SUPPORTED_VERSION)" > "$(MOD_DIR)/$(MOD_ID).mod"
+
+	# 2. Copy translation files
 	@SOURCE_DIR="submodules/EU4JPModAppendixI/source/localisation"; \
-	DEST_DIR="$(MOD_DIR)/eu4dll_translations/localisation"; \
+	DEST_DIR="$(MOD_DIR)/$(MOD_ID)/localisation"; \
 	echo "Source: $${SOURCE_DIR}"; \
 	echo "Destination: $${DEST_DIR}"; \
 	if [ ! -d "$${SOURCE_DIR}" ]; then \
@@ -59,5 +71,5 @@ deploy_translations: ## Copy generated translation files to the EU4 mod director
 		exit 1; \
 	fi; \
 	mkdir -p "$${DEST_DIR}"; \
-	cp -v "$${SOURCE_DIR}"/*.yml "$${DEST_DIR}"/; \
+	cp "$${SOURCE_DIR}"/*.yml "$${DEST_DIR}"/; \
 	echo "Deployment complete. Files are assumed to be in UTF-8."
