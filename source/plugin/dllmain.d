@@ -1,5 +1,6 @@
 module plugin.dllmain;
 
+import std.logger; // std.logger全体をインポート
 import std.stdio;
 import core.stdc.stdlib;
 import plugin.byte_pattern;
@@ -45,7 +46,10 @@ void hijack()
 
 void hijackProcess()
 {
-    BytePattern.startLog("eu4jps");
+    // std.logger の設定
+    // ログファイルへの出力設定
+    // sharedLog に FileLogger を設定
+    std.logger.sharedLog = new shared FileLogger("pattern_eu4jps.log", LogLevel.trace);
 
     DllError success;
 
@@ -116,17 +120,16 @@ void hijackProcess()
     {
         // PluginVersion.initが失敗した場合、DllErrorにエラーフラグを設定する（ここでは仮に何もしない）
         // success.versionPluginVersionProc1Injector = true; // DllErrorの構造変更が必要になるため、一時的にコメントアウト
-        BytePattern.tempInstance().debugOutput("PluginVersion.init failed.");
+        std.logger.error("PluginVersion.init failed.");
     }
 
     if (pluginVersionInitResult) // PluginVersion.initの結果を直接判定
     {
-        BytePattern.tempInstance().debugOutput("DLL [OK]");
+        std.logger.info("DLL [OK]");
     }
     else
     {
-        BytePattern.tempInstance().debugOutput("DLL [NG] (PluginVersion.init failed)");
+        std.logger.error("DLL [NG] (PluginVersion.init failed)");
         exit(-1);
     }
-    BytePattern.tempInstance().flushLog(); // ログバッファを強制的にフラッシュ
 }

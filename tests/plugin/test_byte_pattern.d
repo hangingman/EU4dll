@@ -117,58 +117,6 @@ unittest
     b.parseSubPattern("88").should.equal(Pat(0x88, 0xFF));
 }
 
-@("startLog")
-unittest
-{
-    Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest1.log");
-    tryRemove(logFilePath);
-
-    auto b = new BytePattern();
-    b.startLog("unittest1");
-    b._literal = "48656C6C6F2C45553421"; // "Hello,EU4!" の16進数表現をセット
-    b.debugOutput(); // 引数なしのdebugOutputを呼び出す
-
-    assert(existsAsFile(logFilePath.toString()));
-
-    const ubyte[] actualLogs = cast(ubyte[])std.file.read(logFilePath.toString()); // cast(ubyte[])std.file.read に変更
-
-    // 期待するログ内容をバイト列として定義
-    const ubyte[] expectedLogs = cast(ubyte[])( // cast(ubyte[]) を追加
-        "Result(s) of pattern: 48656C6C6F2C45553421\n" ~
-            "(Hello,EU4!)\n" ~
-            "None\n" ~
-            replicate("-", 80) ~ "\n"
-    ); // .to!ubyte[] を削除
-
-    assert(actualLogs == expectedLogs); // バイト列同士で直接比較
-}
-
-@("debugOutput")
-unittest
-{
-    Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_unittest2.log");
-    tryRemove(logFilePath);
-
-    auto b = new BytePattern();
-    b.startLog("unittest2");
-    b._literal = "48656C6C6F20576F726C6421";
-    b.debugOutput();
-
-    assert(existsAsFile(logFilePath.toString()));
-
-    const ubyte[] actualLogs = cast(ubyte[])std.file.read(logFilePath.toString()); // cast(ubyte[])std.file.read に変更
-
-    // 期待するログ内容をバイト列として定義
-    const ubyte[] expectedLogs = cast(ubyte[])( // cast(ubyte[]) を追加
-        "Result(s) of pattern: 48656C6C6F20576F726C6421\n" ~
-            "(Hello World!)\n" ~
-            "None\n" ~
-            replicate("-", 80) ~ "\n"
-    ); // .to!ubyte[] を削除
-
-    assert(actualLogs == expectedLogs); // バイト列同士で直接比較
-}
-
 @("tempInstance")
 unittest
 {

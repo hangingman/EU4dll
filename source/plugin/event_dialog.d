@@ -1,6 +1,7 @@
 module plugin.event_dialog;
 
 import std.stdio;
+import std.logger; // std.loggerのために追加
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.input; // For DllError and RunOptions
@@ -49,7 +50,7 @@ DllError eventDialog1Injector(RunOptions options) {
             eventDialogProc1ReturnAddress = address + 0x14;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc1));
-            writeln("JMP for eventDialog1Injector created.");
+            std.logger.info("JMP for eventDialog1Injector created.");
         }
         else {
             e.unmatchdEventDialog1Injector = true;
@@ -67,7 +68,7 @@ DllError eventDialog1Injector(RunOptions options) {
             eventDialogProc1ReturnAddress = address + 0x14;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc1V132));
-            writeln("JMP for eventDialog1Injector (v1_32_plus) created.");
+            std.logger.info("JMP for eventDialog1Injector (v1_32_plus) created.");
         }
         else {
             e.unmatchdEventDialog1Injector = true;
@@ -117,7 +118,7 @@ DllError eventDialog2Injector(RunOptions options) {
             eventDialogProc2ReturnAddress1 = address + 0x0F;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc2));
-            writeln("JMP for eventDialog2Injector created.");
+            std.logger.info("JMP for eventDialog2Injector created.");
         }
         else {
             e.unmatchdEventDialog2Injector = true;
@@ -144,7 +145,7 @@ DllError eventDialog2Injector(RunOptions options) {
             eventDialogProc2ReturnAddress1 = address + 0x0F;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc2));
-            writeln("JMP for eventDialog2Injector (v1_32_plus) created.");
+            std.logger.info("JMP for eventDialog2Injector (v1_32_plus) created.");
         }
         else {
             e.unmatchdEventDialog2Injector = true;
@@ -172,7 +173,7 @@ DllError eventDialog3Injector(RunOptions options) {
             eventDialogProc3ReturnAddress = address + 0x13;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc3));
-            writeln("JMP for eventDialog3Injector created.");
+            std.logger.info("JMP for eventDialog3Injector created.");
         }
         else {
             e.unmatchdEventDialog3Injector = true;
@@ -198,7 +199,7 @@ DllError eventDialog3Injector(RunOptions options) {
             eventDialogProc3ReturnAddress = address + 0x13;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc3V130));
-            writeln("JMP for eventDialog3Injector (v1_30_plus) created.");
+            std.logger.info("JMP for eventDialog3Injector (v1_30_plus) created.");
         }
         else {
             e.unmatchdEventDialog3Injector = true;
@@ -216,7 +217,7 @@ DllError eventDialog3Injector(RunOptions options) {
             eventDialogProc3ReturnAddress = address + 0x14;
 
             PatchManager.instance().addPatch(cast(void*)address, makeJmp(cast(void*)address, cast(void*)eventDialogProc3V132));
-            writeln("JMP for eventDialog3Injector (v1_32_plus) created.");
+            std.logger.info("JMP for eventDialog3Injector (v1_32_plus) created.");
         }
         else {
             e.unmatchdEventDialog3Injector = true;

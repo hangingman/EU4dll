@@ -5,7 +5,7 @@ import plugin.constant;
 import plugin.patcher.patcher : PatchManager, makeJmp; // PatchManager, makeJmpを使用するためにインポート
 import plugin.input; // 共通変数・構造体を使用するため
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
-import std.stdio; // writeln を使用するため
+import std.logger;
 
 import plugin.misc; // get_branch_destination_offset を使用するため
 
@@ -34,7 +34,7 @@ DllError InputProc10Injector(RunOptions options)
 
             PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                     void*) InputProc10));
-            writeln("JMP for Input10Injector created.");
+            std.logger.info("JMP for Input10Injector created.");
         }
         else
         {
@@ -60,7 +60,7 @@ DllError InputProc10Injector(RunOptions options)
 
             PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                     void*) InputProc10V130));
-            writeln("JMP for Input10Injector (v1_30_plus) created.");
+            std.logger.info("JMP for Input10Injector (v1_30_plus) created.");
         }
         else
         {
@@ -87,7 +87,7 @@ DllError InputProc10Injector(RunOptions options)
 
             PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                     void*) InputProc10V131));
-            writeln("JMP for Input10Injector (v1_31_plus) created.");
+            std.logger.info("JMP for Input10Injector (v1_31_plus) created.");
         }
         else
         {
@@ -111,7 +111,7 @@ DllError InputProc10Injector(RunOptions options)
 
             PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                     void*) InputProc10V132));
-            writeln("JMP for Input10Injector (v1_32_plus) created.");
+            std.logger.info("JMP for Input10Injector (v1_32_plus) created.");
         }
         else
         {

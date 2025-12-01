@@ -5,6 +5,8 @@ import plugin.constant;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.localization.common; // 共通変数・構造体を使用するため
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import std.logger;
+import std.logger;
 import std.stdio; // writeln を使用するため
 
 DllError localizationProc5Injector(RunOptions options) {
@@ -207,7 +209,7 @@ DllError localizationProc5Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("nameを逆転させる [NG]");
+        log(LogLevel.error, "nameを逆転させる [NG]");
         // e.versionLocalizationProc5Injector = true; // 削除
         break;
     }

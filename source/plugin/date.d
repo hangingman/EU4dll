@@ -1,6 +1,7 @@
 module plugin.date;
 
 import std.stdio;
+import std.logger; // std.loggerのために追加
 import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
@@ -50,7 +51,7 @@ DllError dateProc1Injector(RunOptions options) {
             size_t address = BytePattern.tempInstance().getFirst().address;
 
             PatchManager.instance().addPatch(cast(void*)address, cast(ubyte[])isoFormat.text);
-            writeln("WriteMemory for dateProc1Injector called.");
+            std.logger.info("WriteMemory for dateProc1Injector called.");
         }
         else {
             e.unmatchdDateProc1Injector = true;

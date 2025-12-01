@@ -9,6 +9,7 @@ import dyaml.loader; // YAMLをパースするため
 import dyaml.node; // YAMLノードとNodeIDを扱うため
 import dyaml.exception; // YAMLパース例外を扱うため
 import std.uni; // toUTF8 for unicode handling
+import std.logger; // std.loggerのために追加
 
 // YAMLパーサーのユーティリティ関数
 private string getScalarValue(const Node value)
@@ -22,7 +23,6 @@ private string getScalarValue(const Node value)
 }
 
 import std.array; // 動的配列操作のため
-import plugin.byte_pattern; // debugOutputのため
 
 // 翻訳データを保持する構造体
 struct TranslationData
@@ -40,8 +40,7 @@ TranslationData[string] translationMap;
  */
 void loadTranslationMods(string customModDirPath = "")
 {
-    BytePattern.tempInstance()
-        .debugOutput("Searching for translation mods and loading YAML files...");
+    std.logger.info("Searching for translation mods and loading YAML files...");
 
     string modDirPath;
     if (customModDirPath.empty)
@@ -49,8 +48,8 @@ void loadTranslationMods(string customModDirPath = "")
         string homeDir = environment.get("HOME");
         if (homeDir.empty)
         {
-            throw new Exception(
-                "HOME environment variable is not set. Cannot determine mod directory.");
+            std.logger.error("HOME environment variable is not set. Cannot determine mod directory.");
+            return; // エラーなので処理を中断
         }
         modDirPath = buildPath(homeDir, ".local", "share", "Paradox Interactive", "Europa Universalis IV", "mod");
     }
@@ -59,38 +58,44 @@ void loadTranslationMods(string customModDirPath = "")
         modDirPath = customModDirPath;
     }
 
-    BytePattern.tempInstance().debugOutput(format("Checking mod directory: %s", modDirPath));
+    std.logger.info(format("Checking mod directory: %s", modDirPath));
     if (modDirPath.exists && modDirPath.isDir)
     {
-        BytePattern.tempInstance().debugOutput(format("Found mod directory: %s", modDirPath));
+        std.logger.info(format("Found mod directory: %s", modDirPath));
 
-        int jsonFileCount = 0;
+        int yamlFileCount = 0;
         foreach (DirEntry entry; dirEntries(modDirPath, SpanMode.depth))
         {
             if (entry.isFile)
             {
                 if (entry.name.endsWith(".yml"))
                 {
-                    jsonFileCount++; // YAMLファイル数としてカウント
+                    yamlFileCount++; // YAMLファイル数としてカウント
+                    string filePath = entry.name; // DirEntry.name を直接使用
                     try
                     {
-                        string filePath = entry.name;
                         string yamlContent = readText(filePath);
+
+                        // d-yamlが厳密で、ファイルの先頭に l_english: がないとパースに失敗するため、
+                        // 無い場合は補う
+                        if (!yamlContent.strip().startsWith("l_english:"))
+                        {
+                            std.logger.info(format("  Warning: 'l_english:' prefix missing in %s. Attempting to add it.", entry.name));
+                            yamlContent = "l_english:\n" ~ yamlContent;
+                        }
 
                         // YAMLをパース (Loader structを使用)
                         auto loader = dyaml.loader.Loader.fromString(yamlContent, filePath); // ファイル名を渡す
                         if (loader.empty) // ロードするドキュメントがない場合
                         {
-                             BytePattern.tempInstance()
-                                .debugOutput(format("  Warning: %s contains no YAML documents.", entry.name));
-                             continue;
+                            std.logger.info(format("  Warning: %s contains no YAML documents.", entry.name));
+                            continue;
                         }
                         auto rootNode = loader.load(); // 最初のドキュメントのルートノードを取得
 
                         if (rootNode.empty) // ロードされたノードが空の場合
                         {
-                            BytePattern.tempInstance()
-                                .debugOutput(format("  Warning: %s is empty or invalid YAML.", entry.name));
+                            std.logger.info(format("  Warning: %s is empty or invalid YAML.", entry.name));
                             continue;
                         }
 
@@ -108,44 +113,34 @@ void loadTranslationMods(string customModDirPath = "")
                                         if (pair.value.nodeID == NodeID.scalar)
                                         {
                                             string valueStr = pair.value.as!string;
-                                                string keyStr = pair.key.as!string;
-                                                translationMap[keyStr] = TranslationData(keyStr, valueStr);
+                                            string keyStr = pair.key.as!string;
+                                            translationMap[keyStr] = TranslationData(keyStr, valueStr);
                                         }
                                     }
                                 }
                             }
                         }
-                        BytePattern.tempInstance()
-                            .debugOutput(format("  Successfully loaded and parsed YAML from %s", entry
-                                    .name));
+                        std.logger.info(format("  Successfully loaded and parsed YAML from %s", entry.name));
                     }
-                    catch (dyaml.exception.ParserException e)
+                    catch (YAMLException e)
                     {
-                        BytePattern.tempInstance()
-                            .debugOutput(format("  Error parsing YAML from %s: %s", entry.name, e
-                                    .msg));
-                    }
-                    catch (FileException e)
-                    {
-                        BytePattern.tempInstance()
-                            .debugOutput(format("  Error reading file %s: %s", entry.name, e.msg));
+                        // YAMLExceptionから行番号を取得する方法を修正
+                        // dyaml 0.10.0のYAMLExceptionにはstartMarkプロパティがない可能性があるため、
+                        // e.msgから情報を抽出するか、よりジェネリックなエラーメッセージにする
+                        std.logger.error(format("  Error parsing YAML from %s: %s", entry.name, e.msg));
                     }
                     catch (Exception e)
                     {
-                        BytePattern.tempInstance()
-                            .debugOutput(format("  An unexpected error occurred while processing %s: %s", entry.name, e
-                                    .msg));
+                        std.logger.error(format("  An unexpected error occurred while processing %s: %s", entry.name, e.msg));
                     }
                 }
             }
         }
-        BytePattern.tempInstance()
-            .debugOutput(format("Total YAML translation files loaded: %d", jsonFileCount));
-        BytePattern.tempInstance().debugOutput(format("Total translations added to map: %d", translationMap
-                .length));
+        std.logger.info(format("Total YAML translation files loaded: %d", yamlFileCount));
+        std.logger.info(format("Total translations added to map: %d", translationMap.length));
     }
     else
     {
-        BytePattern.tempInstance().debugOutput(format("Mod directory not found: %s", modDirPath));
+        std.logger.info(format("Mod directory not found: %s", modDirPath));
     }
 }

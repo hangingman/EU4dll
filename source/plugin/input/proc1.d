@@ -4,7 +4,7 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.patcher.patcher : PatchManager, makeJmp; // PatchManager, makeJmpを使用するためにインポート
 import plugin.input; // 共通変数・構造体を使用するため
-import std.stdio; // writeln を使用するため
+import std.logger;
 
 import plugin.misc; // get_branch_destination_offset を使用するため
 
@@ -44,7 +44,7 @@ DllError InputProc1Injector(RunOptions options)
 
             PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                     void*) InputProc1));
-            writeln("JMP for InputProc1Injector created.");
+            std.logger.info("JMP for InputProc1Injector created.");
         }
         else
         {
