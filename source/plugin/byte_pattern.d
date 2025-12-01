@@ -1,11 +1,8 @@
 module plugin.byte_pattern;
-import plugin.constant;
 
 import core.stdc.stdint;
 import core.sys.posix.dlfcn;
 import elf;
-// import freck.streams.filestream; // freck-streams を削除
-// import freck.streams.stream;     // freck-streams を削除
 import plugin.memory_pointer;
 import plugin.singleton;
 import scriptlike.core;
@@ -15,8 +12,8 @@ import scriptlike.path.extras : Path;
 import std.conv;
 import std.container : Array, SList;
 import std.file : thisExePath;
-import std.stdio; // std.stdio のすべてをインポートし、writeln, File, SeekPos を解決
-import core.stdc.stdio : SEEK_SET; // SEEK_SET をインポート
+import std.stdio : File; // Fileのみをインポート
+import core.stdc.stdio : SEEK_SET;
 import std.typecons;
 import std.array : replicate;
 import std.format;
@@ -26,17 +23,15 @@ import core.stdc.stdlib;
 import std.algorithm.searching : BoyerMooreFinder;
 import cerealed;
 import std.mmfile;
-
+import std.logger; // std.loggerのために追加
 
 alias SectionRange = Tuple!(size_t, "fileOffset", size_t, "size", uintptr_t, "virtualAddress");
 alias Pat = Tuple!(uint8_t, "pattern", uint8_t, "mask");
 alias Patterns = Pat[];
 alias Bytes = ubyte[];
 
-
 class BytePattern
 {
-    // シングルトンパターン
     mixin singleton;
 
     Bytes[string] _contents;
@@ -45,26 +40,22 @@ class BytePattern
     Array!(MemoryPointer) _results;
     string _literal;
     ptrdiff_t[256] _bmbc;
-    static File _stream = File.init; // Stream から std.stdio.File に変更
-    const string sep = replicate("-", 80);
 
     // 仮想アドレスをファイルオフセットに変換するヘルパー関数
     size_t virtualAddressToFileOffset(uintptr_t virtualAddress)
     {
         foreach (range; _ranges) {
             if (virtualAddress >= range.virtualAddress && virtualAddress < range.virtualAddress + range.size) {
-                // 仮想アドレスからセクション内のオフセットを計算
                 size_t offsetInSection = virtualAddress - range.virtualAddress;
-                // ファイルオフセットを計算
                 return range.fileOffset + offsetInSection;
             }
         }
+        std.logger.error(format("Virtual address 0x%x not found in any section ranges.", virtualAddress));
         throw new Exception(format("Virtual address 0x%x not found in any section ranges.", virtualAddress));
     }
 
     static typeof(this) tempInstance()
     {
-        // シングルトンのインスタンスを返す
         return BytePattern.opCall();
     }
 
@@ -73,7 +64,6 @@ class BytePattern
         setModule();
     }
 
-    // キャッシュをクリアするメソッド
     static void clearContentsCache()
     {
         BytePattern.opCall()._contents.clear();
@@ -94,6 +84,7 @@ class BytePattern
                 return cast(uint8_t) (ch - 'a' + 10);
             }
 
+        std.logger.error("Could not parse pattern: Invalid hex digit.");
         throw new Exception("Could not parse pattern.");
     }
 
@@ -112,19 +103,17 @@ class BytePattern
             {
                 return *content;
             }
-        // freck-streams の FileStream の代わりに std.stdio.File を使用
         auto f = File(binPath, "r");
-        scope(exit) f.close(); // ファイルを必ず閉じる
+        scope(exit) f.close();
         size_t size = f.size;
         ubyte[] content = new ubyte[size];
-        f.rawRead(content); // rawRead に引数スライスを渡す
+        f.rawRead(content);
         _contents[binPath] = content;
         return _contents[binPath];
     }
 
     Pat parseSubPattern(string sub)
     {
-        // パターンマッチを使いたいが、D言語にはない
         Pat result;
 
         if (sub.length == 1)
@@ -165,6 +154,7 @@ class BytePattern
             }
         else
             {
+                std.logger.error(format("Could not parse pattern: Invalid sub-pattern length %s.", sub));
                 throw new Exception("Could not parse pattern.");
             }
 
@@ -193,6 +183,7 @@ class BytePattern
             }
         catch (Exception e)
             {
+                std.logger.error(format("Error transforming pattern '%s': %s", literal, e.msg));
                 this.clear();
             }
     }
@@ -270,19 +261,14 @@ class BytePattern
         foreach (range ; this._ranges)
             {
                 debug {
-                    std.stdio.writeln(mixin(interp!"module size: ${contents.length}"));
-                    // import plugin.constant; // constantは既にインポート済み
-
-                    std.stdio.writeln(mixin(interp!"[${range.fileOffset} .. ${range.fileOffset + range.size}]"));
-
-                    std.stdio.writeln("pattern:");
-                    std.stdio.writeln(pattern.map!(d => std.conv.to!string(d.pattern, 16) ));
-                    std.stdio.writeln("mask:");
-                    std.stdio.writeln(pattern.map!(d => std.conv.to!string(d.mask, 16) ));
+                    std.logger.info(format("module size: %d", contents.length));
+                    std.logger.info(format("[%x .. %x]", range.fileOffset, range.fileOffset + range.size));
+                    std.logger.info(format("pattern: %s", pattern.map!(d => std.conv.to!string(d.pattern, 16) ).join(" ")));
+                    std.logger.info(format("mask: %s", pattern.map!(d => std.conv.to!string(d.mask, 16) ).join(" ")));
                 }
 
                 auto section = contents[range.fileOffset .. range.fileOffset + range.size];
-                ptrdiff_t index = std.algorithm.searching.countUntil!((a, b) // 完全修飾名を使用
+                ptrdiff_t index = std.algorithm.searching.countUntil!((a, b)
                                               {
                                                   return (a & b.mask) == (b.pattern & b.mask);
                                               })(section, pattern);
@@ -292,8 +278,8 @@ class BytePattern
                         MemoryPointer m = new MemoryPointer(range.virtualAddress + index, patternLen);
                         this._results.insertBack(m);
                         debug {
-                            std.stdio.writeln((range.virtualAddress + index).format!"Found on: %d");
-                            std.stdio.writeln(section[index .. index + patternLen].map!(d => std.conv.to!string(d, 16) ));
+                            std.logger.info(format("Found on: 0x%x", range.virtualAddress + index));
+                            std.logger.info(format("Bytes: %s", section[index .. index + patternLen].map!(d => std.conv.to!string(d, 16) ).join(" ")));
                         }
                     }
             }
@@ -302,13 +288,12 @@ class BytePattern
     BytePattern search()
     {
         findIndexes();
-        debugOutput();
         return this;
     }
 
     BytePattern findPattern(string patternLiteral)
     {
-        debugOutput(mixin(interp!"findPattern str: ${hexToUTF8(patternLiteral)},hex: ${patternLiteral}"));
+        std.logger.info(format("findPattern str: %s, hex: %s", hexToUTF8(patternLiteral), patternLiteral));
         this.setPattern(patternLiteral).search();
         return this;
     }
@@ -316,16 +301,15 @@ class BytePattern
     T found(T)()
     {
         auto m = getFirst();
-        // 仮想アドレスをファイルオフセットに変換し、バイト列を取得
         size_t fileOffset = virtualAddressToFileOffset(m.address());
         const ubyte[] content = binToRange()[fileOffset .. fileOffset + m.byteLength];
         debug {
-            std.stdio.writeln("-- found --");
-            std.stdio.writeln(m.address().format!("from 0x%x (virtual)"));
-            std.stdio.writeln((fileOffset).format!("from 0x%x (file offset)")); // ファイルオフセットもログに出力
-            std.stdio.writeln(m.address(m.byteLength).format!("to 0x%x (virtual)"));
-            std.stdio.writeln((fileOffset + m.byteLength).format!("to 0x%x (file offset)")); // ファイルオフセットもログに出力
-            std.stdio.writeln(content.map!(d => std.conv.to!string(d, 16) ));
+            std.logger.info("-- found --");
+            std.logger.info(format("from 0x%x (virtual)", m.address()));
+            std.logger.info(format("from 0x%x (file offset)", fileOffset));
+            std.logger.info(format("to 0x%x (virtual)", m.address(m.byteLength)));
+            std.logger.info(format("to 0x%x (file offset)", fileOffset + m.byteLength));
+            std.logger.info(format("Content: %s", content.map!(d => std.conv.to!string(d, 16) ).join(" ")));
         }
         T ans = cerealed.decerealise!T(content);
         return ans;
@@ -335,117 +319,7 @@ class BytePattern
     {
         findPattern(patternLiteral);
         auto m = getFirst();
-        return found!T(); // テンプレートの呼び出しを修正
-    }
-
-    static File logStream(string logFilePath=null) // std.stdio.File を返す
-    {
-        if (this._stream == File.init) // File.init で未初期化を判定
-            {
-                this._stream = File(logFilePath, "a+");
-            }
-
-        return this._stream;
-    }
-
-public:
-    /++
-     + デバッグログを出力する
-     +
-     + Example:
-     + ---
-     + // 内部に検索結果の文字列が格納されている場合それを出力する
-     + Result(s) of pattern: 45 55 34
-     +
-     + // 以下のようにすればasciiに戻せる
-     + $ echo "45 55 34" | sed -e 's/ //g' | xxd -r -p
-     + EU4
-     + ---
-     +/
-    void debugOutput()
-    {
-        if (this._stream == File.init) // File.init で未初期化を判定
-            {
-                return;
-            }
-
-    // writeln の代わりに rawWrite と明示的な改行コードを使用
-    _stream.rawWrite(cast(ubyte[])(_literal.format!"Result(s) of pattern: %s"));
-    _stream.rawWrite(cast(ubyte[])"\n");
-    _stream.rawWrite(cast(ubyte[])(hexToUTF8(_literal).format!"(%s)"));
-    _stream.rawWrite(cast(ubyte[])"\n");
-
-    if (count() > 0)
-        {
-            foreach (pointer; _results)
-                {
-                    _stream.rawWrite(cast(ubyte[])(pointer.address().format!("0x%s")));
-                    _stream.rawWrite(cast(ubyte[])"\n");
-                }
-        }
-    else
-        {
-            _stream.rawWrite(cast(ubyte[])"None");
-            _stream.rawWrite(cast(ubyte[])"\n");
-        }
-
-    _stream.rawWrite(cast(ubyte[])sep);
-    _stream.rawWrite(cast(ubyte[])"\n");
-        _stream.seek(0, SEEK_SET); // SEEK_SET を使用
-    }
-
-    void debugOutput(const string message)
-    {
-        if (this._stream == File.init) // File.init で未初期化を判定
-            {
-                return;
-            }
-
-        logStream().writeln(message); // writeln を使用
-        logStream().writeln(sep); // writeln を使用
-
-        _stream.seek(0, SEEK_SET); // SEEK_SET を使用
-    }
-
-    static void startLog(const string moduleName)
-    {
-        shutdownLog();
-        // TODO: EU4と同じディレクトリに書き込もうとするとno such file or directoryとなるため
-        // とりあえず１つ上のディレクトリに書き込んでいる、単体のプログラムだと問題が再現しない
-        Path logFilePath = Path(thisExePath()).up().up() ~ mixin(interp!"pattern_${moduleName}.log");
-        tempInstance().logStream(logFilePath.toString());
-    }
-
-    static void shutdownLog()
-    {
-        if (_stream != File.init) // File.init で未初期化を判定
-            {
-                _stream.close();
-                _stream = File.init;
-            }
-    }
-
-    MemoryPointer get(size_t index)
-    {
-        return this._results[index];
-    }
-
-    MemoryPointer getFirst()
-    {
-        return this.get(0);
-    }
-
-    MemoryPointer getSecond()
-    {
-        return this.get(1);
-    }
-
-    void flushLog()
-    {
-        if (_stream != File.init) // File.init で未初期化を判定
-        {
-            _stream.flush(); // std.stdio.File の flush() を呼び出す
-        }
+        return found!T();
     }
 
     BytePattern setPattern(string patternLiteral)
@@ -464,5 +338,38 @@ public:
     {
         this.getModuleRanges(mmf);
         return this;
+    }
+
+    // `getFirst`メソッドを追加
+    MemoryPointer getFirst()
+    {
+        if (_results.empty)
+        {
+            std.logger.error("No pattern found for getFirst().");
+            throw new Exception("No pattern found for getFirst().");
+        }
+        return _results[0];
+    }
+
+    // `getSecond`メソッドを追加
+    MemoryPointer getSecond()
+    {
+        if (_results.length < 2)
+        {
+            std.logger.error("No second pattern found for getSecond().");
+            throw new Exception("No second pattern found for getSecond().");
+        }
+        return _results[1];
+    }
+
+    // `get(int index)`メソッドを追加
+    MemoryPointer get(int index)
+    {
+        if (index >= _results.length || index < 0)
+        {
+            std.logger.error(format("Index %d out of bounds for get().", index));
+            throw new Exception(format("Index %d out of bounds for get().", index));
+        }
+        return _results[index];
     }
 }

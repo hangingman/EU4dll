@@ -6,6 +6,8 @@ import plugin.input; // DllErrorとRunOptionsを使用するためインポー�
 import plugin.localization.common; // 共通変数・構造体を使用するため
 import plugin.misc; // get_branch_destination_offset を使用するため
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import std.logger;
+import std.logger;
 import std.stdio; // writeln を使用するため
 
 DllError localizationProc3Injector(RunOptions options) {
@@ -142,7 +144,7 @@ DllError localizationProc3Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("MDEATH_HEIR_SUCCEEDS heir nameを逆転させる [NG]");
+        log(LogLevel.error, "MDEATH_HEIR_SUCCEEDS heir nameを逆転させる [NG]");
         e.versionLocalizationProc3Injector = true;
         break;
     }
@@ -410,7 +412,7 @@ DllError localizationProc4Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("MDEATH_REGENCY_RULE heir nameを逆転させる [NG]");
+        log(LogLevel.error, "MDEATH_REGENCY_RULE heir nameを逆転させる [NG]");
         e.versionLocalizationProc4Injector = true;
         break;
     }

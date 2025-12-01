@@ -5,7 +5,7 @@ import plugin.constant;
 import plugin.input; // For DllError and RunOptions
 import plugin.patcher.patcher : PatchManager, makeJmp; // PatchManager, makeJmpを使用するためにインポート
 import plugin.file_save.common; // 共通変数・構造体を使用するため
-import std.stdio; // writeln を使用するため
+import std.logger;
 
 DllError fileSaveProc7Injector(RunOptions options)
 {
@@ -29,7 +29,7 @@ DllError fileSaveProc7Injector(RunOptions options)
 
             PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                     void*) fileSaveProc7));
-            writeln("JMP for fileSaveProc77Injector created.");
+            std.logger.info("JMP for fileSaveProc77Injector created.");
         }
         else
         {
@@ -77,7 +77,7 @@ DllError fileSaveProc7Injector(RunOptions options)
 
         PatchManager.instance().addPatch(cast(void*) address, makeJmp(cast(void*) address, cast(
                 void*) fileSaveProc7));
-        writeln("JMP for fileSaveProc7Injector (v1_30_plus) created.");
+        std.logger.info("JMP for fileSaveProc7Injector (v1_30_plus) created.");
 
         break;
     default:

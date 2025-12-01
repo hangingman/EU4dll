@@ -6,6 +6,7 @@ import plugin.process.process : get_executable_memory_range; // get_executable_m
 import plugin.misc; // get_branch_destination_offset を使用するため
 import plugin.input; // DllError を使用するため
 import plugin.byte_pattern; // BytePattern を使用するため
+import std.logger;
 
 // 各Injectorモジュールの関数をインポート
 import plugin.input.proc1;
@@ -36,12 +37,18 @@ DllError init(EU4Ver eu4Version)
         if (BytePattern.tempInstance().hasSize(1, "cursorAddress")) {
             cursorAddress = BytePattern.tempInstance().getFirst().address;
             cursor = *cast(Cursor*) (cursorAddress + 0x3);
+            std.logger.info("cursorAddress found: %x", cursorAddress);
+        } else {
+            std.logger.error("cursorAddress not found.");
         }
 
         BytePattern.tempInstance().setModule().setPattern("48 8D 05 ? ? ? ? 48 8D 4C 24 20").search();
         if (BytePattern.tempInstance().hasSize(2, "imeAddress")) {
             imeAddress = BytePattern.tempInstance().get(1).address; // 2番目のアドレスを取得
             ime = *cast(Ime*) (imeAddress + 0x3);
+            std.logger.info("imeAddress found: %x", imeAddress);
+        } else {
+            std.logger.error("imeAddress not found.");
         }
     }
 

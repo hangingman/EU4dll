@@ -5,6 +5,8 @@ import plugin.constant;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.localization.common; // 共通変数・構造体を使用するため
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import std.logger;
+import std.logger;
 import std.stdio; // writeln を使用するため
 
 DllError localizationProc2Injector(RunOptions options) {
@@ -78,7 +80,7 @@ DllError localizationProc2Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("Battle of areaを逆転させる [NG]");
+        log(LogLevel.error, "Battle of areaを逆転させる [NG]");
         e.versionLocalizationProc2Injector = true;
         break;
     }

@@ -5,6 +5,8 @@ import plugin.constant;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.localization.common; // 共通変数・構造体を使用するため
 import plugin.patcher.patcher : ScopedPatch, PatchManager; // ScopedPatch, PatchManagerを使用するため
+import std.logger;
+import std.logger;
 import std.stdio; // writeln を使用するため
 
 DllError localizationProc9Injector(RunOptions options) {
@@ -32,7 +34,7 @@ DllError localizationProc9Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("Replace space [NG]");
+        log(LogLevel.error, "Replace space [NG]");
         // e.versionLocalizationProc9Injector = true; // 削除
         break;
     }

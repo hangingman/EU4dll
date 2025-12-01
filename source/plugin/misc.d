@@ -1,13 +1,12 @@
 module plugin.misc;
 
-
 import plugin.constant;
 import plugin.byte_pattern;
 import std.stdio;
 import std.format;
 import scriptlike.core;
 import std.conv;
-
+import std.logger; // std.loggerのために追加
 
 struct Misc
 {
@@ -41,7 +40,7 @@ static:
             {
                 const EU4Version minor = b.found!(EU4Version)();
                 int calculatedVer = minor.calVer();
-                b.debugOutput(format("Misc.getVersion: Calculated version number: %s", calculatedVer));
+                std.logger.info(format("Misc.getVersion: Calculated version number: %s", calculatedVer));
 
                 switch (calculatedVer) {
                 case 250:
@@ -64,16 +63,16 @@ static:
                     ver = EU4Ver.v1_37_5;
                     break;
                 default:
-                    b.debugOutput(format("Misc.getVersion: No matching case for calculated version: %s, returning UNKNOWN", calculatedVer));
+                    std.logger.info(format("Misc.getVersion: No matching case for calculated version: %s, returning UNKNOWN", calculatedVer));
                     ver = EU4Ver.UNKNOWN;
                     break;
                 }
             }
         else {
-            b.debugOutput("Misc.getVersion: Pattern for EU4 version not found, returning UNKNOWN");
+            std.logger.info("Misc.getVersion: Pattern for EU4 version not found, returning UNKNOWN");
         }
 
-        b.debugOutput(format("Misc.getVersion: Final EU4Ver result: %s", std.conv.to!string(ver)));
+        std.logger.info(format("Misc.getVersion: Final EU4Ver result: %s", std.conv.to!string(ver)));
         return ver;
     };
 };

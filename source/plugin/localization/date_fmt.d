@@ -6,6 +6,8 @@ import plugin.input; // DllErrorとRunOptionsを使用するためインポー�
 import plugin.localization.common; // 共通変数・構造体を使用するため
 import plugin.misc; // get_branch_destination_offset を使用するため
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import std.logger;
+import std.logger;
 import std.stdio; // writeln を使用するため
 
 DllError localizationProc6Injector(RunOptions options) {
@@ -186,7 +188,7 @@ DllError localizationProc6Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("M, Y → Y年M [NG]");
+        log(LogLevel.error, "M, Y → Y年M [NG]");
         // e.versionLocalizationProc6Injector = true; // 削除
         break;
     }
@@ -318,7 +320,7 @@ DllError localizationProc7Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("D M, Y → Y年MD日 [NG]");
+        log(LogLevel.error, "D M, Y → Y年MD日 [NG]");
         // e.versionLocalizationProc7Injector = true; // 削除
         break;
     }
@@ -457,7 +459,7 @@ DllError localizationProc8Injector(RunOptions options) {
         break;
     }
     default: {
-        BytePattern.tempInstance().debugOutput("M Y → Y年M [NG]");
+        log(LogLevel.error, "M Y → Y年M [NG]");
         // e.versionLocalizationProc8Injector = true; // 削除
         break;
     }
