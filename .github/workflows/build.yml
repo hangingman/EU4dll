@@ -18,6 +18,14 @@ jobs:
       with:
         compiler: ldc-latest
 
+    - name: Cache dub
+      uses: actions/cache@v4
+      with:
+        path: ~/.dub
+        key: ${{ runner.os }}-dub-${{ hashFiles('**/dub.json', '**/dub.selections.json') }}
+        restore-keys: |
+          ${{ runner.os }}-dub-
+
     - name: Build
       run: make
 
