@@ -3,26 +3,6 @@
 ## 優先度: 高
 
 -   [x] `Plugin64/` ディレクトリ内の残りのC++ファイルをD言語に移植する。
-    -   **入力・IME関連モジュール**
-        -   `input.cpp` / `input_asm.asm`: テキスト入力フック、UTF-8変換。
-        -   `ime.cpp` / `ime_asm.asm`: IME制御、再変換対応など。
-    -   **フォント・テキスト描画・整形モジュール**
-        -   `font.cpp` / `font_asm.asm`: フォントバッファ管理、サイズ拡張。
-        -   `main_text.cpp` / `main_text_asm.asm`: メインテキスト描画フック。
-        -   `list_field_adjustment.cpp` / `list_field_adjustment_asm.asm`: リストビューの文字調整。
-        -   `date.cpp` / `date_asm.asm`: 日付フォーマット修正。
-        -   `localization.cpp` / `localization_asm.asm`: ローカライズ関連（人名順序など）。
-    -   **マップ・UI表示調整モジュール**
-        -   `map_view.cpp` / `map_view_asm.asm`: マップ上のテキスト表示。
-        -   `map_adjustment.cpp` / `map_adjustment_asm.asm`: マップ文字位置調整。
-        -   `map_justify.cpp` / `map_justify_asm.asm`: マップ文字均等割付。
-        -   [x] `map_popup.cpp` / `map_popup_asm.asm`: ポップアップ表示調整。
-        -   [x] `tooltip_and_button.cpp` / `tooltip_and_button_asm.asm`: ツールチップとボタンのUI調整。
-        -   [x] `event_dialog.cpp` / `event_dialog_asm.asm`: イベントダイアログ修正。
-    -   **システム・その他機能モジュール**
-        -   [x] `file_save.cpp` / `file_save_asm.asm`: セーブデータ関連。
-        -   [x] `options.cpp`: 設定ファイル (`plugin.ini`) 読み込み。
-        -   [x] `dll_main.cpp`, `version.cpp`: DLLエントリーポイント、バージョン管理。
 -   [x] Linux環境でのパッチ適用方法を `LD_PRELOAD` を利用した手法に移行する。
     -   [x] `d3d9.dll` プロキシの代わりに、共有オブジェクト（`.so`）を `LD_PRELOAD` でロードする仕組みを実装する。
     -   [x] Windows API (`VirtualProtect` など) に依存しているコードをLinux API (`mprotect(2)`, `dl_iterate_phdr(3)` など) を使用するように書き換える。
@@ -53,6 +33,7 @@
     -   [x] `make test` コマンドでテストを実行し、PASSすることを確認する。
     -   [ ] `LD_PRELOAD` を使用してパッチが正しく適用され、ゲームが動作することを確認する。
     -   [ ] 各機能が期待通りに動作することを確認する。
+    -   [ ] **文字化け解消のPoC**: `source/plugin/main_text.d` の `getCharInFont` に相当する箇所を特定し、パッチを適用する。
 -   [x] **翻訳ファイルダウンローダーのPoC作成** (Gitサブモジュール EU4JPModAppendixI の統合により実現)
     -   [x] `tests/poc/downloader.d` の作成。
     -   [x] `std.net.curl` を使用したファイルのダウンロード機能の実装。
@@ -84,10 +65,6 @@
 ## 優先度: 中
 
 -   [x] D言語コードのリファクタリング: `source/plugin/localization.d` (1347行), `source/plugin/file_save.d` (624行), `source/plugin/input.d` (597行), `source/plugin/tooltip_and_button.d` (516行) を同名のサブディレクトリに分割する。
-    -   [x] `source/plugin/localization/` ディレクトリの作成とファイル分割。
-    -   [x] `source/plugin/file_save/` ディレクトリの作成とファイル分割。
-    -   [x] `source/plugin/input/` ディレクトリの作成とファイル分割。
-    -   [x] `source/plugin/tooltip_and_button/` ディレクトリの作成とファイル分割。
 -   [ ] 移植されたD言語コードのパフォーマンス最適化。
 -   [ ] D言語のユニットテストカバレッジの拡充。
 -   [ ] CI/CDパイプラインのD言語ビルドプロセスへの適応。

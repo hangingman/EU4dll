@@ -14,6 +14,8 @@
             "sourcePaths": [
                 "source/"
             ],
+            "dflags": ["--relocation-model=pic"],
+            "lflags": [],
             "dependencies": {
                 "scriptlike": "~>0.10.3",
                 "elf-d": "~>0.2.5",
