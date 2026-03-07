@@ -68,8 +68,23 @@ $ LD_PRELOAD=./libeu4dll.so ./eu4
 -   **`mod.d`におけるYAMLファイルパス解決のバグ:**
     -   `source/plugin/mod.d`において、`std.file.DirEntry.name`が`dirEntries(SpanMode.depth)`によって絶対パスとして返されることを考慮し、`filePath`を`entry.name`を直接使用するように修正しました。これにより、`tests/plugin/test_mod.d`のユニットテストが成功するようになりました。
 
+## D言語ビルドとテストの修正履歴 (2026/03/07)
+
+### 発生した主なエラーと修正内容
+
+-   **Linux x86_64におけるインラインアセンブリのPIC対応と再配置エラー:**
+    *   **問題**: LDCを使用して共有ライブラリ（.so）をビルドする際、インラインアセンブリ（iasm）内でグローバル変数に `[symbol]` 形式でアクセスすると、リンカが `R_X86_64_PC32` や `R_X86_64_32S` の再配置エラー（shared object作成時に使用不可）を出す。
+    *   **解決**: 全てのグローバル変数アクセスに **RIP相対アドレッシング** `[RIP + symbol]` を使用するように修正。これにより、位置独立コード（PIC）として正しくリンク可能になった。
+    *   **補足**: `dub.json` に `-fvisibility=hidden` を追加し、内部変数を非公開にすることで、リンカによる最適化と再配置の安定性を向上させた。
+
+-   **LDC/DMD-iasmにおける `MOVSXD` の互換性問題:**
+    *   **問題**: レジスタ間（例: `movsxd RDX, EDI`）の `MOVSXD` 指令が LDC のインラインアセンブラで `invalid operand size/type` エラーを発生させることがある。
+    *   **解決**: **手動符号拡張** を実装。 `shl RAX, 32` -> `sar RAX, 32` のシーケンスを使用することで、指令レベルの互換性問題を回避し、確実に32bitから64bitへの符号拡張を実現。
+
+-   **メモリオペランドのサイズ明示 (`ptr` 構文):**
+    *   **内容**: `byte [RCX+R9]` などの記述は LDC の iasm パーサで曖昧さとみなされる場合があるため、 `byte ptr [RCX+R9]` のように `ptr` を付加する Intel/DMD 互換構文を徹底。
+
 ### 結果
 
--   `make all` コマンドでプロジェクトのビルドがエラーなく成功しました。
--   `make test` コマンドでテストがすべてPASSしました。
--   `memory-bank/TODO.txt` の関連項目を `[x]` に更新しました。
+-   `ldc2` を使用したビルドとテストが、Linux環境のPIC要件を満たした状態で完全に成功（PASS）。
+-   GitHub Actions CIにキャッシュ機能を導入し、ビルド時間を短縮。
