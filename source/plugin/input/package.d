@@ -82,6 +82,8 @@ public struct DllError
     bool versionMainTextProc3Injector;
     bool unmatchdMainTextProc4Injector; // 追加
     bool versionMainTextProc4Injector; // 追加
+    bool unmatchdMainTextProcCopyBuffInjector; // 追加
+    bool versionMainTextProcCopyBuffInjector; // 追加
 
     // map_adjustment.d
     bool unmatchdMapAdjustmentProc1Injector;
