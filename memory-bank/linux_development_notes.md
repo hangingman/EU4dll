@@ -1,5 +1,8 @@
 # Memo
 
+## 参考資料
+- [バイナリ解析・探索ガイド](file:///home/hiroyuki/git/EU4dll/memory-bank/binary_analysis_guide.md)
+
 ## Mod
 
 [Mods - Europa Universalis 4 Wiki](https://eu4.paradoxwikis.com/Mods)

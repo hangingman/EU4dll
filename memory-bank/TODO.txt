@@ -1,5 +1,14 @@
 # D言語移行 TODOリスト
 
+## 優先度: 最優先 (バイナリ解析と実装の同期)
+
+- [ ] **バイナリ探索と実装の同期**
+    - [ ] 実装済みコード（`main_text.d`等）からバイナリ探索対象（フック候補）をピックアップ
+    - [ ] Ghidraを用いた「テキスト処理ループ2」の探索と特定
+    - [ ] 探索結果に基づいた実装済みコードのフックアドレス更新
+- [ ] Ghidra環境構築 (JDK 17+, Ghidra)
+    - 詳細は [binary_analysis_guide.md](file:///home/hiroyuki/git/EU4dll/memory-bank/binary_analysis_guide.md) を参照
+
 ## 優先度: 高
 
 -   [x] `Plugin64/` ディレクトリ内の残りのC++ファイルをD言語に移植する。
