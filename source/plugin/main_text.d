@@ -7,11 +7,11 @@ import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
-// Removed: import ldc.attributes; // @naked を使用するため
+ // @naked を使用するため
 
 // 対策3: __gshared必須、一時的なコードポイントを格納
 // mainTextProc2TmpCharacter	DD	0 に相当
-__gshared uint s_lastCodePoint = 0;
+private __gshared uint s_lastCodePoint = 0;
 
 // ASMで定義されている定数
 enum ESCAPE_SEQ_1 = 0x10;
@@ -37,35 +37,36 @@ extern (C)
             {
                 naked;
                 mov       EAX, EDI;
-                movsxd    RAX, EAX; // 32bitから64bitへの符号拡張を明示的に
+                shl       RAX, 32;
+                sar       RAX, 32; // 32bitから64bitへの符号拡張を明示的に (LDC/DMD iasm互換性のための手動実装)
 
-                cmp       byte [RAX + RBX], ESCAPE_SEQ_1;
+                cmp       byte ptr [RAX + RBX], ESCAPE_SEQ_1;
                 jz        JMP_A;
-                cmp       byte [RAX + RBX], ESCAPE_SEQ_2;
+                cmp       byte ptr [RAX + RBX], ESCAPE_SEQ_2;
                 jz        JMP_B;
-                cmp       byte [RAX + RBX], ESCAPE_SEQ_3;
+                cmp       byte ptr [RAX + RBX], ESCAPE_SEQ_3;
                 jz        JMP_C;
-                cmp       byte [RAX + RBX], ESCAPE_SEQ_4;
+                cmp       byte ptr [RAX + RBX], ESCAPE_SEQ_4;
                 jz        JMP_D;
-                movzx     EAX, byte [RAX+RBX];
+                movzx     EAX, byte ptr [RAX+RBX];
                 jmp       JMP_E;
 
             JMP_A:
-                movzx     EAX, word [RAX + RBX + 1];
+                movzx     EAX, word ptr [RAX + RBX + 1];
                 jmp       JMP_F;
 
             JMP_B:
-                movzx     EAX, word [RAX + RBX + 1];
+                movzx     EAX, word ptr [RAX + RBX + 1];
                 sub       EAX, SHIFT_2;
                 jmp       JMP_F;
 
             JMP_C:
-                movzx     EAX, word [RAX + RBX + 1];
+                movzx     EAX, word ptr [RAX + RBX + 1];
                 add       EAX, SHIFT_3;
                 jmp       JMP_F;
 
             JMP_D:
-                movzx     EAX, word [RAX + RBX + 1];
+                movzx     EAX, word ptr [RAX + RBX + 1];
                 add       EAX, SHIFT_4;
 
             JMP_F:
@@ -76,12 +77,12 @@ extern (C)
                 ja        JMP_E;
                 mov       EAX, NOT_DEF;
             JMP_E:
-                movss     XMM3, dword [R15+0x848];
-                mov       RBX, qword [R15+RAX*8];
-                mov       qword [RBP+0x100], RBX;
+                movss     XMM3, dword ptr [R15+0x848];
+                mov       RBX, qword ptr [R15+RAX*8];
+                mov       qword ptr [RBP+0x100], RBX;
 
-                lea       R11, [mainTextProc1ReturnAddress]; // LEAでアドレスをロード
-                jmp       qword [R11]; // ロードしたアドレスにジャンプ
+                lea       R11, [RIP + mainTextProc1ReturnAddress]; // LEAでアドレスをロード
+                jmp       qword ptr [R11]; // ロードしたアドレスにジャンプ
             }
         }
     }
@@ -94,14 +95,18 @@ extern (C)
             asm
             {
                 naked;
-                movsxd    RDX, EDI;
-                movsxd    RCX, R14D;
-                mov       R10, qword [RSP + 0x78]; // RSP+858h-7E0h = RSP+78h
+                mov       EDX, EDI;
+                shl       RDX, 32;
+                sar       RDX, 32;
+                mov       ECX, R14D;
+                shl       RCX, 32;
+                sar       RCX, 32;
+                mov       R10, qword ptr [RSP + 0x78]; // RSP+858h-7E0h = RSP+78h
 
-                movzx     EAX, byte [RDX+R10];
-                lea       R9, [mainTextProc2BufferAddress]; // LEAでアドレスをロード
-                mov       R9, qword [R9]; // グローバル変数の値をR9にロード
-                mov       byte [RCX+R9], AL;
+                movzx     EAX, byte ptr [RDX+R10];
+                lea       R9, [RIP + mainTextProc2BufferAddress]; // LEAでアドレスをロード
+                mov       R9, qword ptr [R9]; // グローバル変数の値をR9にロード
+                mov       byte ptr [RCX+R9], AL;
 
                 inc       R14D;
                 inc       RCX;
@@ -117,25 +122,25 @@ extern (C)
                 jmp       JMP_E;
 
             JMP_A:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 jmp       JMP_F;
 
             JMP_B:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 sub       EAX, SHIFT_2;
                 jmp       JMP_F;
 
             JMP_C:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 add       EAX, SHIFT_3;
                 jmp       JMP_F;
 
             JMP_D:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 add       EAX, SHIFT_4;
 
             JMP_F:
@@ -151,11 +156,11 @@ extern (C)
                 add       RDX, 2;
                 add       EDI, 2;
             JMP_E:
-                lea       R11, [s_lastCodePoint]; // LEAでアドレスをロード
-                mov       dword [R11], EAX; // 対策3: __gshared変数に保存
+                lea       R11, [RIP + s_lastCodePoint]; // LEAでアドレスをロード
+                mov       dword ptr [R11], EAX; // 対策3: __gshared変数に保存
                 
-                lea       R11, [mainTextProc2ReturnAddress]; // LEAでアドレスをロード
-                jmp       qword [R11]; // ロードしたアドレスにジャンプ
+                lea       R11, [RIP + mainTextProc2ReturnAddress]; // LEAでアドレスをロード
+                jmp       qword ptr [R11]; // ロードしたアドレスにジャンプ
             }
         }
     }
@@ -174,14 +179,17 @@ extern (C)
                 // mov     r10, qword ptr [rsp+80h]
                 naked;
                 mov       EDX, EDI;
-                movsxd    RDX, EDX; // 32bitから64bitへの符号拡張を明示的に
-                movsxd    RCX, R14D;
-                mov       R10, qword [RSP + 0x78]; // RSP+858h-7E0h = RSP+78h
+                shl       RDX, 32;
+                sar       RDX, 32;
+                mov       ECX, R14D;
+                shl       RCX, 32;
+                sar       RCX, 32;
+                mov       R10, qword ptr [RSP + 0x78]; // RSP+858h-7E0h = RSP+78h
 
-                movzx     EAX, byte [RDX+R10];
-                lea       R9, [mainTextProc2BufferAddress]; // LEAでアドレスをロード
-                mov       R9, qword [R9]; // グローバル変数の値をR9にロード
-                mov       byte [RCX+R9], AL;
+                movzx     EAX, byte ptr [RDX+R10];
+                lea       R9, [RIP + mainTextProc2BufferAddress]; // LEAでアドレスをロード
+                mov       R9, qword ptr [R9]; // グローバル変数の値をR9にロード
+                mov       byte ptr [RCX+R9], AL;
 
                 inc       R14D;
                 inc       RCX;
@@ -197,25 +205,25 @@ extern (C)
                 jmp       JMP_E;
 
             JMP_A:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 jmp       JMP_F;
 
             JMP_B:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 sub       EAX, SHIFT_2;
                 jmp       JMP_F;
 
             JMP_C:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 add       EAX, SHIFT_3;
                 jmp       JMP_F;
 
             JMP_D:
-                movzx     EAX, word [RDX+R10+1];
-                mov       word [RCX+R9], AX;
+                movzx     EAX, word ptr [RDX+R10+1];
+                mov       word ptr [RCX+R9], AX;
                 add       EAX, SHIFT_4;
 
             JMP_F:
@@ -231,11 +239,11 @@ extern (C)
                 add       RDX, 2;
                 add       EDI, 2;
             JMP_E:
-                lea       R11, [s_lastCodePoint]; // LEAでアドレスをロード
-                mov       dword [R11], EAX; // 対策3: __gshared変数に保存
+                lea       R11, [RIP + s_lastCodePoint]; // LEAでアドレスをロード
+                mov       dword ptr [R11], EAX; // 対策3: __gshared変数に保存
                 
-                lea       R11, [mainTextProc2ReturnAddress]; // LEAでアドレスをロード
-                jmp       qword [R11]; // ロードしたアドレスにジャンプ
+                lea       R11, [RIP + mainTextProc2ReturnAddress]; // LEAでアドレスをロード
+                jmp       qword ptr [R11]; // ロードしたアドレスにジャンプ
             }
         }
     }
@@ -253,8 +261,7 @@ extern (C)
                 jmp JMP_B;
 
             JMP_A:
-                mov R11, qword ptr[RIP + s_lastCodePoint]; // RIP相対アドレス
-                cmp dword ptr[R11], 0xFF; // 対策3: __gshared変数から読み込み
+                cmp dword ptr [RIP + s_lastCodePoint], 0xFF; // 対策3: __gshared変数から読み込み
                 ja JMP_B;
 
                 mov R11, qword ptr[RIP + mainTextProc3ReturnAddress2];
@@ -279,16 +286,14 @@ extern (C)
             {
                 naked;
                 // check code point saved proc1
-                mov R11, qword ptr[RIP + s_lastCodePoint]; // RIP相対アドレス
-                cmp dword ptr[R11], 0xFF; // 対策3: __gshared変数から読み込み
+                cmp dword ptr [RIP + s_lastCodePoint], 0xFF; // 対策3: __gshared変数から読み込み
                 ja JMP_A;
 
                 movzx EAX, byte ptr[RDX + R10]; // Original instruction
                 jmp JMP_B;
 
             JMP_A:
-                mov R11, qword ptr[RIP + s_lastCodePoint]; // RIP相対アドレス
-                mov EAX, dword ptr[R11]; // 対策3: __gshared変数から読み込み
+                mov EAX, dword ptr [RIP + s_lastCodePoint]; // 対策3: __gshared変数から読み込み
 
             JMP_B:
                 mov RCX, qword ptr[R15 + RAX * 8];
@@ -302,12 +307,12 @@ extern (C)
     }
 }
 
-__gshared size_t mainTextProc1ReturnAddress;
-__gshared size_t mainTextProc2ReturnAddress;
-__gshared size_t mainTextProc2BufferAddress;
-__gshared size_t mainTextProc3ReturnAddress1;
-__gshared size_t mainTextProc3ReturnAddress2;
-__gshared size_t mainTextProc4ReturnAddress;
+private __gshared size_t mainTextProc1ReturnAddress;
+private __gshared size_t mainTextProc2ReturnAddress;
+private __gshared size_t mainTextProc2BufferAddress;
+private __gshared size_t mainTextProc3ReturnAddress1;
+private __gshared size_t mainTextProc3ReturnAddress2;
+private __gshared size_t mainTextProc4ReturnAddress;
 // mainTextProc4ReturnAddress_after_movzx_eax は C++版には存在しないため削除
 // mainTextProcCopyBuffReturnAddress も C++版には存在しないため削除
 
