@@ -47,6 +47,31 @@ objdump -dC --start-address=0x2079b00 --stop-address=0x2079cbc "$EU4_BIN"
 
 確認結果は `CTextSprite::SetText(...)` が `0x20d9da4`、サイズ2151バイトで、複数のCStringを`std::string`内部バッファへコピーし、フォント取得、テクスチャ更新、テキスト描画データ更新、`RecalculateVertices()`まで行う実装だった。`CGraphics::CreateTextSprite(...)` は `0x2079b00`、サイズ443バイトで、テキストスプライト型を検索・生成し、末尾で設定用の仮想関数（vtable +0x1a8）へ文字列・書式・サイズ引数を渡す実装だった。前者を文字列設定の第1候補、後者を生成・設定入口の第2候補とした。これは候補選定の根拠であり、実機の表示経路や呼び出し頻度を確定するものではない。
 
+### CStringアクセスの追加確認
+
+同じEU4 v1.37.5実行ファイルで、次のシンボルと命令列を確認した。これは静的解析のみであり、EU4は起動していない。
+
+```sh
+readelf -Ws --wide "$EU4_BIN" | c++filt | rg 'CString::CString\(char const\*\)|CString::operator==|CTextSprite::SetText|CGraphics::CreateTextSprite'
+objdump -dC --start-address=0x254b1c2 --stop-address=0x254b1d5 "$EU4_BIN"
+objdump -dC --start-address=0xd96f6a --stop-address=0xd96f94 "$EU4_BIN"
+objdump -dC --start-address=0x20d9da4 --stop-address=0x20da60c "$EU4_BIN"
+objdump -dC --start-address=0x2079b00 --stop-address=0x2079cbc "$EU4_BIN"
+```
+
+- `CString::CString(char const*)`（`0x254b1c2`）は `std::string::basic_string(char const*, allocator const&)` を呼ぶ。
+- `CString::operator==(CString const&) const`（`0xd96f6a`）は両オブジェクトの `+8` を長さとして比較し、非ゼロなら各オブジェクトの `+0` を `bcmp` のデータポインタとして渡す。
+- `CTextSprite::SetText(...)`（`0x20d9da4`）は第一CString候補の `rdx` を保存し、`mov (%rdx), %rbp` の後に `%rbp` を `strlen` へ渡す。後続のCString候補でも同じ形式のアクセスがある。
+- `CGraphics::CreateTextSprite(...)`（`0x2079b00`）は第一CString候補の `rsi` を `mov 0x0(%rbp), %rsi` で読み、その値を `std::string` 構築へ渡す。
+
+以上から、CString先頭の `+0` はchar*相当のデータポインタ候補、`+8` は長さ候補である。ただし、この静的根拠だけでは候補アドレスが有効なCStringオブジェクトであること、指すデータがNUL終端であること、実機ヒット時の寿命・文字コード・引数位置を保証できない。
+
+## 文字列読出しの安全性判断
+
+GDB標準の `info proc mappings` はマッピングを表示できるが、ブレークポイントコマンド内でその結果を読み取り可能範囲の条件式として安全に利用する機構はない。候補CStringの `+0` を間接参照する時点で未確認メモリを読むため、`x/s` や `x/b` を条件付きで追加しても、GDB標準機能だけでアクセス成功を保証できない。GDB Pythonとinferior関数呼出しも制約により使用しない。
+
+従って、`tools/trace_eu4_runtime.gdb` と `tools/trace_eu4_text_args.gdb` は変更せず、後者は候補アドレス、tid、pc、回数だけを各ヒット1行で記録する。`Load Game`、`ロード`、または対応するUTF-8/UTF-16値が実際に読めていないため、`MENU_BAR_LOAD_GAME`との対応は未確認のままとする。
+
 ## 判定上の注意
 
 - シンボルの存在は、実行時にその経路が通ることを意味しない。
@@ -107,3 +132,16 @@ GDB標準コマンドだけでは、任意の候補ポインタを読み取り�
 記録したのは候補CStringアドレスのみで、文字列の読み出しはしていない。ログ中に `Load Game` も `ロード` も現れないため、`MENU_BAR_LOAD_GAME` との直接対応、CString構造、各レジスタ候補の正しさ、文字列形式・寿命、呼び出し元と表示値の対応は未確認である。従って、`CGraphics::CreateTextSprite` → `CTextSprite::SetText` はMENU画面で頻繁に通る表示生成経路候補として記録するが、既知キー対応とは断定しない。
 
 このスクリプトは未確認ポインタの文字列読出しを行わないため、任意メモリ参照による停止リスクを避けられる一方、アドレスだけでは文字列一致を判定できない。次は既存の有志翻訳Mod/`translationMap`を入力データとして維持しつつ、CString ABIの構造を静的に確認し、安全条件を設けた別調査スクリプトで一度に少数の引数だけを観測する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは行わない。
+
+## CStringメタデータの限定観測スクリプト
+
+`tools/trace_eu4_text_preview.sh` は、既存のアドレスのみの `trace_eu4_text_args.sh` を変更せずに、CStringオブジェクトのメタデータを限定観測する。実行例:
+
+```sh
+EU4_BIN="$HOME/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4" \
+  ./tools/trace_eu4_text_preview.sh 2>&1 | tee text-preview-trace.log
+```
+
+`CTextSprite::SetText` の `rdx` と `CGraphics::CreateTextSprite` の `rsi` を対象とし、各関数の最初の最大10ヒットで、CStringオブジェクトがNULLでない場合だけ `+0` のデータポインタ候補と `+8` の長さ候補を記録する。GDBの `if` でオブジェクトNULLを除外するが、データポインタ自体のreadable判定は行わない。
+
+GDB標準コマンドだけでは任意アドレスのreadable判定を安全に保証できないため、`x/s`、`x/b`、GDB Python、inferior関数呼出しは使用しない。したがって、このスクリプトは文字列本体を表示せず、`Load Game`、`ロード`との一致や `MENU_BAR_LOAD_GAME` との関係を判定できない。実機は起動しておらず、実機結果は未取得である。
