@@ -80,6 +80,7 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 ## 観測結果（2026/08/22）
 
 - `loadTranslationMods()` 完了時に `MENU_BAR_LOAD_GAME` だけを直接照会し、loaded/missing と値を1行記録する観測を追加した。
+- `EU4DLL_TRANSLATION_OBSERVATION_KEYS` で既存`translationMap`から複数の観測対象キーを選択できるようにした。未設定時は`MENU_BAR_LOAD_GAME`のみを対象とする。辞書ロード結果であり、実機表示の証拠とは扱わない。
 - `translationMap` のロードと既知キーの値はユニットテストで確認できる。これはゲーム本体の表示経路を確認するものではない。
 - `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` の安全なLinux v1.37.5呼び出し境界は未確認であり、シンボルフックやインラインパッチは追加していない。
 - `readelf -Ws` では上記候補シンボルの存在を確認した。これは実行時の呼び出し経路、引数、文字列形式を確認したものではない。

@@ -36,6 +36,7 @@
 
 ## 未完了
 
+- 実機で未観測のキーを表示されたと断定しない前提で、`EU4DLL_TRANSLATION_OBSERVATION_KEYS` による既存辞書の複数キー選択と loaded/missing/value の直接照会を追加した。未設定時の既定値は`MENU_BAR_LOAD_GAME`である。
 - 既知文字列のゲーム本体内ランタイム追跡（今回の観測はtranslationMap到達まで）。
 - Linux版の置換地点確定。
 

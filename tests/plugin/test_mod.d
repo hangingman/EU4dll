@@ -62,4 +62,16 @@ unittest {
         loadTranslationMods(nonExistentModDir);
         translationMap.length.should.equal(0);
     }
+
+    // テストケース4: 観測対象キーを複数指定し、空白と重複を除去する
+    {
+        auto keys = translationObservationKeys(" MENU_BAR_LOAD_GAME, MENU_BAR_QUIT, MENU_BAR_LOAD_GAME ");
+        keys.should.equal(["MENU_BAR_LOAD_GAME", "MENU_BAR_QUIT"]);
+    }
+
+    // テストケース5: 観測対象キーが未指定なら既知のキーだけを使う
+    {
+        auto keys = translationObservationKeys("");
+        keys.should.equal(["MENU_BAR_LOAD_GAME"]);
+    }
 }

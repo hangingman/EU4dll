@@ -4,6 +4,16 @@
 
 `MENU_BAR_LOAD_GAME` が `translationMap` にロードされた後、EU4本体でどの関数を通って表示準備へ渡されるかを観測する。追跡はGDBのブレークポイントとスタック表示だけで行い、本体の命令・データを書き換えない。
 
+## 辞書観測対象の選択
+
+実機で表示を確認したキーは現時点で `MENU_BAR_LOAD_GAME` だけであり、他のキーを表示されたと断定しない。既存の `translationMap` から追加候補を比較するため、ロード完了時の辞書観測対象を次の環境変数でカンマ区切り指定できる。
+
+```sh
+EU4DLL_TRANSLATION_OBSERVATION_KEYS=MENU_BAR_LOAD_GAME,MENU_BAR_QUIT
+```
+
+未設定時は `MENU_BAR_LOAD_GAME` のみを対象とする。出力される `loaded` と値は辞書へのロード結果であり、ゲーム画面での表示、SetText引数との一致、キーと表示値の対応を証明しない。この機能は対象特定の選択肢を増やすだけで、安全なフック証明の代替ではない。
+
 ## 再現手順
 
 1. EU4を終了し、対象バイナリの場所を確認する。
@@ -120,6 +130,18 @@ EU4 v1.37.5は正常終了した。実機はMENU画面まで到達し、「ロ�
 EU4_BIN="$HOME/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4" \
   ./tools/trace_eu4_text_args.sh 2>&1 | tee text-args-trace.log
 ```
+
+### DLL付き実機トレースの起動
+
+`LD_PRELOAD=libeu4dll.so gdb ...` とするとDLLがGDB自身にもロードされ、DLL constructorがGDBをEU4と誤認して終了コード255になる可能性がある。GDB自身へ`LD_PRELOAD`を設定せず、inferiorのEU4だけへ設定する専用wrapperを使用する。
+
+```sh
+cd ~/git/EU4dll && \
+EU4DLL_TRANSLATION_OBSERVATION_KEYS='MENU_BAR_LOAD_GAME,MENU_BAR_LOAD,MENU_BAR_QUIT,MENU_BAR_SAVE_GAME,MENU_BAR_GAME_OPTIONS,MENU_BAR_CLOSE' \
+./tools/trace_eu4_text_with_dll.sh 2>&1 | tee /tmp/eu4dll-multi-key-with-dll.log
+```
+
+`tools/trace_eu4_text_with_dll.sh` はEU4のdirnameを作業ディレクトリにし、GDB自身には呼び出し元の`LD_PRELOAD`を継承させず、`set startup-with-shell off` と `set environment LD_PRELOAD=...` でinferiorのEU4だけへDLLを設定する。その後、既存の`trace_eu4_text_args.gdb`を実行する。`EU4_BIN`、`EU4_DLL`、`TRACE_GDB`で対象を変更でき、その他の環境変数と末尾の起動引数は呼び出し側から継承する。ログは標準出力へ流し、wrapper内では`tee`を行わない。GDBの`run`で起動したEU4は、ユーザーが終了するまでwrapperから自動終了しない。実機結果は未取得である。
 
 このスクリプトは各候補関数で最大2個の `CString` 候補について、`symbol`、`tid`、`pc`、ヒット回数、レジスタ値（アドレス）だけを記録する。`SetText` は `rdx`/`rcx`、`CreateTextSprite` は `rsi`/`rdx` を対象とする。これはSysV x86-64の暗黙の `this`（`rdi`）を除いたC++引数配置と、`readelf -Ws` のデマングル済みシグネチャに基づく。後続の引数はスタック上または整数レジスタに混在し得るため対象外とした。
 
