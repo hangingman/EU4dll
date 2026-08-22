@@ -11,9 +11,10 @@
 - `tests/poc`に`LD_PRELOAD`ロード確認と`fopen`の対象限定I/O観測を追加した。
 - localisation・YAML・フォント関連パスだけをstderrへ記録し、通常のI/Oを記録しないことをPoCで確認した。
 - `make -C tests/poc`、`make test`、`make all`が成功した。
+- `make run`でEU4 v1.37.5を`LD_PRELOAD`付きで起動し、メニュー到達と操作可能を確認した。
+- `pattern_eu4jps.log`がEU4インストール先に作成され、起動時の翻訳YAMLロードおよび`DLL [OK]`を確認した。
 
 ## 未完了
 
-- EU4本体での動的観測基盤の実行確認。
 - 既知文字列1件のランタイム追跡。
 - Linux版の置換地点確定。
