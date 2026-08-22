@@ -1,5 +1,13 @@
 # EU4 Linux ランタイム追跡手順
 
+## 翻訳ロードスキップ実機比較（2026/08/23）
+
+EU4 v1.37.5でJapanese Language modを無効、Waifu Universalisを維持し、`eu4dll_translations`を有効にした。LD_PRELOAD + GDB実機で`EU4DLL_SKIP_TRANSLATIONS=1`を指定したところ、`SetText`最初の5ヒットはlength `0,0,0,13("Connect to ID"),4("Back")`となった。翻訳ロードありの`ID??`/`??`から英語へ戻り、EU4は正常終了した。
+
+この差分から、`loadTranslationMods()`単体または起動初期の大量YAML/Dランタイム/GC処理が文字列破損の有力原因と判定する。ただし画面全体の正常表示はユーザーの手動確認を根拠とし、未確認なら断定しない。診断用スキップ実装は`source/plugin/dllmain.d`に既存で、通常動作を壊さない。
+
+設計方針は、constructor中に翻訳ロードを行わず、EU4本体の正規localisation初期化後に適切な内部境界で観測・フックすることとする。原因切り分け前に`SetText`フックを実装しない。
+
 ## 最新実機境界とYAMLキー修正（2026/08/22）
 
 修正後の実機確認は`TRACE_GDB="$PWD/tools/trace_eu4_text_preview.gdb" ./tools/trace_eu4_text_with_dll.sh`で実施した。`/tmp/eu4dll-all-key-preview-fixed2.log`は8009 bytes、GDB wrapperのエラーはなく、`TRACE_PREVIEW`は20行（CreateTextSprite 10、SetText 10）だった。EU4 v1.37.5は正常終了し、最新ログに`DLL [OK]`がある。
@@ -205,6 +213,29 @@ GDB標準コマンドだけでは任意アドレスのreadable判定を安全に
 この観測は、CStringの `+0` がデータポインタ、`+8` が長さという静的解析上の候補と整合する実機メタデータを得たことを示す。ただし、NULL除外はCStringオブジェクトに対してだけ行い、データポインタ自体のreadable判定は行っていない。文字列本体も読み出していないため、ログに `Load Game` / `ロード` の一致はなく、文字列内容、引数の意味、`MENU_BAR_LOAD_GAME`との直接対応、寿命は未確認である。既知キー対応や文字列内容を成功扱いしない。
 
 次の最小ステップは文字列読出しを急がず、今回得たデータポインタと長さの組を静的に検討することとする。必要になった場合だけ、安全条件を明示した単一候補・単一ヒットの観測を設計する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは行わない。
+
+## SetText実引数文字列の限定観測
+
+実引数の文字列本体と翻訳辞書候補を照合するため、既存の引数・メタデータ・previewスクリプトとは分離した `tools/trace_eu4_settext_string.gdb` と `.sh` を追加した。対象は `CTextSprite::SetText` の第1 `CString`（`rdx`）だけであり、`CreateTextSprite` は対象外である。wrapperは既存の `tools/trace_eu4_text_with_dll.sh` を再利用する。
+
+```sh
+EU4_BIN=/path/to/eu4 EU4_DLL=/path/to/libeu4dll.so \
+  ./tools/trace_eu4_settext_string.sh 2>&1 | tee /tmp/eu4dll-settext-string.log
+```
+
+対象関数の最初の5ヒットだけを処理する。`CString`オブジェクトとデータポインタがNULLの場合、または `+8` の長さが `1..64` バイトに入らない場合は、文字列を読まず `status=SKIP` と記録する。条件を満たす場合だけ、`TRACE_STRING` 行に `SETTEXT_READ_##` 識別子を付け、`eval` による長さ分の `x/<length>xb`（byte形式・16進）を一度実行する。固定64バイト読出しや `x/s` は行わない。`length=0` は空文字列として読まない。実引数が取得できても、表示値・キー対応・置換可能性を確定するものではない。
+
+GDB標準機能には任意ポインタがreadableであることを保証する判定がない。したがって、NULL除外、長さ上限、`SetText`直後に `strlen` が同じポインタを読むという静的根拠を適用しても、`x/s` の読出し失敗でGDBまたはEU4が終了する可能性がある。この理由で実機は本作業では起動しておらず、実行はユーザーがこの制限を了承した場合だけ行う。ログ解析時も `TRACE_STRING` の `READ` と直後のGDB `x/s` 行を一組として扱い、文字列と翻訳キーが一致するまで `MENU_BAR_*` 対応や置換可能とは断定しない。
+
+実機で `/tmp/eu4dll-settext-string.log` を取得した。`TRACE_STRING` は5件で、最初の3件は `length=0` のSKIP、後2件は `length=4` と `length=2` のREADだった。GDBの `x/s` 表示はそれぞれ `ID??` と `??` であり、非ASCIIバイト列は取得できなかった。EU4は正常終了したが、実引数の文字列内容と `translationMap` の対応は未確認である。
+
+この実機観測では、`SetText`のCString読出し条件と終了時の安全性は確認できたが、`x/s`の`?`表示により実引数の内容は同定できなかった。次は同じヒット数・長さ上限・NULL除外を維持し、限定長のバイト列を16進で記録する。目的はASCII/UTF-8等の判定と`translationMap`表示値との照合であり、照合前に置換へ進まない。
+
+## 再開時の直近タスク
+
+次回は `x/s` を文字列同定の根拠にせず、同じく `SetText` の `rdx`、最初の少数ヒット、NULL除外、長さ上限を維持したまま、データポインタから限定長のバイト列を16進で記録する。目的はASCII/UTF-8/UTF-16相当を後処理で判別し、実引数の表示値を既存 `translationMap` の値と照合することである。
+
+文字列一致が確認できた後にのみ、Linux v1.37.5専用のSetTextフックを検討する。実装条件は、AOB一意性、命令境界、トランポリンと元処理復帰、相対アドレス範囲、W^X、再入、初期化前呼出し、CStringの所有権・寿命、元バッファ非破壊、一時CStringの終端である。全UI一括置換、`PdxLocalize`一括フック、`open`/`read`フック、SDL/OpenGL描画層フックは対象外とする。
 
 ## 追加観測を見送る判断
 

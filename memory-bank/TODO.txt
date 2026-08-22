@@ -1,5 +1,13 @@
 # EU4dll 開発 TODO
 
+## 最新の実機判断（2026/08/23）
+
+- [x] EU4 v1.37.5（Japanese Language mod無効、Waifu Universalis維持、`eu4dll_translations`有効）で、LD_PRELOAD + GDB実機に`EU4DLL_SKIP_TRANSLATIONS=1`を指定して比較した。
+- [x] `SetText`最初の5ヒットがlength `0,0,0,13("Connect to ID"),4("Back")`となり、翻訳ロードありの`ID??`/`??`から英語へ戻ったこと、およびEU4正常終了を記録した。
+- [ ] `loadTranslationMods()`単体または起動初期の大量YAML/Dランタイム/GC処理を有力原因として、実行時期の切り分けを行う。画面全体の正常表示はユーザー手動確認がある場合だけ確認済みとする。
+- [ ] constructor中の翻訳ロードを避け、EU4本体の正規localisation初期化後の内部境界を観測・フックする。`SetText`フックは先行実装しない。
+- 診断用`EU4DLL_SKIP_TRANSLATIONS=1`は`source/plugin/dllmain.d`に既存で、通常動作を壊さない。
+
 ## 方針
 
 Linux版EU4の文字列置換は、Ghidraによる静的解析を出発点にしない。
@@ -64,6 +72,7 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
      - [x] `CTextBox::ChangeTextBox` が今回のトレースでヒットしないことを確認した。
 - [x] 候補関数ごとに最大2個のCString引数アドレスだけを記録する調査用GDBスクリプトを追加した。未確認ポインタの文字列読出しは安全な可読性判定を保証できないため実装していない。
 - [ ] 調査用スクリプトで、`Load Game`、`ロード`、または対応するゲーム内文字列との一致を確認する。
+- [x] `CTextSprite::SetText` の第1 `CString`（`rdx`）だけを各5ヒットに限定し、NULL除外と長さ `1..64` の条件付きで `x/s` を一度だけ行う専用観測スクリプトを追加した。GDB標準機能では任意ポインタのreadable判定を保証できず、読出し失敗でGDB/EU4が終了し得るため、実機結果は未取得である。
 - [x] EU4 v1.37.5で `CGraphics::CreateTextSprite` 236回（全てtid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 442回（全てtid=1、pc=`0x20d9da4`）の実機ヒットおよび候補CStringアドレスを観測した。
      - `/tmp/eu4dll-text-args.log` は85135 bytes、`TRACE_ARGS` は678行で、EU4は正常終了した。
      - 記録したのは候補CStringアドレスのみで、文字列の読み出しはしていない。ログ中に `Load Game` も `ロード` も現れない。
@@ -120,6 +129,15 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - [ ] 置換に必要な最小限の候補関数を1つに絞る。
 - [ ] 候補関数をGhidra、`readelf`、`objdump`、GDBで解析する。
 - [ ] Linux版専用の命令境界、呼び出し規約、レジスタ引数を確定する。
+
+## 再開時の直近タスク
+
+- [x] `tools/trace_eu4_settext_string.gdb` で最初の5ヒットを限定観測し、length=0を3件SKIP、length=4/2を2件READした。GDB表示は`ID??`/`??`で非ASCIIバイトは未同定。
+- [x] `tools/trace_eu4_settext_string.gdb` を、少数ヒットの長さ限定バイト列（16進）観測へ変更した。各READに `SETTEXT_READ_##` 識別子を付け、実機再取得は未実施。
+- [ ] `SetText` 実引数のバイト列をUTF-8/ASCII等として同定する。
+- [ ] 実引数の表示値を既存 `translationMap` の値と照合する。
+- [ ] 表示値との一致前にキー対応・置換可能と断定しない。
+- [ ] 一致後にLinux v1.37.5専用トランポリンの命令境界・AOB一意性・元処理復帰を検証する。
 
 ## 次: 1件だけの置換PoC
 
