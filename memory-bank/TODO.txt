@@ -52,11 +52,27 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - [ ] 文字列が静的データか、実行時に生成されたデータかを区別する。
 - [ ] 1件の文字列について、ロードから描画準備までの経路を記録する。
 
+### GDBによる安全な候補観測
+
+- [x] `tools/trace_eu4_runtime.sh` に、既知シンボルへのGDBブレークポイントと呼び出し元・レジスタ・スレッドの記録を追加した。
+- [x] EU4 v1.37.5の `LocalizeAddLocalization`、`LocalizeAddLocalizationYAMLBuffer`、`YmlParse`、`PdxLocalizeInitialize`、`ReloadPdxLocalize`、`CTextBox::ChangeTextBox` のシンボル存在を `readelf -Ws` で確認した。
+- [ ] 実機で対象メニューを操作し、`MENU_BAR_LOAD_GAME` の引数・文字列形式を確認する。
+    - [x] 起動時のトレースで `PdxLocalizeInitialize` 2回、`LocalizeAddLocalizationYAMLBuffer` 300回、`YmlParse` 300回、`ReloadPdxLocalize` 1回を確認した。
+    - [x] `LocalizeAddLocalizationYAMLBuffer` と `YmlParse` がlocalisation読み込み経路でヒットすることを確認した。
+    - [x] `CTextBox::ChangeTextBox` が今回のトレースでヒットしないことを確認した。
+    - [ ] 表示時の候補関数ヒット、引数、文字列形式を確認する。
+- [x] ヒットした候補についてのみ、呼び出し元、引数の意味、文字列の寿命、呼び出しスレッドを記録する。
+    - 主要ヒットはtid=1で、`PdxLocalizeSetup`→`PdxLocalizeReadFolder`→`ReadLocalizationFileHelper`→`LocalizeAddLocalizationYAMLBuffer`→`YmlParse`の順だった。
+    - `rsi`はYAMLバッファ長とみられる値、`rdx`は共通のlocalisationデータ領域とみられるが、型・寿命は未確定。
+
 ## 観測結果（2026/08/22）
 
 - `loadTranslationMods()` 完了時に `MENU_BAR_LOAD_GAME` だけを直接照会し、loaded/missing と値を1行記録する観測を追加した。
 - `translationMap` のロードと既知キーの値はユニットテストで確認できる。これはゲーム本体の表示経路を確認するものではない。
 - `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` の安全なLinux v1.37.5呼び出し境界は未確認であり、シンボルフックやインラインパッチは追加していない。
+- `readelf -Ws` では上記候補シンボルの存在を確認した。これは実行時の呼び出し経路、引数、文字列形式を確認したものではない。
+- `tools/trace_eu4_runtime.sh` はGDBブレークポイントのみを設定し、EU4本体へパッチを適用しない。実機でlocalisation読み込み経路の追跡結果を取得した。
+- `runtime-trace.log`では表示時の `PdxLocalize` 実体や `CTextBox::ChangeTextBox` のヒットは確認できず、`MENU_BAR_LOAD_GAME` の表示経路は未確定である。
 - 未確認事項は、既知キーがゲーム内部で保持される形式、表示時の受け渡し関数、呼び出しスレッド、候補文字列のメモリアドレスである。
 
 ## 次: 置換地点の選定
