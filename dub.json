@@ -30,10 +30,17 @@
             "targetName": "eu4dll-poc",
             "targetType": "dynamicLibrary",
             "targetPath": "tests/poc/",
+            "dflags": [
+                "-fvisibility=default"
+            ],
+            "sourcePaths": [
+                "tests/poc"
+            ],
             "sourceFiles": [
                 "tests/poc/dllmain.d"
             ],
             "excludedSourceFiles": [
+                "source/**/*.d",
                 "source/plugin/dllmain.d",
                 "tests/plugin/*.d"
             ],
