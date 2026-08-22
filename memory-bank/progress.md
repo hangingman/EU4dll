@@ -30,9 +30,18 @@
 - `tools/trace_eu4_text_args.gdb` と `tools/trace_eu4_text_args.sh` は未確認ポインタの文字列読出しを行わず、アドレス、tid、pc、回数だけを記録するため、安全性と限界を確認した。次は既存の有志翻訳Mod/translationMapを入力データとして維持しつつ、CString ABIを静的確認し、少数の引数だけを安全条件付きで観測する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは禁止する。
 - EU4 v1.37.5を起動せずに `readelf -Ws --wide | c++filt` と `objdump -dC` を実行し、`CString::CString(char const*)`（`0x254b1c2`）、`CString::operator==(CString const&) const`（`0xd96f6a`）、`CTextSprite::SetText(...)`（`0x20d9da4`）、`CGraphics::CreateTextSprite(...)`（`0x2079b00`）を確認した。CStringの `+0` はデータポインタ候補、`+8` は長さ候補で、SetTextの `rdx` およびCreateTextSpriteの `rsi` がその `+0` を読む根拠を記録した。
 - GDB標準機能だけでは、候補ポインタが読み取り可能なマッピング内にあることをブレークポイントコマンドで安全に保証できない。未確認ポインタの `x/s`、`x/b`、GDB Python、inferior関数呼出しは追加せず、既存のアドレスのみの調査スクリプトを維持した。文字列一致は未確認で、`MENU_BAR_LOAD_GAME` 対応とは断定しない。
-- `tools/trace_eu4_text_preview.gdb` と `.sh` を追加し、`CTextSprite::SetText` の `rdx` と `CGraphics::CreateTextSprite` の `rsi` について、NULLでないCStringオブジェクトの `+0` データポインタ候補と `+8` 長さ候補を各関数の最初の最大10ヒットだけ記録するようにした。GDB標準機能でデータポインタのreadable判定を保証できないため、文字列表示は実装していない。実機結果は未取得であり、`Load Game`、`ロード`および `MENU_BAR_LOAD_GAME` との対応は未確認のままである。
+- `tools/trace_eu4_text_preview.gdb` と `.sh` を追加し、`CTextSprite::SetText` の `rdx` と `CGraphics::CreateTextSprite` の `rsi` について、NULLでないCStringオブジェクトの `+0` データポインタ候補と `+8` 長さ候補を各関数の最初の最大10ヒットだけ記録するようにした。GDB標準機能でデータポインタのreadable判定を保証できないため、文字列表示は実装していない。`Load Game`、`ロード`および `MENU_BAR_LOAD_GAME` との対応は未確認のままである。実機結果は次項に記録する。
+- 実機トレース結果を `/tmp/eu4dll-text-preview.log` に記録した（10612 bytes）。EU4 v1.37.5は正常終了しMENU画面まで到達した。各関数の最初の最大10ヒットを対象にNULLでないCStringだけを観測し、`CGraphics::CreateTextSprite` の `rsi` は全件で `+0` データポインタ候補が非NULL、`+8` 長さが `7,7,13,13,18,13,6,32,32,13`、`CTextSprite::SetText` の `rdx` は全件で `+0` データポインタ候補が非NULL、`+8` 長さが `0,0,0,4,2,6,6,5,5,2` だった。文字列本体は読み出していないため、静的根拠とのメタデータ整合性までを確認事項とし、文字列内容、`Load Game`/`ロード`との一致、`MENU_BAR_LOAD_GAME`との直接対応、引数の意味、寿命は未確認である。次はデータポインタと長さの組を静的に検討し、必要なら安全条件を明示した単一候補・単一ヒットの観測を設計する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは禁止する。
+- 今回の判断として、Linuxの`/proc/<pid>/maps`を利用する外部監視はGDBバッチスクリプトだけでは実装できず、未確認ポインタの文字列読出しも現時点では不可欠でないため追加しない。既存の静的根拠とメタデータ観測を維持し、次は置換候補の絞り込みへ進む。文字列一致が必要になった場合のみ、安全条件と別プロセス監視の導入可否を再評価する。
 
 ## 未完了
 
 - 既知文字列のゲーム本体内ランタイム追跡（今回の観測はtranslationMap到達まで）。
 - Linux版の置換地点確定。
+
+## SetText置換PoCの判断（2026/08/22）
+
+- `CTextSprite::SetText` の1件置換PoCは安全停止点として見送った。
+- 実機観測ではCStringの候補ポインタと長さだけが得られ、`MENU_BAR_LOAD_GAME` のキーまたは表示値との一致、各引数の意味、バッファの寿命・所有権・終端は未確認である。
+- 既存の `makeJmp` / `ScopedPatch` は5バイトJMPとW^X切替を行うが、命令境界、トランポリンと元処理への復帰、相対アドレス範囲、一意AOB、パッチ競合を検証しない。今回のSetTextへ流用すると、無効化可能かつ失敗時に原文を維持する要件を満たせない。
+- 本体命令を書き換えるフック、無条件の文字列読出し、元CStringの直接変更、一時CStringの未証明な生成は追加していない。再開条件は、実引数の一致確認とLinux専用の検証済みパッチ設計である。
