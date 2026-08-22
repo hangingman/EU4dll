@@ -24,9 +24,10 @@
 - `CTextBox::UpdateTextSprite()` / `CTextBox::ChangeString(CString const&, FontFormatting, bool)` はbreakpoint設定後のMENU画面トレースで0ヒットだったため、候補から外し成功扱いにしない。
 - `readelf -Ws` と `objdump -dC` の結果から、次の表示テキスト生成・設定候補を `CTextSprite::SetText(...)`（`0x20d9da4`, 2151 bytes）と `CGraphics::CreateTextSprite(...)`（`0x2079b00`, 443 bytes）の2つに限定した。前者はCStringの内部コピー、フォント・テクスチャ処理、頂点再計算を行い、後者はスプライト生成と設定仮想関数呼び出しを行う。
 - `tools/trace_eu4_runtime.gdb` は上記2候補だけを停止し、各ヒットを `symbol/tid/pc` の1行で記録する。既存のlocalisation読み込み300回ログ、レジスタ、バックトレースの出力は削除した。
-- `/tmp/eu4dll-sprite-trace.log`（45921 bytes）で `CGraphics::CreateTextSprite` 236回（全てtid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 444回（全てtid=1、pc=`0x20d9da4`）の実機ヒットを確認した。EU4 v1.37.5は正常終了し、MENU画面まで到達して「ロード」表示状態を確認した。
-- 短いTRACEは文字列引数を記録していないため、上記ヒットと `MENU_BAR_LOAD_GAME` の直接対応、引数の意味、文字列形式、文字列の寿命は未確認である。従って、`CGraphics::CreateTextSprite` → `CTextSprite::SetText` を現在最有力の表示生成経路として記録するが、因果関係は断定しない。
+- `/tmp/eu4dll-text-args.log`（85135 bytes、`TRACE_ARGS` 678行）で、`CGraphics::CreateTextSprite` 236回（全てtid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 442回（全てtid=1、pc=`0x20d9da4`）の実機ヒットおよび候補CStringアドレスを確認した。EU4 v1.37.5は正常終了し、MENU画面まで到達した。
+- 記録したのは候補CStringアドレスのみで、文字列は読み出していない。ログ中に `Load Game` も `ロード` も現れないため、上記ヒットと `MENU_BAR_LOAD_GAME` の直接対応、CString構造、各レジスタ候補の正しさ、文字列形式・寿命は未確認である。両関数をMENU画面で頻繁に通る表示生成経路候補として記録するが、既知キー対応とは断定しない。
 - `MENU_BAR_LOAD_GAME` の安全な文字列ポインタ根拠は未確認で、ASCII/UTF-8/UTF-16相当のメモリ探索は実施していない。次の最小ステップは、未確認ポインタの無条件読み取りを追加せず、静的解析または安全な条件付き観測方法を検討することとする。全 `PdxLocalize` テンプレート一括フック、`open`/`read` フック、インラインパッチは禁止する。
+- `tools/trace_eu4_text_args.gdb` と `tools/trace_eu4_text_args.sh` は未確認ポインタの文字列読出しを行わず、アドレス、tid、pc、回数だけを記録するため、安全性と限界を確認した。次は既存の有志翻訳Mod/translationMapを入力データとして維持しつつ、CString ABIを静的確認し、少数の引数だけを安全条件付きで観測する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは禁止する。
 
 ## 未完了
 

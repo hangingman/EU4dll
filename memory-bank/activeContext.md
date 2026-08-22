@@ -6,7 +6,7 @@ Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測
 
 ## 次の作業
 
-- `CTextSprite::SetText(...)` と `CGraphics::CreateTextSprite(...)` のヒットが `MENU_BAR_LOAD_GAME` に対応するかを、未確認ポインタの無条件読み取りなしで静的解析または安全な条件付き観測により確認する。
+- CString ABIの構造を静的に確認し、安全条件を設けた別調査スクリプトで一度に少数の引数だけ文字列を観測する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは行わない。
 
 ## 直近の完了
 
@@ -24,7 +24,9 @@ EU4本体を`make run`で起動し、メニュー到達・操作可能を確認�
 
 ## 今回の変更
 
-`/tmp/eu4dll-sprite-trace.log`（45921 bytes）で `CGraphics::CreateTextSprite` 236回（tid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 444回（tid=1、pc=`0x20d9da4`）を確認した。EU4 v1.37.5は正常終了し、MENU画面まで到達して「ロード」表示状態を確認した。短いTRACEは文字列引数を記録していないため、`MENU_BAR_LOAD_GAME`との直接対応、引数、文字列形式、寿命は未確認である。表示生成経路として現在最有力だが、因果関係は断定しない。
+候補関数ごとにSysV x86-64 ABI上の先頭2つのCString候補アドレスを記録する調査用GDBスクリプトを実機で実行した。`/tmp/eu4dll-text-args.log` は85135 bytes、`TRACE_ARGS` は678行で、候補アドレスのみを記録し、文字列は読み出していない。
+
+EU4 v1.37.5は正常終了し、MENU画面まで到達した。`CGraphics::CreateTextSprite` は236回、`CTextSprite::SetText` は442回で、全てtid=1、pcはそれぞれ `0x2079b00`、`0x20d9da4` だった。ログ中に `Load Game` も `ロード` も現れず、既知キーとの直接対応、CString構造、レジスタ候補、文字列形式・寿命は未確認である。両関数はMENU画面で頻繁に通る表示生成経路候補として記録するが、既知キー対応とは断定しない。
 
 次の最小ステップでは、全 `PdxLocalize` テンプレート一括フック、`open`/`read` フック、インラインパッチを行わず、まず静的解析または安全な条件付き観測方法を検討する。
 
