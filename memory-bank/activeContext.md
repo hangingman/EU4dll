@@ -10,6 +10,8 @@ Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測
 
 ## 次の作業
 
+- `EU4DLL_TRANSLATION_OBSERVATION_KEYS` で既存`translationMap`内の複数キーを辞書観測対象として選択できるようにした。未設定時は`MENU_BAR_LOAD_GAME`のみを照会する。これはゲーム実機での表示観測やキー対応の証明ではない。
+- GDB自身へ`LD_PRELOAD`を設定せずinferiorのEU4だけへDLLを設定する専用wrapper `tools/trace_eu4_text_with_dll.sh` を追加した。実行例は `memory-bank/details/runtime_trace.md` に記録し、実機結果は未取得である。
 - 文字列読出しを急がず、今回得たCStringのデータポインタと長さの組を静的に検討する。必要なら安全条件を明示した単一候補・単一ヒットの観測を設計する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは行わない。
 - 置換を再開する前に、Linux v1.37.5での実引数文字列一致、CStringの所有権・寿命、命令境界とトランポリン、AOB一意性、相対アドレス範囲、W^X復元を個別に証明する。
 

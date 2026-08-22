@@ -10,6 +10,7 @@ import dyaml.node; // YAMLノードとNodeIDを扱うため
 import dyaml.exception; // YAMLパース例外を扱うため
 import std.uni; // toUTF8 for unicode handling
 import std.logger; // std.loggerのために追加
+import std.algorithm : canFind;
 
 // YAMLパーサーのユーティリティ関数
 private string getScalarValue(const Node value)
@@ -35,21 +36,47 @@ struct TranslationData
 TranslationData[string] translationMap;
 
 /**
- * Record whether the one known menu translation was loaded.
- * This deliberately performs a direct lookup instead of enumerating the map.
+ * Return the keys to inspect after translation loading.
+ *
+ * The default remains the one key already observed on the real game. Extra
+ * keys are opt-in so dictionary contents are never mistaken for game display
+ * evidence.
  */
-void logKnownTranslationObservation()
+string[] translationObservationKeys(string configuredKeys)
 {
-    enum key = "MENU_BAR_LOAD_GAME";
-    auto translation = key in translationMap;
-    if (translation is null)
-    {
-        std.logger.info(format("Translation observation: key=%s status=missing", key));
-        return;
-    }
+    enum defaultKey = "MENU_BAR_LOAD_GAME";
+    if (configuredKeys.empty)
+        return [defaultKey];
 
-    std.logger.info(format("Translation observation: key=%s status=loaded value=%s", key,
-            translation.value));
+    string[] keys;
+    foreach (rawKey; configuredKeys.split(","))
+    {
+        auto key = rawKey.strip;
+        if (!key.empty && !keys.canFind(key))
+            keys ~= key;
+    }
+    return keys.empty ? [defaultKey] : keys;
+}
+
+/**
+ * Record dictionary observations for explicitly selected keys.
+ * This deliberately performs direct lookups instead of enumerating the map.
+ */
+void logTranslationObservations()
+{
+    auto configuredKeys = environment.get("EU4DLL_TRANSLATION_OBSERVATION_KEYS");
+    foreach (key; translationObservationKeys(configuredKeys))
+    {
+        auto translation = key in translationMap;
+        if (translation is null)
+        {
+            std.logger.info(format("Translation observation: key=%s status=missing", key));
+            continue;
+        }
+
+        std.logger.info(format("Translation observation: key=%s status=loaded value=%s", key,
+                translation.value));
+    }
 }
 
 /**
@@ -67,7 +94,7 @@ void loadTranslationMods(string customModDirPath = "")
         if (homeDir.empty)
         {
             std.logger.error("HOME environment variable is not set. Cannot determine mod directory.");
-            logKnownTranslationObservation();
+            logTranslationObservations();
             return; // エラーなので処理を中断
         }
         modDirPath = buildPath(homeDir, ".local", "share", "Paradox Interactive", "Europa Universalis IV", "mod");
@@ -167,5 +194,5 @@ void loadTranslationMods(string customModDirPath = "")
         std.logger.info(format("Mod directory not found: %s", modDirPath));
     }
 
-    logKnownTranslationObservation();
+    logTranslationObservations();
 }
