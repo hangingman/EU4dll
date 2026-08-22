@@ -1,5 +1,17 @@
 # EU4 Linux ランタイム追跡手順
 
+## localisation境界の最新実機結果（2026/08/23）
+
+ログ `/tmp/eu4dll-localization-boundary.log` に基づく観測。
+
+- 静的検証 `bash -n`、GDB `/bin/true`、`git diff --check` は成功した。
+- DLL付きEU4 v1.37.5を翻訳ロード有効で起動し、EU4は正常終了した。
+- `TRACE_LOCALIZE` は全件 `tid=1`。`PdxLocalizeSetup` 1回、`PdxLocalizeInitialize` 2回（入口・復帰）、`PdxLocalizeReadFolder` 2回入口、`LocalizeAddLocalizationYAMLBuffer` 10回入口、`YmlParse` 10回入口、`ReloadPdxLocalize` 1回（入口・復帰）だった。
+- 初回順序は `PdxLocalizeSetup` → `PdxLocalizeInitialize` 入口 → `LocalizeAddLocalizationYAMLBuffer`/`YmlParse` → `PdxLocalizeInitialize` 復帰 → `PdxLocalizeReadFolder` → 補助10件。次回順序は `ReloadPdxLocalize` 入口 → `PdxLocalizeInitialize` 入口・復帰 → `PdxLocalizeReadFolder` → `ReloadPdxLocalize` 復帰だった。
+- `ReloadPdxLocalize` 復帰は遅延ロード境界の候補だが、今回の観測だけではlocalisation構築完了、再入安全性、翻訳ロード実行安全性を証明しない。`PdxLocalizeInitialize` 復帰単独も、直後に`ReadFolder`が続くため完了境界とみなさない。
+- 次作業はSetText置換ではなく、constructorで翻訳ロードをスキップし、`ReloadPdxLocalize`復帰後に実行する最小・一回限り・翻訳ロードのみの診断PoC設計とする。再入ガード、`tid=1`限定、例外・失敗時のゲーム原文維持、ログマーカー、無効化可能性を要件とし、実装はまだ行わない。
+- 既存のSetText置換、AOB、トランポリン、Open/read、全`PdxLocalize`一括、Windows流用は保留する。
+
 ## 翻訳ロードスキップ実機比較（2026/08/23）
 
 EU4 v1.37.5でJapanese Language modを無効、Waifu Universalisを維持し、`eu4dll_translations`を有効にした。LD_PRELOAD + GDB実機で`EU4DLL_SKIP_TRANSLATIONS=1`を指定したところ、`SetText`最初の5ヒットはlength `0,0,0,13("Connect to ID"),4("Back")`となった。翻訳ロードありの`ID??`/`??`から英語へ戻り、EU4は正常終了した。

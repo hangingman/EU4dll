@@ -1,11 +1,14 @@
 # Progress
 
-## 翻訳ロードスキップ実機比較（2026/08/23）
+## localisation境界の実機観測（2026/08/23）
 
-- EU4 v1.37.5、Japanese Language mod無効、Waifu Universalis維持、`eu4dll_translations`有効の条件で、LD_PRELOAD + GDB実機に`EU4DLL_SKIP_TRANSLATIONS=1`を指定した。
-- `SetText`最初の5ヒットはlength `0,0,0,13("Connect to ID"),4("Back")`で、翻訳ロードありの`ID??`/`??`から英語へ戻った。EU4は正常終了した。
-- `loadTranslationMods()`単体または起動初期の大量YAML/Dランタイム/GC処理を文字列破損の有力原因と判定する。画面全体の正常表示はユーザーの手動確認を根拠とし、未確認なら断定しない。
-- 設計方針を、constructor中の翻訳ロードを避け、EU4本体の正規localisation初期化後に適切な内部境界で観測・フックする形へ更新した。`SetText`フックは先に実装しない。`EU4DLL_SKIP_TRANSLATIONS=1`の診断実装は`source/plugin/dllmain.d`に既存で、通常動作を壊さない。
+- 静的検証 `bash -n`、GDB `/bin/true`、`git diff --check` は成功した。
+- DLL付きEU4 v1.37.5を翻訳ロード有効で起動し、EU4は正常終了した。
+- `TRACE_LOCALIZE` は全件 `tid=1`。`PdxLocalizeSetup` 1回、`PdxLocalizeInitialize` 2回（各入口・復帰）、`PdxLocalizeReadFolder` 2回入口、`LocalizeAddLocalizationYAMLBuffer` 10回入口、`YmlParse` 10回入口、`ReloadPdxLocalize` 1回（入口・復帰）だった。
+- 初回は `PdxLocalizeSetup` → `PdxLocalizeInitialize` 入口 → `LocalizeAddLocalizationYAMLBuffer`/`YmlParse` → `PdxLocalizeInitialize` 復帰 → `PdxLocalizeReadFolder` → 補助10件。次回は `ReloadPdxLocalize` 入口 → `PdxLocalizeInitialize` 入口・復帰 → `PdxLocalizeReadFolder` → `ReloadPdxLocalize` 復帰だった。
+- `ReloadPdxLocalize` 復帰は遅延ロード境界の候補だが、localisation構築完了、再入安全性、翻訳ロード実行安全性は未証明。`PdxLocalizeInitialize` 復帰単独も、直後に`ReadFolder`が続くため完了境界としない。
+- 次作業はSetText置換ではなく、constructorで翻訳ロードをスキップし、`ReloadPdxLocalize`復帰後に一回だけ翻訳ロードする診断PoCの設計。再入ガード、`tid=1`限定、失敗時のゲーム原文維持、ログマーカー、無効化可能性を要件とし、実装はまだ行わない。
+
 
 ## SetText実引数文字列観測（2026/08/22）
 
@@ -14,35 +17,10 @@
 - 旧版の実機 `/tmp/eu4dll-settext-string.log` では5ヒットを取得し、最初の3件は `length=0` のためSKIP、後2件はREADとなったが、GDB表示は `ID??` と `??` で非ASCIIバイトを判定できなかった。今回のバイト列版は実機未実施である。
 - GDB標準機能では任意ポインタのreadable判定を保証できないため、条件を満たしても読出し失敗でGDB/EU4が終了する可能性がある。文字列内容、`MENU_BAR_*`との対応、置換可能性は未確認である。
 
-## 次回再開時の直近タスク
+## SetText観測の保留
 
-- `x/s`では非ASCII文字が`?`になるため、`CTextSprite::SetText`の`rdx`について、最初の少数ヒットだけ限定長バイト列を16進で記録する。
-- 得られたバイト列をASCII/UTF-8等として判定し、既存`translationMap`の表示値と照合する。実引数が表示値と一致しない限り、キー対応・置換可能とは断定しない。
-- 一致後にのみLinux v1.37.5専用のAOB、命令境界、トランポリン、元処理復帰、W^X、再入、CString所有権・寿命を設計する。
-
-## 今後のタスク
-
-1. 実引数の文字列バイト列を同定する。
-2. `translationMap`表示値との対応を確認する。
-3. 置換なしの安全なSetTextフック方式を検証する。
-4. 翻訳値1件を一時CStringへ置換するPoCを実装する。
-5. 実機で表示、操作継続、正常終了を確認する。
-6. 成功後に対象キーを複数化する。
-
-## 再開時の直近タスク
-
-- `SetText` の `rdx` を対象に、最初の少数ヒットだけ文字列バイト列を16進で記録する。`x/s` の `??` 表示に依存しない。
-- バイト列をUTF-8/ASCII等として解析し、`translationMap`の表示値と照合する。実引数が表示値と一致しない限り、キー対応・置換可能とは断定しない。
-- 一致後にLinux v1.37.5専用のAOB、命令境界、トランポリン、元処理復帰、W^X、再入、CString所有権・寿命を設計する。
-
-## 今後のタスク
-
-1. 実引数の文字列同定
-2. `translationMap`表示値との対応確認
-3. 置換なしの安全なSetTextフック設計・検証
-4. 翻訳値1件の一時CString置換PoC
-5. 実機で表示・操作継続・正常終了を確認
-6. 成功後に複数キーへ拡張
+- 以前のSetTextバイト列同定、`translationMap`との照合、SetTextフック、翻訳値置換PoCは、localisation境界の診断PoC設計が完了するまで保留する。
+- AOB、トランポリン、Open/read、全`PdxLocalize`一括、Windows流用も保留する。
 
 ## YAMLキー修正（2026/08/22）
 

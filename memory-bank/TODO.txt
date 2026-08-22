@@ -2,11 +2,12 @@
 
 ## 最新の実機判断（2026/08/23）
 
-- [x] EU4 v1.37.5（Japanese Language mod無効、Waifu Universalis維持、`eu4dll_translations`有効）で、LD_PRELOAD + GDB実機に`EU4DLL_SKIP_TRANSLATIONS=1`を指定して比較した。
-- [x] `SetText`最初の5ヒットがlength `0,0,0,13("Connect to ID"),4("Back")`となり、翻訳ロードありの`ID??`/`??`から英語へ戻ったこと、およびEU4正常終了を記録した。
-- [ ] `loadTranslationMods()`単体または起動初期の大量YAML/Dランタイム/GC処理を有力原因として、実行時期の切り分けを行う。画面全体の正常表示はユーザー手動確認がある場合だけ確認済みとする。
-- [ ] constructor中の翻訳ロードを避け、EU4本体の正規localisation初期化後の内部境界を観測・フックする。`SetText`フックは先行実装しない。
-- 診断用`EU4DLL_SKIP_TRANSLATIONS=1`は`source/plugin/dllmain.d`に既存で、通常動作を壊さない。
+- [x] 静的検証 `bash -n`、GDB `/bin/true`、`git diff --check` の成功を確認した。
+- [x] DLL付きEU4 v1.37.5を翻訳ロード有効で起動し、EU4正常終了を確認した。
+- [x] `TRACE_LOCALIZE` は29行で全件 `tid=1`。Setup 1回、Initialize 2回（各入口・復帰）、ReadFolder 2回入口、Add/YmlParse 各10回入口、Reload 1回（入口・復帰）を記録した。初回はSetup→Initialize入口→Add/YmlParse→Initialize復帰→ReadFolder→補助10件、次回はReload入口→Initialize入口/復帰→ReadFolder→Reload復帰の順序だった。
+- [ ] `ReloadPdxLocalize`復帰後を遅延ロード境界候補として、localisation構築完了・再入安全性・翻訳ロード実行安全性を別途検証する。Initialize復帰単独はReadFolderが続くため完了境界としない。
+- [ ] constructorでは翻訳ロードをスキップし、候補境界で最小・一回限り・翻訳ロードのみの診断PoCを設計する。再入ガード、`tid=1`限定、失敗時のゲーム原文維持、ログマーカー、無効化可能性を要件とする。実装はまだ行わない。
+- 診断用`EU4DLL_SKIP_TRANSLATIONS=1`は既存実装で、通常動作を壊さない。
 
 ## 方針
 
@@ -130,29 +131,17 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - [ ] 候補関数をGhidra、`readelf`、`objdump`、GDBで解析する。
 - [ ] Linux版専用の命令境界、呼び出し規約、レジスタ引数を確定する。
 
-## 再開時の直近タスク
+## 現行の次作業
 
-- [x] `tools/trace_eu4_settext_string.gdb` で最初の5ヒットを限定観測し、length=0を3件SKIP、length=4/2を2件READした。GDB表示は`ID??`/`??`で非ASCIIバイトは未同定。
-- [x] `tools/trace_eu4_settext_string.gdb` を、少数ヒットの長さ限定バイト列（16進）観測へ変更した。各READに `SETTEXT_READ_##` 識別子を付け、実機再取得は未実施。
-- [ ] `SetText` 実引数のバイト列をUTF-8/ASCII等として同定する。
-- [ ] 実引数の表示値を既存 `translationMap` の値と照合する。
-- [ ] 表示値との一致前にキー対応・置換可能と断定しない。
-- [ ] 一致後にLinux v1.37.5専用トランポリンの命令境界・AOB一意性・元処理復帰を検証する。
+- [ ] `ReloadPdxLocalize`復帰後に限定して実行する、最小・一回限り・翻訳ロードのみの診断PoCを設計する。
+- [ ] constructorでは翻訳ロードをスキップし、正規localisation後の候補境界へ接続する方式を検討する。
+- [ ] 再入ガード、`tid=1`限定、例外・失敗時のゲーム原文維持、ログマーカー、無効化可能性を要件化する。
+- [ ] localisation構築完了と翻訳ロード実行安全性を、実装前に別途検証する。
 
-## 次: 1件だけの置換PoC
+## 保留
 
-### 2026/08/22 安全停止
-
-`CTextSprite::SetText` の置換は見送った。実引数の文字列内容・引数の意味・CStringの寿命と所有権が未確認であり、既存 `makeJmp` / `ScopedPatch` も命令境界、トランポリン復帰、相対アドレス範囲、一意AOB、競合を検証しないためである。未確認のまま本体を書き換えず、再開条件を満たすまで観測と設計に留める。
-
-- [ ] 翻訳辞書1件を固定して、対象文字列だけを置換する。
-- [ ] 既存の辞書・ログ機構を再利用する。
-- [ ] 置換前後の文字列、呼び出し回数、スレッドをログで確認する。
-- [ ] 文字列バッファの所有権、終端、長さ、書き込み可否を確認する。
-- [ ] 元の文字列を変更せず、必要なら呼び出し用の一時バッファを使う。
-- [ ] 再入、再帰、初期化前の呼び出し、メモリアロケータ依存を確認する。
-- [ ] EU4を起動し、対象画面で置換結果を確認する。
-- [ ] 置換失敗時にゲームを終了させず、理由をログへ記録する。
+- SetText実引数の同定・辞書照合、SetText置換PoC、AOB、トランポリン、Open/read、全`PdxLocalize`一括、Windows流用は保留する。
+- 未確認の表示経路・文字列対応・寿命・所有権を成功扱いしない。ソースコードは変更しない。
 
 ## フック方式の判断
 
