@@ -6,8 +6,7 @@ Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測
 
 ## 次の作業
 
-- `LD_PRELOAD`による最小ロードログを確認する。
-- localisation・フォント関連I/Oの対象限定観測を実装する。
+- EU4本体で`LD_PRELOAD`によるロードと対象限定I/Oログを確認する。
 - 既知文字列1件のランタイム追跡へ進む。
 
 ## 直近の完了
@@ -17,3 +16,7 @@ Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測
 ## 方針変更
 
 FreeType/HarfBuzz、SDL/OpenGL描画API、Windows版アドレスの直接流用は前提にしない。
+
+## 直近の完了
+
+`tests/poc`に`fopen`の対象限定観測を追加した。`localisation`、`.yml`、`.yaml`、フォント拡張子だけをstderrへ出力し、通常のI/Oは記録しない。`make -C tests/poc`と`make test`、`make all`が成功した。
