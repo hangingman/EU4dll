@@ -54,14 +54,20 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ### GDBによる安全な候補観測
 
-- [x] `tools/trace_eu4_runtime.sh` に、既知シンボルへのGDBブレークポイントと呼び出し元・レジスタ・スレッドの記録を追加した。
+- [x] `tools/trace_eu4_runtime.gdb` に、表示テキスト生成候補2関数へのGDBブレークポイントと `symbol/tid/pc` だけの短い記録を追加した。
 - [x] EU4 v1.37.5の `LocalizeAddLocalization`、`LocalizeAddLocalizationYAMLBuffer`、`YmlParse`、`PdxLocalizeInitialize`、`ReloadPdxLocalize`、`CTextBox::ChangeTextBox` のシンボル存在を `readelf -Ws` で確認した。
 - [ ] 実機で対象メニューを操作し、`MENU_BAR_LOAD_GAME` の引数・文字列形式を確認する。
     - [x] 起動時のトレースで `PdxLocalizeInitialize` 2回、`LocalizeAddLocalizationYAMLBuffer` 300回、`YmlParse` 300回、`ReloadPdxLocalize` 1回を確認した。
     - [x] `LocalizeAddLocalizationYAMLBuffer` と `YmlParse` がlocalisation読み込み経路でヒットすることを確認した。
-    - [x] `CTextBox::ChangeTextBox` が今回のトレースでヒットしないことを確認した。
-    - [ ] 表示時の候補関数ヒット、引数、文字列形式を確認する。
-- [x] ヒットした候補についてのみ、呼び出し元、引数の意味、文字列の寿命、呼び出しスレッドを記録する。
+     - [x] `CTextBox::ChangeTextBox` が今回のトレースでヒットしないことを確認した。
+- [x] EU4 v1.37.5の短いTRACEで `CGraphics::CreateTextSprite` 236回（tid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 444回（tid=1、pc=`0x20d9da4`）を確認した。
+     - `/tmp/eu4dll-sprite-trace.log` は45921 bytesで、EU4は正常終了した。
+     - 実機はMENU画面まで到達し、「ロード」表示状態を確認した。ただし短いTRACEでは文字列引数を記録していないため、これらのヒットが `MENU_BAR_LOAD_GAME` そのものに対応することは未確認である。
+     - 引数の意味、文字列形式、文字列の寿命、呼び出し元と表示値の対応も未確認である。
+- [x] 表示時の `CTextBox::UpdateTextSprite()` / `CTextBox::ChangeString(CString const&, FontFormatting, bool)` が今回のMENU画面操作で0ヒットであることを確認した。
+    - breakpointはそれぞれ `0x20d3a34`、`0x20d3b6c` に正常設定され、EU4は正常終了した。
+    - したがって、これらは今回のMENU表示経路の候補から外し、成功扱いにしない。
+- [ ] ヒットした表示更新候補について、呼び出し元、引数の意味、文字列の寿命、呼び出しスレッドを記録する。
     - 主要ヒットはtid=1で、`PdxLocalizeSetup`→`PdxLocalizeReadFolder`→`ReadLocalizationFileHelper`→`LocalizeAddLocalizationYAMLBuffer`→`YmlParse`の順だった。
     - `rsi`はYAMLバッファ長とみられる値、`rdx`は共通のlocalisationデータ領域とみられるが、型・寿命は未確定。
 
@@ -72,8 +78,15 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` の安全なLinux v1.37.5呼び出し境界は未確認であり、シンボルフックやインラインパッチは追加していない。
 - `readelf -Ws` では上記候補シンボルの存在を確認した。これは実行時の呼び出し経路、引数、文字列形式を確認したものではない。
 - `tools/trace_eu4_runtime.sh` はGDBブレークポイントのみを設定し、EU4本体へパッチを適用しない。実機でlocalisation読み込み経路の追跡結果を取得した。
-- `runtime-trace.log`では表示時の `PdxLocalize` 実体や `CTextBox::ChangeTextBox` のヒットは確認できず、`MENU_BAR_LOAD_GAME` の表示経路は未確定である。
+- `runtime-trace.log`では表示時の `PdxLocalize` 実体や `CTextBox::ChangeTextBox` のヒットは確認できず、今回の短いTRACEでも `MENU_BAR_LOAD_GAME` との直接対応は未確定である。
+- 前回の候補 `CTextBuffer::ChangeString()` / `CTextBox::ChangeString(CString const&)` は、`/tmp/eu4dll-candidate-trace.log`（9484 bytes）でTRACE 0件だった。GDB breakpointはそれぞれ `0x20d8c7e` / `0x20d3a9a` に設定できたが、今回の起動・操作では呼ばれず、表示経路は未確定のままである。
+- 前回の表示更新候補は `CTextBox::UpdateTextSprite()` と `CTextBox::ChangeString(CString const&, FontFormatting, bool)` の2つに限定していた。前者は `CTextBox`内spriteへの仮想dispatch、後者は `CString` の比較・コピー後にsprite更新系dispatchを行う命令列を `objdump -dC` で確認した。
+- 現在のGDB補助は新しい2候補のみを停止し、各ヒットで `symbol/tid/pc` の1行だけを出力する。既存のlocalisation読み込み300回ログと全レジスタ・バックトレース出力は廃止した。
+- 新候補は `CTextSprite::SetText(...)`（`0x20d9da4`, 2151 bytes）と `CGraphics::CreateTextSprite(...)`（`0x2079b00`, 443 bytes）に更新した。前者は文字列を内部バッファへコピーしてフォント・テクスチャ処理と頂点再計算を行い、後者はスプライト生成後にテキスト設定の仮想関数へ引数を渡す。`/tmp/eu4dll-sprite-trace.log`で前者444回、後者236回の実機ヒットを確認したが、`MENU_BAR_LOAD_GAME`との直接対応、引数、文字列形式、寿命は未確認である。
+- `CTextBox::UpdateTextSprite()` と `CTextBox::ChangeString(CString const&, FontFormatting, bool)` は、実機TRACE 0件のため候補から除外した。
+- `MENU_BAR_LOAD_GAME` のASCII/UTF-8/UTF-16相当ポインタを安全に読める根拠は未確認のため、未確認アドレスの大量 `x/s` は実施していない。
 - 未確認事項は、既知キーがゲーム内部で保持される形式、表示時の受け渡し関数、呼び出しスレッド、候補文字列のメモリアドレスである。
+- 次に実機を再度止める必要がある場合も、候補2関数のTRACEで未確認ポインタを無条件に読む処理は追加せず、まず静的解析または安全な条件付き観測方法を検討する。全 `PdxLocalize` テンプレート一括フック、`open`/`read` フック、インラインパッチは行わない。
 
 ## 次: 置換地点の選定
 
