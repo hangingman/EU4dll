@@ -6,7 +6,7 @@ Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測
 
 ## 次の作業
 
-- `MENU_BAR_LOAD_GAME` の表示時に呼ばれる具体的な `PdxLocalize` 実体またはテキスト更新関数を絞る。
+- `CTextSprite::SetText(...)` と `CGraphics::CreateTextSprite(...)` のヒットが `MENU_BAR_LOAD_GAME` に対応するかを、未確認ポインタの無条件読み取りなしで静的解析または安全な条件付き観測により確認する。
 
 ## 直近の完了
 
@@ -24,10 +24,16 @@ EU4本体を`make run`で起動し、メニュー到達・操作可能を確認�
 
 ## 今回の変更
 
+`/tmp/eu4dll-sprite-trace.log`（45921 bytes）で `CGraphics::CreateTextSprite` 236回（tid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 444回（tid=1、pc=`0x20d9da4`）を確認した。EU4 v1.37.5は正常終了し、MENU画面まで到達して「ロード」表示状態を確認した。短いTRACEは文字列引数を記録していないため、`MENU_BAR_LOAD_GAME`との直接対応、引数、文字列形式、寿命は未確認である。表示生成経路として現在最有力だが、因果関係は断定しない。
+
+次の最小ステップでは、全 `PdxLocalize` テンプレート一括フック、`open`/`read` フック、インラインパッチを行わず、まず静的解析または安全な条件付き観測方法を検討する。
+
+## これまでの変更
+
 `MENU_BAR_LOAD_GAME`（`Load Game` / `ロード`）を既知観測対象に固定した。翻訳ロード完了時にこのキーだけを照会し、loaded/missing と値を1行記録する。ゲーム本体の `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` は安全な呼び出し境界を確認できないため、フックは追加していない。
 
-## 今回の変更
+## これまでの観測
 
-GDBバッチ補助スクリプトを追加した。`LocalizeAddLocalization`、`LocalizeAddLocalizationYAMLBuffer`、`YmlParse`、`PdxLocalizeInitialize`、`ReloadPdxLocalize`、`CTextBox::ChangeTextBox` に停止点を置き、レジスタ、バックトレース、スレッド番号を記録する。スクリプトはアドレス推測、インラインパッチ、シンボルフックを行わない。候補の役割と未確認事項は `memory-bank/details/runtime_trace.md` に記録した。
+前回の候補 `CTextBuffer::ChangeString()` と `CTextBox::ChangeString(CString const&)` は、breakpoint設定には成功したが `/tmp/eu4dll-candidate-trace.log`（9484 bytes）でTRACE 0件だった。今回の操作では呼ばれておらず、成功扱いにしない。続く `CTextBox::UpdateTextSprite()` と `CTextBox::ChangeString(CString const&, FontFormatting, bool)` もMENU画面までのTRACE 0件だったため除外した。新候補を `CTextSprite::SetText(...)` と `CGraphics::CreateTextSprite(...)` に更新し、各ヒットで `symbol/tid/pc` の1行だけを記録した。実機ヒットの対応関係と引数は未確認である。
 
 実機トレースではlocalisation読み込み経路を確認したが、`CTextBox::ChangeTextBox`はヒットせず、表示時の既知キー追跡には至っていない。次は候補を一括で増やさず、表示更新に近い既存テキスト関数を1つずつ観測する。
