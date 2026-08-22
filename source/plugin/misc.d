@@ -30,9 +30,7 @@ static:
     EU4Ver getVersion()
     {
         BytePattern b = BytePattern.tempInstance();
-        // EU4の実行ファイルパスを設定する
-        // TODO: EU4_DIRを動的に取得するように修正する
-        b.setModule("/home/hiroyuki/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4");
+        b.setModule();
         b.findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
         EU4Ver ver = EU4Ver.UNKNOWN;
 
