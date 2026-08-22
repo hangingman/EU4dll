@@ -26,13 +26,16 @@ unittest {
 
         loadTranslationMods(testModDir);
 
-        translationMap.length.should.equal(4); // GREETING_KEY, FAREWELL_KEY, EMPTY_VALUE_KEY, NON_EXISTENT_KEY
+        translationMap.length.should.equal(5); // Includes the known menu translation observation key
         assert("GREETING_KEY" in translationMap, "GREETING_KEY should exist in translationMap");
         translationMap["GREETING_KEY"].value.should.equal("Hello, World!");
         assert("FAREWELL_KEY" in translationMap, "FAREWELL_KEY should exist in translationMap");
         translationMap["FAREWELL_KEY"].value.should.equal("Goodbye, World!");
         assert("EMPTY_VALUE_KEY" in translationMap, "EMPTY_VALUE_KEY should exist in translationMap");
         translationMap["EMPTY_VALUE_KEY"].value.should.equal("");
+        assert("MENU_BAR_LOAD_GAME" in translationMap,
+                "MENU_BAR_LOAD_GAME should exist in translationMap");
+        translationMap["MENU_BAR_LOAD_GAME"].value.should.equal("ロード");
         // NON_EXISTENT_KEY はYAMLパーシングで直接キーとして追加されないためテストしない
     }
 
