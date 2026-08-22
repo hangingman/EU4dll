@@ -79,8 +79,15 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ## 観測結果（2026/08/22）
 
+- 最新実機ALL観測（2026-08-22 21:53:18付近）は`key_count=117805`で、全件loaded/missing=0だった。`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`は最新ALLブロックにloadedで存在した。`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。
+- 修正版DLLの実機起動（21:53:19付近）はGDB wrapperからEU4 v1.37.5が正常起動し、`DLL [OK]`を確認した。ただし今回のYAMLキー修正はこの実機結果の後であり、修正後の実機再確認は必要である。
+- `text_l_english.yml`は実機ログで`Key 'true' appears multiple times in mapping`によりファイル単位でスキップされた。実ファイルの未クォート`on`、`off`、`NO`、`YES`などをd-yaml 0.10.0（YAML 1.1）の特殊スカラー解決が真偽値キーとして扱うため、異なるEU4キーが衝突する。前処理で特殊語のキー位置だけをクォートする修正を実装した。
+
 - `loadTranslationMods()` 完了時に `MENU_BAR_LOAD_GAME` だけを直接照会し、loaded/missing と値を1行記録する観測を追加した。
 - `EU4DLL_TRANSLATION_OBSERVATION_KEYS` で既存`translationMap`から複数の観測対象キーを選択できるようにした。未設定時は`MENU_BAR_LOAD_GAME`のみを対象とする。辞書ロード結果であり、実機表示の証拠とは扱わない。
+- `EU4DLL_TRANSLATION_OBSERVATION_KEYS=ALL` でロード済み`translationMap`の全キーを辞書順に観測できるようにした。件数と各キーの loaded/missing/value を記録するためログが大きくなり得る。これは辞書ロード後の直接観測であり、ゲーム本体のフック、実機表示、`SetText`引数との対応証拠ではない。以前に複数指定した6キーがmissingになった現象は未解決で、ALL指定だけで原因が解決するとは断定しない。
+- 実機ALL観測は`key_count=6923`、全件loaded/missing=0だった。欠落した6キーは`EU4_l_english.yml`（3件）と`text_l_english.yml`（3件）に実在し、後者はロード時に`Mapping values are not allowed here`等でファイル単位スキップされていた。両ファイルはUTF-8 BOM付きで、EU4形式の`:1`〜`:3`も含むため、`:0 "`だけの変換では不十分だった。
+- `mod.d`でBOMを除去し、`:0`〜`:9`の数値localisation suffixをYAMLの`: `へ変換してから`l_english:`を補完するよう修正した。最小テストでBOM・ヘッダー補完・6つの`MENU_BAR_*`キーのtranslationMap登録を確認した。実機再確認は未実施。
 - `translationMap` のロードと既知キーの値はユニットテストで確認できる。これはゲーム本体の表示経路を確認するものではない。
 - `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` の安全なLinux v1.37.5呼び出し境界は未確認であり、シンボルフックやインラインパッチは追加していない。
 - `readelf -Ws` では上記候補シンボルの存在を確認した。これは実行時の呼び出し経路、引数、文字列形式を確認したものではない。

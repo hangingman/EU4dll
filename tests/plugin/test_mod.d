@@ -74,4 +74,60 @@ unittest {
         auto keys = translationObservationKeys("");
         keys.should.equal(["MENU_BAR_LOAD_GAME"]);
     }
+
+    // テストケース6: ALLなら辞書の全キーを辞書順で返す
+    {
+        clearTranslationMap();
+        translationMap["ZETA_KEY"] = TranslationData("ZETA_KEY", "zeta");
+        translationMap["ALPHA_KEY"] = TranslationData("ALPHA_KEY", "alpha");
+        translationMap["BETA_KEY"] = TranslationData("BETA_KEY", "beta");
+
+        auto keys = translationObservationKeys(" ALL ");
+        keys.should.equal(["ALPHA_KEY", "BETA_KEY", "ZETA_KEY"]);
+        clearTranslationMap();
+    }
+
+    // テストケース7: BOM、ヘッダー補完、特殊スカラーキーを処理する
+    {
+        clearTranslationMap();
+        auto variantTestModDir = buildPath(environment.get("CWD"), "tests", "translation_variant_mod");
+        if (!variantTestModDir.exists)
+            mkdir(variantTestModDir);
+
+        auto variantYamlPath = buildPath(variantTestModDir, "variant.yml");
+        write(variantYamlPath,
+                "\xEF\xBB\xBFMENU_BAR_LOAD_GAME:0 \"ロード\"\n" ~
+                "MENU_BAR_LOAD:1 \"ロード\"\n" ~
+                "MENU_BAR_QUIT:2 \"ゲーム終了\"\n" ~
+                 "MENU_BAR_SAVE_GAME:0 \"セーブ\"\n" ~
+                 "MENU_BAR_GAME_OPTIONS:1 \"ゲームのオプション\"\n" ~
+                 "MENU_BAR_CLOSE:3 \"閉じる\"\n" ~
+                 "true:0 \"真\"\n" ~
+                 "false:1 \"偽\"\n" ~
+                 "null:2 \"空\"\n" ~
+                 "YES:0 \"YES\"\n" ~
+                 "NO:1 \"NO\"\n" ~
+                 "on:0 \"オン\"\n" ~
+                 "off:0 \"オフ\"\n");
+        loadTranslationMods(variantTestModDir);
+
+        translationMap.length.should.equal(13);
+        translationMap["MENU_BAR_LOAD_GAME"].value.should.equal("ロード");
+        translationMap["MENU_BAR_LOAD"].value.should.equal("ロード");
+        translationMap["MENU_BAR_QUIT"].value.should.equal("ゲーム終了");
+        translationMap["MENU_BAR_SAVE_GAME"].value.should.equal("セーブ");
+        translationMap["MENU_BAR_GAME_OPTIONS"].value.should.equal("ゲームのオプション");
+        translationMap["MENU_BAR_CLOSE"].value.should.equal("閉じる");
+        translationMap["true"].value.should.equal("真");
+        translationMap["false"].value.should.equal("偽");
+        translationMap["null"].value.should.equal("空");
+        translationMap["YES"].value.should.equal("YES");
+        translationMap["NO"].value.should.equal("NO");
+        translationMap["on"].value.should.equal("オン");
+        translationMap["off"].value.should.equal("オフ");
+
+        remove(variantYamlPath);
+        rmdir(variantTestModDir);
+        clearTranslationMap();
+    }
 }
