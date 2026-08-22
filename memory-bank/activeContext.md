@@ -1,5 +1,13 @@
 # Active Context
 
+## YAMLキー修正（2026/08/22）
+
+最新実機ALL観測は2026-08-22 21:53:18付近の`key_count=117805`で全件loaded/missing=0、`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`を確認した。`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。21:53:19付近には修正版DLLの`DLL [OK]`とEU4 v1.37.5の正常起動を確認した。
+
+残存していた`text_l_english.yml`の`Key 'true' appears multiple times in mapping`は、未クォートの`on`、`off`、`NO`、`YES`などをd-yaml 0.10.0がYAML 1.1の真偽値キーとして解決し、異なるキーを衝突させたものと確認した。`normalizeLocalizationYaml`で特殊スカラーに該当するマッピングキーだけをクォートし、BOM除去、`:0`〜`:9`変換、ヘッダー補完、通常の値を維持する最小修正を追加した。回帰テストは`true`、`false`、`null`、`YES`、`on`、`off`と6つの`MENU_BAR_*`キーを確認する。
+
+修正後の実機起動・最新ALL再確認は未実施であり、実機での再確認が必要である。実機起動、GDB、フック、インラインパッチ、open/readフックはこの作業では変更しない。
+
 ## 現在の焦点
 
 Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測から特定する。
@@ -10,7 +18,8 @@ Linux版EU4の文字列置換経路を、Ghidra先行ではなく実行時観測
 
 ## 次の作業
 
-- `EU4DLL_TRANSLATION_OBSERVATION_KEYS` で既存`translationMap`内の複数キーを辞書観測対象として選択できるようにした。未設定時は`MENU_BAR_LOAD_GAME`のみを照会する。これはゲーム実機での表示観測やキー対応の証明ではない。
+- `EU4DLL_TRANSLATION_OBSERVATION_KEYS` で既存`translationMap`内の複数キーを辞書観測対象として選択でき、`ALL`では全キーを辞書順に照会する。ALLはロード後の辞書直接観測であり、キー件数と各キーの値を出すためログが大きくなり得る。未設定時は`MENU_BAR_LOAD_GAME`のみを照会する。これはゲーム実機での表示観測やキー対応の証明ではなく、6キーがmissingだった現象も未解決である。
+- ALL観測の`6923`件は全件loadedだったが、6つの`MENU_BAR_*`キーは`text_l_english.yml`のパースエラーによるファイル単位スキップが原因だった。BOM除去と`:0`〜`:9` suffix変換を実装し、最小テストで6キーの登録を確認した。実機再確認は未実施。
 - GDB自身へ`LD_PRELOAD`を設定せずinferiorのEU4だけへDLLを設定する専用wrapper `tools/trace_eu4_text_with_dll.sh` を追加した。実行例は `memory-bank/details/runtime_trace.md` に記録し、実機結果は未取得である。
 - 文字列読出しを急がず、今回得たCStringのデータポインタと長さの組を静的に検討する。必要なら安全条件を明示した単一候補・単一ヒットの観測を設計する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは行わない。
 - 置換を再開する前に、Linux v1.37.5での実引数文字列一致、CStringの所有権・寿命、命令境界とトランポリン、AOB一意性、相対アドレス範囲、W^X復元を個別に証明する。

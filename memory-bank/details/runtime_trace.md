@@ -1,5 +1,13 @@
 # EU4 Linux ランタイム追跡手順
 
+## 最新実機境界とYAMLキー修正（2026/08/22）
+
+最新実行のALL観測ブロックは2026-08-22 21:53:18付近で、`key_count=117805`、全件loaded/missing=0だった。同ブロックでは`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`をloadedで確認したが、`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は存在しなかった。DLLの`[OK]`は21:53:19付近で、EU4 v1.37.5はGDB wrapperから正常起動した。
+
+実機ログで残った`text_l_english.yml`の`Key 'true' appears multiple times in mapping`は、d-yaml 0.10.0がYAML 1.1の未クォート特殊スカラーキーを真偽値/nullとして解決するためだった。実ファイルには`on`、`off`、`NO`、`YES`などがあり、変換後の`on: "オン"`等が文字列キーではなく真偽値キーとして扱われ、キー衝突によるファイル単位スキップになった。`normalizeLocalizationYaml`で該当するキーだけをクォートする修正と、BOM、ヘッダーなし、`:0`〜`:3`、6つのMENUキーおよび特殊キーの回帰テストを追加した。
+
+上記の実機結果は修正前後の境界を混同しないための既存観測であり、修正後の実機起動およびALL再観測は未実施である。実機で`text_l_english.yml`の再ロードと6キーの再確認が必要である。GDB、フック、インラインパッチ、open/readフックは変更していない。
+
 ## 目的
 
 `MENU_BAR_LOAD_GAME` が `translationMap` にロードされた後、EU4本体でどの関数を通って表示準備へ渡されるかを観測する。追跡はGDBのブレークポイントとスタック表示だけで行い、本体の命令・データを書き換えない。
@@ -12,7 +20,23 @@
 EU4DLL_TRANSLATION_OBSERVATION_KEYS=MENU_BAR_LOAD_GAME,MENU_BAR_QUIT
 ```
 
-未設定時は `MENU_BAR_LOAD_GAME` のみを対象とする。出力される `loaded` と値は辞書へのロード結果であり、ゲーム画面での表示、SetText引数との一致、キーと表示値の対応を証明しない。この機能は対象特定の選択肢を増やすだけで、安全なフック証明の代替ではない。
+全キーを観測する場合は `ALL` を指定する。キーは辞書順で出力され、最初に件数が記録される。
+
+```sh
+EU4DLL_TRANSLATION_OBSERVATION_KEYS=ALL ./tools/trace_eu4_text_with_dll.sh 2>&1 | tee /tmp/eu4dll-all-key-trace.log
+```
+
+代表的なログ形式は `Translation observation: mode=all key_count=1234` と、続く `Translation observation: key=KEY status=loaded value=VALUE`（または `status=missing`）である。値も全件出力するため、キー数に比例してログが大きくなり得る。未設定時は `MENU_BAR_LOAD_GAME` のみを対象とする。
+
+全キー列挙は翻訳辞書ロード後の `translationMap` を直接観測するもので、ゲーム本体のフックではない。出力される `loaded` と値は辞書へのロード結果であり、実機表示、`SetText`引数との一致、キーと表示値の対応を証明しない。この機能は対象特定の選択肢を増やすだけで、安全なフック証明の代替ではない。複数キーが `missing` になった既存の実機現象も未解決であり、全キー観測だけで原因が自動解決するとは扱わない。
+
+## ALL観測と欠落キーの根因（2026/08/22）
+
+実機の最新ALLブロックは `key_count=6923` で、6923件すべて `loaded`、`missing=0` だった。一方、6つの `MENU_BAR_*`キーはブロックに現れなかった。配置ファイルを確認すると、`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`は`EU4_l_english.yml`に、残り3件は`text_l_english.yml`に存在した。
+
+`pattern_eu4jps.log`では`EU4_l_english.yml`はSuccessfully loaded and parsedだが、`text_l_english.yml`は`Mapping values are not allowed here`等のパースエラーでファイル単位スキップされていた。両ファイルはUTF-8 BOM付きで、内容はEU4形式の`:0`だけでなく`:1`〜`:3`も含む。従来の`:0 "`だけの変換では`:1 "`等が残り、d-yamlがファイル全体を拒否するため、後者の3キーがmapへ到達しなかった。
+
+`mod.d`の前処理を、BOM除去、`:0`〜`:9`の数値suffixを`: `へ変換、不足時の`l_english:`補完の順に変更した。ファイルごとの例外処理は維持し、最小テストでBOM付き・ヘッダーなし入力から6つの対象キーが`translationMap`へ入ることを確認した。実機での修正版ALL再観測と実際のEU4表示経路は未確認である。
 
 ## 再現手順
 

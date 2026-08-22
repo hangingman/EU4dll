@@ -1,5 +1,13 @@
 # Progress
 
+## YAMLキー修正（2026/08/22）
+
+- 最新ALL観測（2026-08-22 21:53:18付近）は`key_count=117805`で全件loaded/missing=0だった。`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`はloadedで確認し、`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。
+- 21:53:19付近に修正版DLLの`DLL [OK]`とEU4 v1.37.5のGDB wrapperからの正常起動を確認した。
+- `text_l_english.yml`の残存エラーは`Key 'true' appears multiple times in mapping`によるファイル単位スキップだった。d-yaml 0.10.0のYAML 1.1特殊スカラー解決で、未クォートの`on`、`off`、`NO`、`YES`などが真偽値キーとして衝突することを、実ファイルと変換後入力で確認した。
+- `normalizeLocalizationYaml`に、特殊スカラーに見えるキー位置だけをクォートする処理を追加した。既存のBOM除去、`:0`〜`:9`変換、`l_english:`補完、通常のYAML値は変更しない。回帰テストでBOM、ヘッダーなし、`:0`〜`:3`、特殊キー、6つの`MENU_BAR_*`キーの登録を確認した。
+- 修正後の実機再確認は未実施であり、`text_l_english.yml`の再ロードと最新ALLの再観測が必要である。GDB、フック、インラインパッチ、open/readフックは変更していない。
+
 ## 完了
 
 - Linux版EU4の依存関係と動的シンボルを確認した。
@@ -37,6 +45,9 @@
 ## 未完了
 
 - 実機で未観測のキーを表示されたと断定しない前提で、`EU4DLL_TRANSLATION_OBSERVATION_KEYS` による既存辞書の複数キー選択と loaded/missing/value の直接照会を追加した。未設定時の既定値は`MENU_BAR_LOAD_GAME`である。
+- `EU4DLL_TRANSLATION_OBSERVATION_KEYS=ALL` を追加し、ロード済み`translationMap`の全キーを辞書順で列挙する。件数と各キーの loaded/missing/value を出力するためログ量が増える。これはゲーム本体のフックではなく辞書ロード後の直接観測で、実機表示や`SetText`引数との対応証拠ではない。複数指定した6キーがmissingだった現象は未解決であり、ALLで自動解決するとは断定しない。
+- 実機ALL観測（`key_count=6923`）は全件loadedで、6つの`MENU_BAR_*`キーだけが対象ブロックに無かった。配置上の3キーは`EU4_l_english.yml`、3キーは`text_l_english.yml`に存在したが、後者は`Mapping values are not allowed here`等のパースエラーでファイル単位スキップされていた。両ファイルのUTF-8 BOMと`:1`〜`:3` suffixを確認し、`:0`だけの変換不足を根因と特定した。
+- `mod.d`でUTF-8 BOMを除去し、`:0`〜`:9`を`: `へ変換してから不足時の`l_english:`補完を行うよう修正した。テストはBOM・ヘッダー補完・6つの`MENU_BAR_*`キーが`translationMap`へ入ることを最小データで検証する。実機再確認は未実施。
 - 既知文字列のゲーム本体内ランタイム追跡（今回の観測はtranslationMap到達まで）。
 - Linux版の置換地点確定。
 

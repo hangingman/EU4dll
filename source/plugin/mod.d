@@ -10,7 +10,52 @@ import dyaml.node; // YAMLノードとNodeIDを扱うため
 import dyaml.exception; // YAMLパース例外を扱うため
 import std.uni; // toUTF8 for unicode handling
 import std.logger; // std.loggerのために追加
-import std.algorithm : canFind;
+import std.algorithm : canFind, sort;
+
+private string normalizeLocalizationYaml(string yamlContent)
+{
+    // d-yaml does not treat the UTF-8 BOM as part of the document header.
+    if (yamlContent.startsWith("\xEF\xBB\xBF"))
+        yamlContent = yamlContent[3 .. $];
+
+    // EU4 uses KEY:0 "Value" through KEY:9 "Value". Convert the numeric
+    // version suffix before handing the content to the YAML parser.
+    foreach (version_; 0 .. 10)
+        yamlContent = yamlContent.replace(format(":%d \"", version_), ": \"");
+
+    // EU4 keys are strings, but YAML 1.1 resolves these words as scalar
+    // booleans/null. Quote only the affected mapping keys so d-yaml does not
+    // merge distinct localisation keys (for example, YES and on).
+    string[] yamlSpecialKeys = ["true", "false", "null", "yes", "no", "on", "off"];
+    string[] normalizedLines;
+    foreach (line; yamlContent.splitLines())
+    {
+        auto colon = line.indexOf(':');
+        if (colon > 0)
+        {
+            auto key = line[0 .. colon].strip;
+            if (!key.empty && key[0] != '"' && key[0] != '\''
+                    && yamlSpecialKeys.canFind(key.toLower))
+            {
+                auto indentationLength = line[0 .. colon].length - key.length;
+                auto indentation = line[0 .. indentationLength];
+                line = indentation ~ "\"" ~ key ~ "\":" ~ line[colon + 1 .. $];
+            }
+        }
+        normalizedLines ~= line;
+    }
+    yamlContent = normalizedLines.join("\n");
+
+    if (!yamlContent.strip().startsWith("l_english:"))
+    {
+        string indentedContent;
+        foreach (line; yamlContent.splitLines())
+            indentedContent ~= " " ~ line ~ "\n";
+        yamlContent = "l_english:\n" ~ indentedContent;
+    }
+
+    return yamlContent;
+}
 
 // YAMLパーサーのユーティリティ関数
 private string getScalarValue(const Node value)
@@ -38,15 +83,22 @@ TranslationData[string] translationMap;
 /**
  * Return the keys to inspect after translation loading.
  *
- * The default remains the one key already observed on the real game. Extra
- * keys are opt-in so dictionary contents are never mistaken for game display
- * evidence.
+ * The default remains the one key already observed on the real game. `ALL`
+ * opts in to a sorted enumeration of the loaded dictionary. These are
+ * dictionary observations, not evidence of game display calls.
  */
 string[] translationObservationKeys(string configuredKeys)
 {
     enum defaultKey = "MENU_BAR_LOAD_GAME";
     if (configuredKeys.empty)
         return [defaultKey];
+
+    if (configuredKeys.strip == "ALL")
+    {
+        auto keys = translationMap.keys;
+        keys.sort;
+        return keys;
+    }
 
     string[] keys;
     foreach (rawKey; configuredKeys.split(","))
@@ -59,13 +111,17 @@ string[] translationObservationKeys(string configuredKeys)
 }
 
 /**
- * Record dictionary observations for explicitly selected keys.
- * This deliberately performs direct lookups instead of enumerating the map.
+ * Record dictionary observations for selected keys. ALL deliberately
+ * enumerates the already-loaded map and performs the same direct lookups.
  */
 void logTranslationObservations()
 {
     auto configuredKeys = environment.get("EU4DLL_TRANSLATION_OBSERVATION_KEYS");
-    foreach (key; translationObservationKeys(configuredKeys))
+    auto keys = translationObservationKeys(configuredKeys);
+    if (configuredKeys.strip == "ALL")
+        std.logger.info(format("Translation observation: mode=all key_count=%d", keys.length));
+
+    foreach (key; keys)
     {
         auto translation = key in translationMap;
         if (translation is null)
@@ -122,17 +178,13 @@ void loadTranslationMods(string customModDirPath = "")
                     {
                         string yamlContent = readText(filePath);
 
-                        // EU4 localisation keys use the `KEY:0 "Value"` form,
-                        // while YAML requires a space after the mapping colon.
-                        yamlContent = yamlContent.replace(":0 \"", ": \"");
-
-                        // d-yamlが厳密で、ファイルの先頭に l_english: がないとパースに失敗するため、
-                        // 無い場合は補う
-                        if (!yamlContent.strip().startsWith("l_english:"))
-                        {
+                        auto headerContent = yamlContent;
+                        if (headerContent.startsWith("\xEF\xBB\xBF"))
+                            headerContent = headerContent[3 .. $];
+                        auto hadLanguageHeader = headerContent.strip().startsWith("l_english:");
+                        yamlContent = normalizeLocalizationYaml(yamlContent);
+                        if (!hadLanguageHeader)
                             std.logger.info(format("  Warning: 'l_english:' prefix missing in %s. Attempting to add it.", entry.name));
-                            yamlContent = "l_english:\n" ~ yamlContent;
-                        }
 
                         // YAMLをパース (Loader structを使用)
                         auto loader = dyaml.loader.Loader.fromString(yamlContent, filePath); // ファイル名を渡す
