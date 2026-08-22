@@ -13,8 +13,11 @@
 - `make -C tests/poc`、`make test`、`make all`が成功した。
 - `make run`でEU4 v1.37.5を`LD_PRELOAD`付きで起動し、メニュー到達と操作可能を確認した。
 - `pattern_eu4jps.log`がEU4インストール先に作成され、起動時の翻訳YAMLロードおよび`DLL [OK]`を確認した。
+- `MENU_BAR_LOAD_GAME`（`Load Game` / `ロード`）を既知文字列として選定し、翻訳元YAMLを確認した。
+- `loadTranslationMods()` 完了時に既知キーだけを照会する1行の観測ログと、値を検証するユニットテストを追加した。
+- `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` の安全なLinux v1.37.5ランタイム境界は未確認のため、危険なフックは追加していない。
 
 ## 未完了
 
-- 既知文字列1件のランタイム追跡。
+- 既知文字列のゲーム本体内ランタイム追跡（今回の観測はtranslationMap到達まで）。
 - Linux版の置換地点確定。

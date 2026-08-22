@@ -35,6 +35,24 @@ struct TranslationData
 TranslationData[string] translationMap;
 
 /**
+ * Record whether the one known menu translation was loaded.
+ * This deliberately performs a direct lookup instead of enumerating the map.
+ */
+void logKnownTranslationObservation()
+{
+    enum key = "MENU_BAR_LOAD_GAME";
+    auto translation = key in translationMap;
+    if (translation is null)
+    {
+        std.logger.info(format("Translation observation: key=%s status=missing", key));
+        return;
+    }
+
+    std.logger.info(format("Translation observation: key=%s status=loaded value=%s", key,
+            translation.value));
+}
+
+/**
  * 翻訳MODを読み込む関数。
  * 検出されたMODファイルの中からYAML形式の翻訳ファイルを特定し、その内容を読み込んでパースします。
  */
@@ -49,6 +67,7 @@ void loadTranslationMods(string customModDirPath = "")
         if (homeDir.empty)
         {
             std.logger.error("HOME environment variable is not set. Cannot determine mod directory.");
+            logKnownTranslationObservation();
             return; // エラーなので処理を中断
         }
         modDirPath = buildPath(homeDir, ".local", "share", "Paradox Interactive", "Europa Universalis IV", "mod");
@@ -75,6 +94,10 @@ void loadTranslationMods(string customModDirPath = "")
                     try
                     {
                         string yamlContent = readText(filePath);
+
+                        // EU4 localisation keys use the `KEY:0 "Value"` form,
+                        // while YAML requires a space after the mapping colon.
+                        yamlContent = yamlContent.replace(":0 \"", ": \"");
 
                         // d-yamlが厳密で、ファイルの先頭に l_english: がないとパースに失敗するため、
                         // 無い場合は補う
@@ -143,4 +166,6 @@ void loadTranslationMods(string customModDirPath = "")
     {
         std.logger.info(format("Mod directory not found: %s", modDirPath));
     }
+
+    logKnownTranslationObservation();
 }
