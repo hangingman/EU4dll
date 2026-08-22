@@ -81,8 +81,29 @@ objdump -dC --start-address=0x2079b00 --stop-address=0x2079cbc "$EU4_BIN"
 | シンボル | ヒット数 | tid | pc |
 | --- | ---: | ---: | --- |
 | `CGraphics::CreateTextSprite(...)` | 236 | 1 | `0x2079b00` |
-| `CTextSprite::SetText(...)` | 444 | 1 | `0x20d9da4` |
+| `CTextSprite::SetText(...)` | 442 | 1 | `0x20d9da4` |
 
 EU4 v1.37.5は正常終了した。実機はMENU画面まで到達し、「ロード」表示状態を確認した。ただし短いTRACEでは文字列引数を記録していないため、これらのヒットが `MENU_BAR_LOAD_GAME` そのものに対応すること、引数の意味、文字列形式、文字列の寿命、localisation値との因果関係は未確認である。従って、`CGraphics::CreateTextSprite` → `CTextSprite::SetText` を現在最有力の表示生成経路として記録するが、表示経路の因果関係は断定しない。
 
 再観測が必要になった場合は、候補2関数のTRACEに未確認ポインタを無条件に読む処理を追加せず、まず静的解析または安全な条件付き観測方法を検討する。全 `PdxLocalize` テンプレート一括フック、`open`/`read` フック、インラインパッチは行わない。
+
+## 候補CStringアドレスの限定観測
+
+既存の `tools/trace_eu4_runtime.sh` は変更せず、引数候補を記録する調査専用スクリプトを追加した。
+
+```sh
+EU4_BIN="$HOME/.steam/debian-installation/steamapps/common/Europa Universalis IV/eu4" \
+  ./tools/trace_eu4_text_args.sh 2>&1 | tee text-args-trace.log
+```
+
+このスクリプトは各候補関数で最大2個の `CString` 候補について、`symbol`、`tid`、`pc`、ヒット回数、レジスタ値（アドレス）だけを記録する。`SetText` は `rdx`/`rcx`、`CreateTextSprite` は `rsi`/`rdx` を対象とする。これはSysV x86-64の暗黙の `this`（`rdi`）を除いたC++引数配置と、`readelf -Ws` のデマングル済みシグネチャに基づく。後続の引数はスタック上または整数レジスタに混在し得るため対象外とした。
+
+GDB標準コマンドだけでは、任意の候補ポインタを読み取り可能か事前に判定し、判定失敗時も停止せずに限定長の文字列を読むことを移植性高く保証できない。このため、本スクリプトは `x/s`、`x/b`、GDB Python、関数呼出しを使用せず、アドレスのみを記録する。ログに `Load Game`、`ロード`、または対応するUTF-8/UTF-16値が現れることはないため、この観測だけでは `MENU_BAR_LOAD_GAME` 対応とは判定しない。
+
+## 候補CStringアドレスの実機結果（EU4 v1.37.5）
+
+`/tmp/eu4dll-text-args.log` は85135 bytesで、`TRACE_ARGS` は678行だった。EU4は正常終了し、実機はMENU画面まで到達した。`CGraphics::CreateTextSprite` は236回（全てtid=1、pc=`0x2079b00`）、`CTextSprite::SetText` は442回（全てtid=1、pc=`0x20d9da4`）だった。
+
+記録したのは候補CStringアドレスのみで、文字列の読み出しはしていない。ログ中に `Load Game` も `ロード` も現れないため、`MENU_BAR_LOAD_GAME` との直接対応、CString構造、各レジスタ候補の正しさ、文字列形式・寿命、呼び出し元と表示値の対応は未確認である。従って、`CGraphics::CreateTextSprite` → `CTextSprite::SetText` はMENU画面で頻繁に通る表示生成経路候補として記録するが、既知キー対応とは断定しない。
+
+このスクリプトは未確認ポインタの文字列読出しを行わないため、任意メモリ参照による停止リスクを避けられる一方、アドレスだけでは文字列一致を判定できない。次は既存の有志翻訳Mod/`translationMap`を入力データとして維持しつつ、CString ABIの構造を静的に確認し、安全条件を設けた別調査スクリプトで一度に少数の引数だけを観測する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは行わない。
