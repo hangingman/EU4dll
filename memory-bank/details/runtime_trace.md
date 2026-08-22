@@ -2,11 +2,15 @@
 
 ## 最新実機境界とYAMLキー修正（2026/08/22）
 
-最新実行のALL観測ブロックは2026-08-22 21:53:18付近で、`key_count=117805`、全件loaded/missing=0だった。同ブロックでは`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`をloadedで確認したが、`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は存在しなかった。DLLの`[OK]`は21:53:19付近で、EU4 v1.37.5はGDB wrapperから正常起動した。
+修正後の実機確認は`TRACE_GDB="$PWD/tools/trace_eu4_text_preview.gdb" ./tools/trace_eu4_text_with_dll.sh`で実施した。`/tmp/eu4dll-all-key-preview-fixed2.log`は8009 bytes、GDB wrapperのエラーはなく、`TRACE_PREVIEW`は20行（CreateTextSprite 10、SetText 10）だった。EU4 v1.37.5は正常終了し、最新ログに`DLL [OK]`がある。
+
+6キーはすべてloadedで、`MENU_BAR_LOAD_GAME=ロード`、`MENU_BAR_LOAD=ロード`、`MENU_BAR_QUIT=ゲーム終了`、`MENU_BAR_SAVE_GAME=セーブ`、`MENU_BAR_GAME_OPTIONS=ゲームのオプション`、`MENU_BAR_CLOSE=閉じる`だった。最新ALLブロックは前回実行の`key_count=117805`で全件loadedであり、今回の6キー実行はALLではない。`text_l_english.yml`は今回の6キー実行でパース成功し、以前の`Key 'true' appears multiple times`は修正で解消した。
+
+これはYAMLロード、DLL、GDB TRACE_PREVIEW取得、EU4正常終了の確認であり、表示が実際に日本語化されたことの証明ではない。TRACE_PREVIEWは候補CStringの`+0`データポインタと`+8`長さだけを記録し、文字列本体は読み出していない。長さはCreateTextSpriteが`7,7,13,13,18,13,6,32,32,13`、SetTextが`0,0,0,4,2,6,6,5,5,2`で、SetText文字列と翻訳キー・表示値の対応および置換可否は未確認である。
 
 実機ログで残った`text_l_english.yml`の`Key 'true' appears multiple times in mapping`は、d-yaml 0.10.0がYAML 1.1の未クォート特殊スカラーキーを真偽値/nullとして解決するためだった。実ファイルには`on`、`off`、`NO`、`YES`などがあり、変換後の`on: "オン"`等が文字列キーではなく真偽値キーとして扱われ、キー衝突によるファイル単位スキップになった。`normalizeLocalizationYaml`で該当するキーだけをクォートする修正と、BOM、ヘッダーなし、`:0`〜`:3`、6つのMENUキーおよび特殊キーの回帰テストを追加した。
 
-上記の実機結果は修正前後の境界を混同しないための既存観測であり、修正後の実機起動およびALL再観測は未実施である。実機で`text_l_english.yml`の再ロードと6キーの再確認が必要である。GDB、フック、インラインパッチ、open/readフックは変更していない。
+上記の実機結果は修正前後の境界を混同しないための既存観測である。今回の修正後実機は6キー実行であり、ALL再観測ではない。GDB、フック、インラインパッチ、open/readフックは変更していない。
 
 ## 目的
 
@@ -36,7 +40,7 @@ EU4DLL_TRANSLATION_OBSERVATION_KEYS=ALL ./tools/trace_eu4_text_with_dll.sh 2>&1 
 
 `pattern_eu4jps.log`では`EU4_l_english.yml`はSuccessfully loaded and parsedだが、`text_l_english.yml`は`Mapping values are not allowed here`等のパースエラーでファイル単位スキップされていた。両ファイルはUTF-8 BOM付きで、内容はEU4形式の`:0`だけでなく`:1`〜`:3`も含む。従来の`:0 "`だけの変換では`:1 "`等が残り、d-yamlがファイル全体を拒否するため、後者の3キーがmapへ到達しなかった。
 
-`mod.d`の前処理を、BOM除去、`:0`〜`:9`の数値suffixを`: `へ変換、不足時の`l_english:`補完の順に変更した。ファイルごとの例外処理は維持し、最小テストでBOM付き・ヘッダーなし入力から6つの対象キーが`translationMap`へ入ることを確認した。実機での修正版ALL再観測と実際のEU4表示経路は未確認である。
+`mod.d`の前処理を、BOM除去、`:0`〜`:9`の数値suffixを`: `へ変換、不足時の`l_english:`補完の順に変更した。ファイルごとの例外処理は維持し、最小テストと修正後の6キー実行で対象キーが`translationMap`へ入りloadedになることを確認した。実際のEU4表示経路は未確認であり、ALL形式での修正版再観測は今回の実行では行っていない。
 
 ## 再現手順
 
@@ -165,7 +169,7 @@ EU4DLL_TRANSLATION_OBSERVATION_KEYS='MENU_BAR_LOAD_GAME,MENU_BAR_LOAD,MENU_BAR_Q
 ./tools/trace_eu4_text_with_dll.sh 2>&1 | tee /tmp/eu4dll-multi-key-with-dll.log
 ```
 
-`tools/trace_eu4_text_with_dll.sh` はEU4のdirnameを作業ディレクトリにし、GDB自身には呼び出し元の`LD_PRELOAD`を継承させず、`set startup-with-shell off` と `set environment LD_PRELOAD=...` でinferiorのEU4だけへDLLを設定する。その後、既存の`trace_eu4_text_args.gdb`を実行する。`EU4_BIN`、`EU4_DLL`、`TRACE_GDB`で対象を変更でき、その他の環境変数と末尾の起動引数は呼び出し側から継承する。ログは標準出力へ流し、wrapper内では`tee`を行わない。GDBの`run`で起動したEU4は、ユーザーが終了するまでwrapperから自動終了しない。実機結果は未取得である。
+`tools/trace_eu4_text_with_dll.sh` はEU4のdirnameを作業ディレクトリにし、GDB自身には呼び出し元の`LD_PRELOAD`を継承させず、`set startup-with-shell off` と `set environment LD_PRELOAD=...` でinferiorのEU4だけへDLLを設定する。その後、既存の`trace_eu4_text_args.gdb`を実行する。`EU4_BIN`、`EU4_DLL`、`TRACE_GDB`で対象を変更でき、その他の環境変数と末尾の起動引数は呼び出し側から継承する。ログは標準出力へ流し、wrapper内では`tee`を行わない。GDBの`run`で起動したEU4は、ユーザーが終了するまでwrapperから自動終了しない。今回の修正後6キー実行で実機結果を取得した。ALL実行ではない。
 
 このスクリプトは各候補関数で最大2個の `CString` 候補について、`symbol`、`tid`、`pc`、ヒット回数、レジスタ値（アドレス）だけを記録する。`SetText` は `rdx`/`rcx`、`CreateTextSprite` は `rsi`/`rdx` を対象とする。これはSysV x86-64の暗黙の `this`（`rdi`）を除いたC++引数配置と、`readelf -Ws` のデマングル済みシグネチャに基づく。後続の引数はスタック上または整数レジスタに混在し得るため対象外とした。
 

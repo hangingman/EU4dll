@@ -52,6 +52,8 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - [ ] 文字列が静的データか、実行時に生成されたデータかを区別する。
 - [ ] 1件の文字列について、ロードから描画準備までの経路を記録する。
 
+次の一手は翻訳辞書から候補文字列を選ぶことではなく、SetTextで実際に渡される文字列と翻訳済み表示値の対応を安全に確認する方法の設計である。無条件の文字列読出し、全ヒット読出し、フック、パッチは行わない。
+
 ### GDBによる安全な候補観測
 
 - [x] `tools/trace_eu4_runtime.gdb` に、表示テキスト生成候補2関数へのGDBブレークポイントと `symbol/tid/pc` だけの短い記録を追加した。
@@ -78,6 +80,11 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - [x] 実機でCStringメタデータを限定観測した。`/tmp/eu4dll-text-preview.log` は10612 bytesで、EU4 v1.37.5は正常終了しMENU画面まで到達した。`CGraphics::CreateTextSprite` の最初の最大10ヒットは、NULLでない `rsi` CStringについて `+0` データポインタ候補が全件非NULL、`+8` 長さが `7,7,13,13,18,13,6,32,32,13` だった。`CTextSprite::SetText` の最初の最大10ヒットも、NULLでない `rdx` CStringについて `+0` データポインタ候補が全件非NULL、`+8` 長さが `0,0,0,4,2,6,6,5,5,2` だった。文字列本体は読み出していないため、`Load Game`/`ロード`との一致、`MENU_BAR_LOAD_GAME`との直接対応、引数の意味、寿命は未確認である。これは `CString +0` がデータポインタ、`+8` が長さという静的根拠と整合するメタデータを得たことに限り、既知キー対応や文字列内容の成功とは扱わない。次は文字列読出しを急がず、今回のデータポインタと長さの組を静的に検討し、必要なら安全条件を明示した単一候補・単一ヒットの観測を設計する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは禁止する。
 
 ## 観測結果（2026/08/22）
+
+- 修正後実機確認は、`TRACE_GDB="$PWD/tools/trace_eu4_text_preview.gdb" ./tools/trace_eu4_text_with_dll.sh`で実施した。`/tmp/eu4dll-all-key-preview-fixed2.log`は8009 bytesで、GDB wrapperのエラーはなく、`TRACE_PREVIEW`は20行（CreateTextSprite 10、SetText 10）だった。EU4 v1.37.5は正常終了し、最新ログに`DLL [OK]`がある。
+- 修正後の6キーはすべてloadedだった。`MENU_BAR_LOAD_GAME=ロード`、`MENU_BAR_LOAD=ロード`、`MENU_BAR_QUIT=ゲーム終了`、`MENU_BAR_SAVE_GAME=セーブ`、`MENU_BAR_GAME_OPTIONS=ゲームのオプション`、`MENU_BAR_CLOSE=閉じる`。最新ALLブロックは前回実行の`key_count=117805`で全件loadedだが、今回の6キー実行はALLではない。
+- `text_l_english.yml`は今回の6キー実行でパース成功し、上記3キーがloadedになった。以前の`Key 'true' appears multiple times`は修正で解消したと記録する。ただしこれはYAMLロードと辞書観測の確認であり、実際に日本語表示されたことの証明ではない。
+- `TRACE_PREVIEW`は候補CStringの`+0`データポインタと`+8`長さだけを記録し、文字列本体は読み出していない。長さはCreateTextSpriteが`7,7,13,13,18,13,6,32,32,13`、SetTextが`0,0,0,4,2,6,6,5,5,2`で、SetText文字列と翻訳キー・表示値の対応および置換可否は未確認である。
 
 - 最新実機ALL観測（2026-08-22 21:53:18付近）は`key_count=117805`で、全件loaded/missing=0だった。`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`は最新ALLブロックにloadedで存在した。`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。
 - 修正版DLLの実機起動（21:53:19付近）はGDB wrapperからEU4 v1.37.5が正常起動し、`DLL [OK]`を確認した。ただし今回のYAMLキー修正はこの実機結果の後であり、修正後の実機再確認は必要である。

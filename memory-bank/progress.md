@@ -2,11 +2,14 @@
 
 ## YAMLキー修正（2026/08/22）
 
+- 修正後に`TRACE_GDB="$PWD/tools/trace_eu4_text_preview.gdb" ./tools/trace_eu4_text_with_dll.sh`を実行した。`/tmp/eu4dll-all-key-preview-fixed2.log`は8009 bytes、GDB wrapperのエラーなし、`TRACE_PREVIEW`は20行（CreateTextSprite 10、SetText 10）だった。EU4 v1.37.5は正常終了し、最新ログに`DLL [OK]`がある。
+- 修正後の6キーはすべてloadedで、`MENU_BAR_LOAD_GAME=ロード`、`MENU_BAR_LOAD=ロード`、`MENU_BAR_QUIT=ゲーム終了`、`MENU_BAR_SAVE_GAME=セーブ`、`MENU_BAR_GAME_OPTIONS=ゲームのオプション`、`MENU_BAR_CLOSE=閉じる`を確認した。最新ALLブロックは前回実行の`key_count=117805`で全件loadedであり、今回の6キー実行はALLではない。
+- `text_l_english.yml`は今回の6キー実行でパース成功し、以前の`Key 'true' appears multiple times`は修正で解消した。これはYAMLロード、DLL、TRACE_PREVIEW取得、EU4正常終了の確認であり、日本語表示の証明ではない。文字列本体は未読出しで、SetText文字列と翻訳キー・表示値の対応および置換可否は未確認である。
 - 最新ALL観測（2026-08-22 21:53:18付近）は`key_count=117805`で全件loaded/missing=0だった。`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`はloadedで確認し、`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。
 - 21:53:19付近に修正版DLLの`DLL [OK]`とEU4 v1.37.5のGDB wrapperからの正常起動を確認した。
 - `text_l_english.yml`の残存エラーは`Key 'true' appears multiple times in mapping`によるファイル単位スキップだった。d-yaml 0.10.0のYAML 1.1特殊スカラー解決で、未クォートの`on`、`off`、`NO`、`YES`などが真偽値キーとして衝突することを、実ファイルと変換後入力で確認した。
 - `normalizeLocalizationYaml`に、特殊スカラーに見えるキー位置だけをクォートする処理を追加した。既存のBOM除去、`:0`〜`:9`変換、`l_english:`補完、通常のYAML値は変更しない。回帰テストでBOM、ヘッダーなし、`:0`〜`:3`、特殊キー、6つの`MENU_BAR_*`キーの登録を確認した。
-- 修正後の実機再確認は未実施であり、`text_l_english.yml`の再ロードと最新ALLの再観測が必要である。GDB、フック、インラインパッチ、open/readフックは変更していない。
+- 最新ALLの再観測は今回の実行ではなく、6キー実行のため未実施である。GDB、フック、インラインパッチ、open/readフックは変更していない。
 
 ## 完了
 
