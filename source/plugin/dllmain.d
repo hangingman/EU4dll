@@ -3,6 +3,7 @@ module plugin.dllmain;
 import std.logger; // std.logger全体をインポート
 import std.stdio;
 import core.stdc.stdlib;
+import std.process;
 import plugin.byte_pattern;
 import plugin.constant; // RunOptionsを使うので必要
 import plugin.misc;
@@ -57,7 +58,15 @@ void hijackProcess()
     EU4Ver eu4Version = Misc.getVersion(); // 今回のテストでコメントアウトを解除
 
     // 翻訳MODの読み込み
-    loadTranslationMods();
+    auto skipTranslations = environment.get("EU4DLL_SKIP_TRANSLATIONS");
+    if (skipTranslations == "1")
+    {
+        std.logger.info("[DIAGNOSTIC] EU4DLL_SKIP_TRANSLATIONS=1; skipping loadTranslationMods()");
+    }
+    else
+    {
+        loadTranslationMods();
+    }
 
     // TODO: フォント関連の修正
     // success = success | Font.init(eu4Version);
