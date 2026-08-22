@@ -2,11 +2,13 @@
 
 ## YAMLキー修正（2026/08/22）
 
-最新実機ALL観測は2026-08-22 21:53:18付近の`key_count=117805`で全件loaded/missing=0、`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`を確認した。`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。21:53:19付近には修正版DLLの`DLL [OK]`とEU4 v1.37.5の正常起動を確認した。
+修正後に`TRACE_GDB="$PWD/tools/trace_eu4_text_preview.gdb" ./tools/trace_eu4_text_with_dll.sh`を実行した。`/tmp/eu4dll-all-key-preview-fixed2.log`は8009 bytes、GDB wrapperのエラーなし、`TRACE_PREVIEW`は20行（CreateTextSprite 10、SetText 10）で、EU4 v1.37.5は正常終了し最新ログに`DLL [OK]`がある。前回実行の最新ALLブロックは`key_count=117805`で全件loadedであり、今回の6キー実行はALLではない。
+
+修正後の6キーはすべてloadedだった。`MENU_BAR_LOAD_GAME=ロード`、`MENU_BAR_LOAD=ロード`、`MENU_BAR_QUIT=ゲーム終了`、`MENU_BAR_SAVE_GAME=セーブ`、`MENU_BAR_GAME_OPTIONS=ゲームのオプション`、`MENU_BAR_CLOSE=閉じる`。`text_l_english.yml`も今回の6キー実行でパース成功し、以前の`Key 'true' appears multiple times`は修正で解消した。
 
 残存していた`text_l_english.yml`の`Key 'true' appears multiple times in mapping`は、未クォートの`on`、`off`、`NO`、`YES`などをd-yaml 0.10.0がYAML 1.1の真偽値キーとして解決し、異なるキーを衝突させたものと確認した。`normalizeLocalizationYaml`で特殊スカラーに該当するマッピングキーだけをクォートし、BOM除去、`:0`〜`:9`変換、ヘッダー補完、通常の値を維持する最小修正を追加した。回帰テストは`true`、`false`、`null`、`YES`、`on`、`off`と6つの`MENU_BAR_*`キーを確認する。
 
-修正後の実機起動・最新ALL再確認は未実施であり、実機での再確認が必要である。実機起動、GDB、フック、インラインパッチ、open/readフックはこの作業では変更しない。
+これはYAMLロード、DLL、GDB TRACE_PREVIEW取得、EU4正常終了までの確認であり、日本語表示の実証ではない。TRACE_PREVIEWは候補CStringの`+0`データポインタと`+8`長さだけで、文字列本体は未読出し。長さはCreateTextSpriteが`7,7,13,13,18,13,6,32,32,13`、SetTextが`0,0,0,4,2,6,6,5,5,2`で、SetText文字列と翻訳キー・表示値の対応および置換可否は未確認である。実機起動、GDB、フック、インラインパッチ、open/readフックはこの作業では変更しない。
 
 ## 現在の焦点
 
