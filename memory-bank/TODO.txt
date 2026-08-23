@@ -2,9 +2,6 @@
 
 ## 最新の実機判断（2026/08/23）
 
-- [x] 静的検証 `bash -n`、GDB `/bin/true`、`git diff --check` の成功を確認した。
-- [x] DLL付きEU4 v1.37.5を翻訳ロード有効で起動し、EU4正常終了を確認した。
-- [x] `TRACE_LOCALIZE` は29行で全件 `tid=1`。Setup 1回、Initialize 2回（各入口・復帰）、ReadFolder 2回入口、Add/YmlParse 各10回入口、Reload 1回（入口・復帰）を記録した。初回はSetup→Initialize入口→Add/YmlParse→Initialize復帰→ReadFolder→補助10件、次回はReload入口→Initialize入口/復帰→ReadFolder→Reload復帰の順序だった。
 - [ ] `ReloadPdxLocalize`復帰後を遅延ロード境界候補として、localisation構築完了・再入安全性・翻訳ロード実行安全性を別途検証する。Initialize復帰単独はReadFolderが続くため完了境界としない。
 - [ ] constructorでは翻訳ロードをスキップし、候補境界で最小・一回限り・翻訳ロードのみの診断PoCを設計する。再入ガード、`tid=1`限定、失敗時のゲーム原文維持、ログマーカー、無効化可能性を要件とする。実装はまだ行わない。
 - 診断用`EU4DLL_SKIP_TRANSLATIONS=1`は既存実装で、通常動作を壊さない。
@@ -32,28 +29,14 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ## 最優先: 動的観測基盤
 
-- [x] 対象実行ファイルのパスを設定に依存させ、ソースコードの個人環境パスを除去する。
-- [x] `LD_PRELOAD`でロードされたことを確認する最小ログを用意する。
 - [ ] `open`、`openat`、`fopen`、`read`の観測方法を調査する。
-    - [x] `fopen`で`localisation`、`.yml`、フォント関連パスだけを記録するPoCを実装した。
-    - [x] ゲーム全体のI/Oを無制限に記録しない構成にした。
     - [ ] `open`、`openat`、`read`は、`fopen`だけでは不足する証拠が得られた場合に追加する。
-- [x] EU4起動時に翻訳ファイルが実際に読まれるパスとタイミングを記録する。
-    - `pattern_eu4jps.log`は`make run`の作業ディレクトリであるEU4インストール先に作成される。
-    - EU4 v1.37.5で、起動時に翻訳YAMLのロードログを確認した。
 - [ ] フォントファイルのロード有無を記録する。
 - [ ] `SDL_GL_SwapWindow`をフレーム境界の観測に利用できるか確認する。
     - [ ] 文字列引数を持たないことを前提にし、置換地点とは扱わない。
-- [x] ダミー実行ファイルで、対象限定ログ出力が起動を壊さないことを確認する。
-- [x] EU4本体でログ出力がゲーム起動を壊さないことを確認する。
-    - メニュー到達と操作可能を確認した。Steam未起動の警告は出たが、EU4dll起因のクラッシュは確認されなかった。
 
 ## 次: 既知文字列のランタイム追跡
 
-- [x] ゲーム画面に確実に表示される英語テキストを1件選ぶ。
-    - `MENU_BAR_LOAD_GAME`（英語値 `Load Game`、日本語値 `ロード`）を選択した。
-- [x] 選択したテキストのlocalisationキーと翻訳元ファイルを特定する。
-    - `submodules/EU4JPModAppendixI/source/localisation/EU4_l_english.yml` に確認済み。
 - [ ] ASCII、UTF-8、UTF-16相当の表現を候補としてメモリ上で探索する。
 - [ ] 読み取り可能なメモリ範囲だけを対象にする。
 - [ ] 候補アドレス、モジュール、オフセット、出現回数を記録する。
@@ -65,29 +48,11 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ### GDBによる安全な候補観測
 
-- [x] `tools/trace_eu4_runtime.gdb` に、表示テキスト生成候補2関数へのGDBブレークポイントと `symbol/tid/pc` だけの短い記録を追加した。
-- [x] EU4 v1.37.5の `LocalizeAddLocalization`、`LocalizeAddLocalizationYAMLBuffer`、`YmlParse`、`PdxLocalizeInitialize`、`ReloadPdxLocalize`、`CTextBox::ChangeTextBox` のシンボル存在を `readelf -Ws` で確認した。
 - [ ] 実機で対象メニューを操作し、`MENU_BAR_LOAD_GAME` の引数・文字列形式を確認する。
-    - [x] 起動時のトレースで `PdxLocalizeInitialize` 2回、`LocalizeAddLocalizationYAMLBuffer` 300回、`YmlParse` 300回、`ReloadPdxLocalize` 1回を確認した。
-    - [x] `LocalizeAddLocalizationYAMLBuffer` と `YmlParse` がlocalisation読み込み経路でヒットすることを確認した。
-     - [x] `CTextBox::ChangeTextBox` が今回のトレースでヒットしないことを確認した。
-- [x] 候補関数ごとに最大2個のCString引数アドレスだけを記録する調査用GDBスクリプトを追加した。未確認ポインタの文字列読出しは安全な可読性判定を保証できないため実装していない。
 - [ ] 調査用スクリプトで、`Load Game`、`ロード`、または対応するゲーム内文字列との一致を確認する。
-- [x] `CTextSprite::SetText` の第1 `CString`（`rdx`）だけを各5ヒットに限定し、NULL除外と長さ `1..64` の条件付きで `x/s` を一度だけ行う専用観測スクリプトを追加した。GDB標準機能では任意ポインタのreadable判定を保証できず、読出し失敗でGDB/EU4が終了し得るため、実機結果は未取得である。
-- [x] EU4 v1.37.5で `CGraphics::CreateTextSprite` 236回（全てtid=1、pc=`0x2079b00`）と `CTextSprite::SetText` 442回（全てtid=1、pc=`0x20d9da4`）の実機ヒットおよび候補CStringアドレスを観測した。
-     - `/tmp/eu4dll-text-args.log` は85135 bytes、`TRACE_ARGS` は678行で、EU4は正常終了した。
-     - 記録したのは候補CStringアドレスのみで、文字列の読み出しはしていない。ログ中に `Load Game` も `ロード` も現れない。
-     - 実機はMENU画面まで到達した。`CGraphics::CreateTextSprite` → `CTextSprite::SetText` はMENU画面で頻繁に通る表示生成経路候補として記録するが、既知キーとの直接対応とは断定しない。
-     - CString構造、各レジスタ候補の正しさ、文字列形式・寿命、呼び出し元と表示値の対応は未確認である。
-- [x] 表示時の `CTextBox::UpdateTextSprite()` / `CTextBox::ChangeString(CString const&, FontFormatting, bool)` が今回のMENU画面操作で0ヒットであることを確認した。
-    - breakpointはそれぞれ `0x20d3a34`、`0x20d3b6c` に正常設定され、EU4は正常終了した。
-    - したがって、これらは今回のMENU表示経路の候補から外し、成功扱いにしない。
 - [ ] ヒットした表示更新候補について、呼び出し元、引数の意味、文字列の寿命、呼び出しスレッドを記録する。
     - 主要ヒットはtid=1で、`PdxLocalizeSetup`→`PdxLocalizeReadFolder`→`ReadLocalizationFileHelper`→`LocalizeAddLocalizationYAMLBuffer`→`YmlParse`の順だった。
      - `rsi`はYAMLバッファ長とみられる値、`rdx`は共通のlocalisationデータ領域とみられるが、型・寿命は未確定。
-- [x] CString ABIのデータポインタ候補を静的に確認した。`CString::CString(char const*)`、`CString::operator==`、`CTextSprite::SetText`、`CGraphics::CreateTextSprite` の逆アセンブルから、CString先頭（`+0`）にchar*相当のデータポインタ、`+8`に長さがある候補を記録した。
-- [x] GDB標準機能で少数の引数メタデータだけを観測する別調査スクリプトを追加した。各関数の最初の最大10ヒットについて、NULLでないCStringオブジェクトの `+0` データポインタ候補と `+8` 長さ候補だけを記録する。任意ポインタのreadable判定を安全に保証できないため、文字列表示は行わない。`Load Game`/`ロード`との一致、`MENU_BAR_LOAD_GAME`との対応は未確認である。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは禁止する。
-- [x] 実機でCStringメタデータを限定観測した。`/tmp/eu4dll-text-preview.log` は10612 bytesで、EU4 v1.37.5は正常終了しMENU画面まで到達した。`CGraphics::CreateTextSprite` の最初の最大10ヒットは、NULLでない `rsi` CStringについて `+0` データポインタ候補が全件非NULL、`+8` 長さが `7,7,13,13,18,13,6,32,32,13` だった。`CTextSprite::SetText` の最初の最大10ヒットも、NULLでない `rdx` CStringについて `+0` データポインタ候補が全件非NULL、`+8` 長さが `0,0,0,4,2,6,6,5,5,2` だった。文字列本体は読み出していないため、`Load Game`/`ロード`との一致、`MENU_BAR_LOAD_GAME`との直接対応、引数の意味、寿命は未確認である。これは `CString +0` がデータポインタ、`+8` が長さという静的根拠と整合するメタデータを得たことに限り、既知キー対応や文字列内容の成功とは扱わない。次は文字列読出しを急がず、今回のデータポインタと長さの組を静的に検討し、必要なら安全条件を明示した単一候補・単一ヒットの観測を設計する。全 `PdxLocalize` 一括、`open`/`read` フック、インラインパッチは禁止する。
 
 ## 観測結果（2026/08/22）
 
@@ -156,8 +121,6 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ## 検証
 
-- [x] `make test`を実行する。
-- [x] `make all`を実行する。
 - [ ] LD_PRELOADによる最小ロードPoCを実行する。
 - [ ] 1件の文字列置換PoCを実機で確認する。
 - [ ] 対象外のゲーム起動、メニュー、入力、保存処理に影響がないことを確認する。
