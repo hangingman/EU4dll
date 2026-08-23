@@ -27,14 +27,6 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 - リポジトリには、LD_PRELOAD、AOBスキャン、`mprotect`、`ScopedPatch`、Linux向けパッチ処理がある。
 - `make test`によるD言語ユニットテストがある。
 
-## 最優先: 動的観測基盤
-
-- [ ] `open`、`openat`、`fopen`、`read`の観測方法を調査する。
-    - [ ] `open`、`openat`、`read`は、`fopen`だけでは不足する証拠が得られた場合に追加する。
-- [ ] フォントファイルのロード有無を記録する。
-- [ ] `SDL_GL_SwapWindow`をフレーム境界の観測に利用できるか確認する。
-    - [ ] 文字列引数を持たないことを前提にし、置換地点とは扱わない。
-
 ## 次: 既知文字列のランタイム追跡
 
 - [ ] ASCII、UTF-8、UTF-16相当の表現を候補としてメモリ上で探索する。
@@ -48,11 +40,12 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ### GDBによる安全な候補観測
 
-- [ ] 実機で対象メニューを操作し、`MENU_BAR_LOAD_GAME` の引数・文字列形式を確認する。
-- [ ] 調査用スクリプトで、`Load Game`、`ロード`、または対応するゲーム内文字列との一致を確認する。
-- [ ] ヒットした表示更新候補について、呼び出し元、引数の意味、文字列の寿命、呼び出しスレッドを記録する。
-    - 主要ヒットはtid=1で、`PdxLocalizeSetup`→`PdxLocalizeReadFolder`→`ReadLocalizationFileHelper`→`LocalizeAddLocalizationYAMLBuffer`→`YmlParse`の順だった。
-     - `rsi`はYAMLバッファ長とみられる値、`rdx`は共通のlocalisationデータ領域とみられるが、型・寿命は未確定。
+- [ ] `CTextSprite::SetText` の第1 `CString`を対象に、長さ・NULL・書込み可能性を確認する。
+- [ ] 対象文字列が一致した場合だけ、固定長の一時バッファへPoC用の置換文字列をコピーする。
+- [ ] 置換前後のバイト列、長さ、ヒット数、tidを限定ログへ記録する。
+- [ ] 置換対象外、NULL、長さ不正、バッファ不足、想定外エンコーディングでは原文を維持する。
+- [ ] `SetText`の呼出規約・CString所有権・寿命を確認し、ゲーム本体のバッファを直接破壊しない。
+- [ ] 実機で1件の置換結果、EU4の継続操作、終了時の復元・クラッシュ有無を確認する。
 
 ## 観測結果（2026/08/22）
 
@@ -105,7 +98,7 @@ FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できる
 
 ## 保留
 
-- SetText実引数の同定・辞書照合、SetText置換PoC、AOB、トランポリン、Open/read、全`PdxLocalize`一括、Windows流用は保留する。
+- SetTextの全面対応、AOB、トランポリン、全`PdxLocalize`一括、Windows流用は保留する。
 - 未確認の表示経路・文字列対応・寿命・所有権を成功扱いしない。ソースコードは変更しない。
 
 ## フック方式の判断
