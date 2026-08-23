@@ -3,6 +3,7 @@ module plugin.dllmain;
 import std.logger; // std.logger全体をインポート
 import std.stdio;
 import core.stdc.stdlib;
+import core.sys.posix.unistd : write;
 import std.process;
 import plugin.byte_pattern;
 import plugin.constant; // RunOptionsを使うので必要
@@ -42,12 +43,17 @@ void hijack()
     }
     else
     {
+        enum msg = "[DIAGNOSTIC-RAW] crt_constructor entered\n";
+        write(2, msg.ptr, msg.length);
         hijackProcess();
     }
 }
 
 void hijackProcess()
 {
+    enum msg = "[DIAGNOSTIC-RAW] hijackProcess entered\n";
+    write(2, msg.ptr, msg.length);
+
     // std.logger の設定
     // ログファイルへの出力設定
     // sharedLog に FileLogger を設定

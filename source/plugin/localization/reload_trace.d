@@ -17,7 +17,7 @@ private __gshared ubyte[8] reloadOriginalBytes;
 
 private bool fitsRel32(void* fromAddress, void* toAddress)
 {
-    auto distance = cast(long) toAddress - (cast(long) fromAddress + CallPatchLength);
+    auto distance = cast(long) toAddress - (cast(long) fromAddress + cast(long) CallPatchLength);
     return distance >= -2147483648L && distance <= 2147483647L;
 }
 
@@ -26,7 +26,7 @@ private void* makeEntryTrampoline(void* nearAddress, void* callback)
     auto pageSize = 4096UL;
     auto hint = cast(void*)(cast(size_t) nearAddress & ~(pageSize - 1));
     auto memory = mmap(hint, 16, PROT_READ | PROT_WRITE | PROT_EXEC,
-        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
     enforce(memory !is MAP_FAILED, "mmap for ReloadPdxLocalize entry trampoline failed");
 
     auto code = cast(ubyte*) memory;
@@ -92,7 +92,13 @@ void initReloadTrace(EU4Ver eu4Version)
         return;
 
     auto entry = makeEntryTrampoline(target, cast(void*) &reloadTraceCallback);
-    if (!fitsRel32(target, entry))
+    auto targetAddress = cast(size_t) target;
+    auto entryAddress = cast(size_t) entry;
+    auto distance = cast(long) entryAddress - (cast(long) targetAddress + CallPatchLength);
+    auto fits = fitsRel32(target, entry);
+    log(LogLevel.info, format("[DIAGNOSTIC] ReloadPdxLocalize trampoline target=0x%x entry=0x%x distance=%d fits=%s",
+        targetAddress, entryAddress, distance, fits ? "true" : "false"));
+    if (!fits)
     {
         log(LogLevel.error, "[DIAGNOSTIC] ReloadPdxLocalize entry exceeds rel32");
         return;
