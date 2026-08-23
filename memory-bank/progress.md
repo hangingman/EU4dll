@@ -1,5 +1,13 @@
 # Progress
 
+## ReloadPdxLocalize hook診断（2026/08/23）
+
+- EU4 v1.37.5 Linux版はELF64 `EXEC`（非PIE）。13バイトAOBを1件検出し、targetは`0x1fefa3a`だった。
+- `mmap`のhint任せによるentry配置と、`size_t CallPatchLength`混在によるsigned/unsigned比較を切り分けた。`fitsRel32()`で`CallPatchLength`を`long`へ明示変換し、entry側には`MAP_32BIT`を使用した。
+- 実機ログで`target=0x1fefa3a entry=0x40afa000 distance=1051764161 fits=true`、`hook installed`、`ReloadPdxLocalize call enter`、`call return result=true`を確認した。GDBなし直接起動でEU4は正常終了した。
+- constructor入口と`hijackProcess()`入口にD runtime/std.logger非依存のstderr raw markerを追加し、DLLロード後の到達を確認した。`std.logger`のFileLoggerも今回起動で出力された。
+- 次はconstructor内の`loadTranslationMods()`を遅延し、`ReloadPdxLocalize`後の一回限り実行を診断専用PoCとして設計する。再入、実行スレッド、失敗時の原文維持、無効化スイッチを要件とする。SetText置換は保留する。
+
 ## localisation境界の実機観測（2026/08/23）
 
 - 静的検証 `bash -n`、GDB `/bin/true`、`git diff --check` は成功した。

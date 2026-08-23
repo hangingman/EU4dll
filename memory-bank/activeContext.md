@@ -2,7 +2,7 @@
 
 ## 現在の焦点
 
-EU4 v1.37.5 Linux版で、DLL側の`ReloadPdxLocalize` hookログが確認できていない原因を特定し、最短でhook成功へ到達する。
+`ReloadPdxLocalize` hook成功後の次段階として、constructorで翻訳ロードを行わず、localisation初期化後に一回だけ安全に翻訳ロードするPoCを設計する。
 
 ## 確定事項
 
@@ -15,33 +15,22 @@ EU4 v1.37.5 Linux版で、DLL側の`ReloadPdxLocalize` hookログが確認でき
 - 最新ビルドを作成してEU4側へコピーしたが、DLL側のhook installed/callbackログはまだ確認できていない。
 - 実機のログ出力先はEU4インストールディレクトリの`pattern_eu4jps.log`。GDBログとは別物である。
 
-## 原因候補の優先順位
+## 原因候補の優先順位（KT法・検証チェックリスト）
 
-1. **実行対象DLLの不一致**
-   - `make all`で生成した`libeu4dll.so`、EU4インストール先へコピーしたDLL、wrapperが`EU4_DLL`で指定するDLLを同一視できていない。
-   - 起動前にサイズ・更新時刻・SHA-256を3箇所で比較する。
+- [x] **1. 実行対象DLLの不一致** — `make all`後の生成物とEU4側コピーはサイズ・更新時刻・SHA-256を比較済み。同一SHA-256（`ddde53...4bc3`）。wrapperの既定値もリポジトリ`libeu4dll.so`を絶対化して使用する。
+- [x] **2. PIE/relocationによるアドレス基準の誤り** — `readelf -h`でEU4は`Type: EXEC`。PIEではなくload biasは0。AOB結果`0x1fefa3a`は実行時対象アドレスとして妥当。`BytePattern`はELF virtual addressを返すが、このバイナリでは追加加算不要。
+- [x] **3. AOB検索範囲・パターンの誤り** — `.text`/`.rodata`を走査し、13バイトAOBは1件、`0x1fefa3a`を検出。version判定も`v1_37_5`。
+- [x] **4. rel32範囲超過** — 2026/08/23 18:31の実機ログで`target=0x1fefa3a entry=0x40afa000 distance=1051764161 fits=true`、`hook installed`、`call enter`、`call return result=true`を確認。原因は`CallPatchLength`（`size_t`）混在によるunsigned比較。`fitsRel32()`で`CallPatchLength`を`long`へ明示変換して解消した。`MAP_32BIT`は維持し、絶対JMP化は不要。
+- [x] **5. ログ出力先・時刻の取り違え** — stderr raw markerとEU4側`pattern_eu4jps.log`の今回起動分を同時に確認できた。`LD_DEBUG=libs`でも`./libeu4dll.so`のロード/initを確認済み。空白を含む絶対`LD_PRELOAD`値は動的リンカーが分割するため不可（`Europa`/`Universalis`/`IV/libeu4dll.so`）。
+- [x] **6. GDBブレークポイントとの干渉** — `entry exceeds rel32`はGDBなしの直接起動でも記録されており、今回の主因ではない。成功確認時は引き続き対象関数へGDB breakpointを置かない。
 
-2. **PIE/relocationによるアドレス基準の誤り**
-   - EU4の静的ELFアドレス`0x1fefa3a`と、実行時の`dlpi_addr + p_vaddr`を区別する必要がある。
-   - `BytePattern`がELFのvirtual addressをそのまま返している場合、PIEでは実行時アドレスにならない。
-   - `readelf -h`のType、`dl_iterate_phdr`の`dlpi_addr`、AOB結果の実行時アドレスを比較する。
+### Gemini助言の追記・検証結果
 
-3. **AOB検索範囲・パターンの誤り**
-   - `BytePattern`は`.text`/`.rodata`のELF virtual addressを検索結果へ格納する。
-   - 13バイトパターンの一致数と、実行時対象アドレスが一致するかをログで確認する。
-
-4. **rel32範囲超過**
-   - `mmap`のhintは配置を保証しない。
-   - trampoline配置先と`target → entry`距離をログへ出し、signed 32-bit範囲を確認する。
-   - 範囲外なら近距離stubまたは絶対間接JMPを使う。
-
-5. **ログ出力先・時刻の取り違え**
-   - GDBの`TRACE_LOCALIZE`、`/tmp`のteeログ、EU4側`pattern_eu4jps.log`を混同しない。
-   - 最新起動時刻以降のログだけを`strings`またはバイナリ対応処理で確認する。
-
-6. **GDBブレークポイントとの干渉**
-   - GDBはEU4本体へ直接breakpointを置き、DLLは同じ本体アドレスを書き換える。
-   - DLL hook確認時は、`ReloadPdxLocalize`へGDB breakpointを置かず、GDBは`main`またはconstructor後の観測だけに限定する。
+- [x] stderrへのraw constructor marker提案 — `dllmain.d`へD runtime/std.logger非依存の固定`write(2,...)`を追加済み。constructor入口と`hijackProcess()`入口を分離観測する。
+- [x] GDBなし直接起動提案 — 実施済み。EU4はexit 0だが、旧ビルドではrel32エラーを確認できた。
+- [x] PIE/relocation確認提案 — `EXEC`確認により今回の原因から除外。
+- [x] AOB一致数・target・trampoline・距離の記録提案 — `reload_trace.d`へtarget/entry/distance/fitsを1行で記録する診断ログを追加済み。次回実機起動で実値を確認する。
+- [ ] `snprintf`を使う可変長raw logger提案 — 未採用。未検証のvarargs実装を増やさず、必要なら固定メッセージの`write(2,...)`だけを使う。
 
 ## 最短の診断手順
 
@@ -109,3 +98,6 @@ source/plugin/localization/reload_trace.dは未コミットの診断実装であ
 - GDBによる本体関数観測は成功。
 - EU4は過去の実機起動で正常終了。
 - `dllmain.d`と`reload_trace.d`の実装状態は`git status`で確認する。
+- 2026/08/23の修正版直接起動は、相対`LD_PRELOAD=./libeu4dll.so`で実施。EU4は停止後プロセス終了を確認したが、ログファイル差分は0 bytes。`LD_DEBUG=libs`ではDLLのロードとinit呼び出しを確認した。
+- 次回実機確認では`/tmp/eu4dll-direct-current.log`から`[DIAGNOSTIC-RAW] crt_constructor entered`と`[DIAGNOSTIC-RAW] hijackProcess entered`を抽出する。前者のみならD runtime/logger初期化境界で停止、両方ならFileLogger以降の問題に絞る。
+- 2026/08/23 18:31の直接起動で、`fits=true`、`hook installed`、`call enter`、`call return result=true`を確認。ReloadPdxLocalize hook診断は完了した。
