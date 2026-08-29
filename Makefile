@@ -12,7 +12,7 @@ help: ## Show this help.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\x1b[36m%-20s\x1b[0m %s\n", $$1, $$2}'
 
 all: ## Build the project using dub.
-	dub build --compiler=ldc2
+	dub build --force --compiler=ldc2
 
 test: ## Run unit tests for the project.
 	dub build --build=unittest --compiler=ldc2

@@ -29,6 +29,14 @@ if [ ! -f "$eu4_dll" ]; then
     exit 1
 fi
 
+# Prevent a unittest/incremental artifact from reaching EU4.  The normal
+# constructor must be present before any game process is started.
+if ! LC_ALL=C strings "$eu4_dll" | grep -Fq '[DIAGNOSTIC-RAW] crt_constructor entered' || \
+   ! LC_ALL=C strings "$eu4_dll" | grep -Fq '[DIAGNOSTIC-RAW] hijackProcess entered'; then
+    printf 'error: DLL is not a verified normal build; run make all first\n' >&2
+    exit 1
+fi
+
 if [ ! -f "$trace_gdb" ]; then
     printf 'error: GDB script not found: %s\n' "$trace_gdb" >&2
     exit 1

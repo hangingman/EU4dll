@@ -21,11 +21,32 @@
 
 ## 次の作業（優先順）
 
-1. CStringの所有権・容量・寿命を確認する。確認できるまで可変長置換を実装しない。
+1. CStringの所有権・容量・寿命を追加観測する。確認できるまで可変長置換を実装しない。
 2. 置換ログにmapping id、対象長、成功/skip理由を追加し、各マッピングの実行結果を個別に追跡できるようにする。
 3. EU4バージョン更新時に、AOBの一意性・17バイトの命令境界・絶対JMPを再検証する。
 4. 対象外のゲーム操作で影響がないことを確認する。
 5. `translationMap`のキーとSetText実引数の対応を確認できた場合のみ、環境変数probeから翻訳辞書連携へ進む。
+
+## 可変長CString置換調査（2026/08/29）
+
+- EU4 v1.37.5の`CString`は、少なくとも`+0=data pointer`、`+8=length`の`std::string`互換レイアウトと整合する。`CString(char const*)`は`std::string`コンストラクタへ転送し、初期化時に`+0`を`this+0x10`、`+8`を0、`+0x10`を0にする。
+- `+0x10`はlibstdc++の`std::string`におけるSBO領域またはcapacity unionとみられるが、CString固有のcapacity値・アロケータ・所有権・デストラクタ契約は本調査では証明できない。SBOの有無も確定扱いしない。
+- `CTextSprite::SetText`（`0x20d9da4`）は入力第1CString（`rdx`）の`+0`を読み、`strlen`後、`std::string::_M_replace`へ渡して`this+0x220`へコピーする。入力CStringオブジェクト自体のpointer/lengthは書き換えない。
+- 分類: 元データへ直接書けるのは、既存の同一バイト長PoCのように書込可否と終端を実測でき、共有・const・寿命の問題を別途排除できる場合だけ。ただし所有権は未証明なので一般化禁止。
+- 新規バッファ差し替えは、所有権を渡さないTLS上の一時CStringビューとして実験した。正規CStringコンストラクタ/destructorは呼ばず、SetText実行期間だけ`data`と`length`を保持した。実験終了後、恒久コードからは削除した。
+- `EU4DLL_SETTEXT_VARIABLE_PROBE=1`の1ケース実験で最大16バイトreplacementを扱った。ASCII可変長は成功したが、日本語UTF-8は文字化けしたため、元の同一長PoCへ戻した。capacity推測と任意アドレス探索は行っていない。
+- `Back=戻る`の可変長置換は、この診断PoCの実機結果（DLLログ、GDBログ、UI反映、クラッシュなし）を分離確認するまで成功扱いにしない。
+- 実機結果（2026/08/29）: constructor/hook設置、`Back`一致、`VARIABLE_VIEW_READY` 9件、EU4正常終了を確認したが、UIは日本語バイト列を文字化け表示した。SetText実行期間のpointer差し替えは通過した一方、UTF-8バイト列を直接渡すだけでは表示形式を満たさない。
+- 追加実機結果（2026/08/29）: `Back=Go Back`（replacement length 7）は`VARIABLE_VIEW_READY` 9件、UI表示成功、EU4正常終了、SIGSEGV/SIGBUSなし。可変長差し替えの制御経路・寿命はASCIIで再確認できた。
+- よって次は可変長機構を変更せず、既存の日本語表示成功箇所のSetText生バイト列を限定観測し、UTF-8以外の形式または後段変換の有無を調べる。
+- 追加実機観測（2026/08/29）: `rdx`・`rcx`・`r8`を対象に、終端NULとlength 1..64を検証して非ASCII列を最大64件探索したが、該当は0件だった。今回の操作では`ロード`のUTF-8列も独自高ビット列もSetText候補3引数には現れていない。
+- Back限定再観測（2026/08/29）: `Back=戻る`で`VARIABLE_VIEW_READY source_length=4 replacement_length=6`を9件確認し、EU4は正常終了した。UIは再び文字化け。元CString一致と一時ビュー生成は確認済みだが、表示可能な日本語入力形式は未同定。
+- 旧C++版確認（git履歴 `c649f5c^`）: `Plugin64/injector.hpp`はメモリ保護・相対/絶対JMP/CALLのみで、ASCII/UTF-8切替は扱わない。一方、`Plugin64/escape_tool.cpp`は`MultiByteToWideChar(CP_UTF8)`→UCS2→Clausewitz用escaped textへ変換し、`ParadoxTextObject`（inline text[0x10]/pointer union + len + len2）を構成する。
+- 旧C++版の`Font::Init`はcode point上限、font buffer clear/拡張、font size limitをpatchし、`dll_main.cpp`は`Font::Init`と`Input::Init`を呼んでいた。従って日本語表示は単純なCStringフラグではなく、UTF-8→escaped表現変換とフォント側拡張の組合せである可能性が高い。Linuxへ未検証移植しない。
+- これは「日本語がASCII相当の内部形式である」「別の描画経路を通る」「観測した操作で日本語表示経路に到達していない」の切り分けを未完了とする結果であり、UTF-8方式の否定証明ではない。次はCreateTextSprite側または日本語表示を確実に再現する入口を同じ安全条件で観測する。
+- 再発防止: `make all`を`dub build --force`へ変更し、EU4起動wrapperで通常版constructor markerを`strings`検査する。検査失敗時はEU4を起動しない。
+- SetText本体の逆アセンブルで「入力CStringからSetText内部std::stringへの即時コピー」は確認できたが、それは入力CStringの差し替え安全性や所有権を証明しない。
+- 追加観測が必要なのは、実機で同一CStringオブジェクトの`+0/+8/+0x10`をconstructor・copy/move・destructor・SetText入口/復帰で追跡し、長短文字列のallocation/freeと呼出し間の寿命を対応付けること。現時点で実機パッチは行わない。
 
 ## 保留
 
