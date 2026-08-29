@@ -1,142 +1,53 @@
 # EU4dll 開発 TODO
 
-## 最新の実機判断（2026/08/29）
+## 最新状態（2026/08/29）
 
-- `ReloadPdxLocalize` は辞書再構築後に既存UIを更新しなかったため、表示更新フックの候補から外す。
-- `CTextSprite::SetText` のnative probeは、明示的opt-in・同一バイト長マッピング・Linux v1.37.5限定で実装済み。
-- `Back=Home` と `Connect to ID=Connect to JP` のnative置換および`Back → Home`のUI反映を実機で確認した。
+- Linux x86-64版EU4 v1.37.5を対象とする。
+- `ReloadPdxLocalize` は辞書を再構築するが、生成済みUIを更新しなかった。表示更新フックの候補から外す。
+- `CTextSprite::SetText` の第1`CString`（`rdx`）をnative hookするPoCを実装済み。
+- `Back=Home` と `Connect to ID=Connect to JP` の同一長置換を実機で確認した。`Back → Home`のUI反映、EU4正常終了も確認済み。
+- 変更は明示的な`EU4DLL_SETTEXT_PROBE=1`が必要で、Linux・v1.37.5に限定している。
+- 旧C++版`Plugin64/injector.hpp`のfar jump実装を確認済み。近距離は5バイト`E9 rel32`、遠距離は14バイトの絶対間接JMPを使用していた。Linux版PoCも後者を採用する。
 
-## 方針
+## 現在の実装
 
-Linux版EU4の文字列置換は、Ghidraによる静的解析を出発点にしない。
-実行時の観測で文字列のロード・生成・受け渡し経路を絞り込み、必要な候補だけを静的解析する。
+- 対象AOBは`CTextSprite::SetText`固有の命令列に限定し、複数一致時は停止する。
+- 先頭17バイトを完全な命令境界でtrampolineへ退避する。
+- 14バイト絶対JMP＋3バイトNOPでhookする。
+- probe stubは引数レジスタを保存し、SysV x86-64のスタックアラインメントを維持して元処理へ復帰する。
+- `CString`のNULL、ポインタ、負数・過大長、終端NUL、read/write結果を検証する。
+- 置換は明示マッピング・同一UTF-8バイト長に限定し、再入を防止する。
+- `make test`、`make all`、`git diff --check`は成功済み。
 
-Windows版とLinux版は、同じフックアドレスや命令列を共有しない。
-共有するのは翻訳辞書、置換ルール、ログ形式、検証項目とする。
+## 次の作業（優先順）
 
-FreeType/HarfBuzzを前提にしない。実機調査で利用が確認できるまで、これらへのフック実装は作らない。
-
-## 現在確認済みの事実
-
-- 対象はLinux x86-64版のEU4。
-- EU4は動的リンクELFで、`SDL_*`シンボルを本体内に保持している。
-- `SDL_Init`、`SDL_GL_SwapWindow`、`SDL_RenderCopy`などを確認済み。
-- `libfreetype`、`libharfbuzz`への依存は確認できない。
-- `FT_*`、`hb_*`シンボルは確認できない。
-- OpenGLは利用しているが、描画APIは文字列置換の第一候補にしない。
-- リポジトリには、LD_PRELOAD、AOBスキャン、`mprotect`、`ScopedPatch`、Linux向けパッチ処理がある。
-- `make test`によるD言語ユニットテストがある。
-
-## 次: 既知文字列のランタイム追跡
-
-- [ ] ASCII、UTF-8、UTF-16相当の表現を候補としてメモリ上で探索する。
-- [ ] 読み取り可能なメモリ範囲だけを対象にする。
-- [ ] 候補アドレス、モジュール、オフセット、出現回数を記録する。
-- [ ] GDBまたは同等の動的手段で、候補文字列を読み取る命令と呼び出し元を特定する。
-- [ ] 文字列が静的データか、実行時に生成されたデータかを区別する。
-- [ ] 1件の文字列について、ロードから描画準備までの経路を記録する。
-
-次の一手は翻訳辞書から候補文字列を選ぶことではなく、SetTextで実際に渡される文字列と翻訳済み表示値の対応を安全に確認する方法の設計である。無条件の文字列読出し、全ヒット読出し、フック、パッチは行わない。
-
-### SetText置換PoC（実装・実機確認済み）
-
-- [x] `CTextSprite::SetText` の第1 `CString`を対象に、長さ・NULL・終端・read/write結果を検証する。
-- [x] 同一UTF-8バイト長の明示マッピングだけを対象にする。
-- [x] 絶対JMP、完全命令境界、ABI保存stub、再入ガードを実装する。
-- [x] 実機で置換記録、UI反映、EU4正常終了を確認する。
-
-## 観測結果（2026/08/22）
-
-- 修正後実機確認は、`TRACE_GDB="$PWD/tools/trace_eu4_text_preview.gdb" ./tools/trace_eu4_text_with_dll.sh`で実施した。`/tmp/eu4dll-all-key-preview-fixed2.log`は8009 bytesで、GDB wrapperのエラーはなく、`TRACE_PREVIEW`は20行（CreateTextSprite 10、SetText 10）だった。EU4 v1.37.5は正常終了し、最新ログに`DLL [OK]`がある。
-- 修正後の6キーはすべてloadedだった。`MENU_BAR_LOAD_GAME=ロード`、`MENU_BAR_LOAD=ロード`、`MENU_BAR_QUIT=ゲーム終了`、`MENU_BAR_SAVE_GAME=セーブ`、`MENU_BAR_GAME_OPTIONS=ゲームのオプション`、`MENU_BAR_CLOSE=閉じる`。最新ALLブロックは前回実行の`key_count=117805`で全件loadedだが、今回の6キー実行はALLではない。
-- `text_l_english.yml`は今回の6キー実行でパース成功し、上記3キーがloadedになった。以前の`Key 'true' appears multiple times`は修正で解消したと記録する。ただしこれはYAMLロードと辞書観測の確認であり、実際に日本語表示されたことの証明ではない。
-- `TRACE_PREVIEW`は候補CStringの`+0`データポインタと`+8`長さだけを記録し、文字列本体は読み出していない。長さはCreateTextSpriteが`7,7,13,13,18,13,6,32,32,13`、SetTextが`0,0,0,4,2,6,6,5,5,2`で、SetText文字列と翻訳キー・表示値の対応および置換可否は未確認である。
-
-- 最新実機ALL観測（2026-08-22 21:53:18付近）は`key_count=117805`で、全件loaded/missing=0だった。`MENU_BAR_LOAD_GAME`、`MENU_BAR_LOAD`、`MENU_BAR_QUIT`は最新ALLブロックにloadedで存在した。`MENU_BAR_SAVE_GAME`、`MENU_BAR_GAME_OPTIONS`、`MENU_BAR_CLOSE`は最新ALLブロックに存在しなかった。
-- 修正版DLLの実機起動（21:53:19付近）はGDB wrapperからEU4 v1.37.5が正常起動し、`DLL [OK]`を確認した。ただし今回のYAMLキー修正はこの実機結果の後であり、修正後の実機再確認は必要である。
-- `text_l_english.yml`は実機ログで`Key 'true' appears multiple times in mapping`によりファイル単位でスキップされた。実ファイルの未クォート`on`、`off`、`NO`、`YES`などをd-yaml 0.10.0（YAML 1.1）の特殊スカラー解決が真偽値キーとして扱うため、異なるEU4キーが衝突する。前処理で特殊語のキー位置だけをクォートする修正を実装した。
-
-- `loadTranslationMods()` 完了時に `MENU_BAR_LOAD_GAME` だけを直接照会し、loaded/missing と値を1行記録する観測を追加した。
-- `EU4DLL_TRANSLATION_OBSERVATION_KEYS` で既存`translationMap`から複数の観測対象キーを選択できるようにした。未設定時は`MENU_BAR_LOAD_GAME`のみを対象とする。辞書ロード結果であり、実機表示の証拠とは扱わない。
-- `EU4DLL_TRANSLATION_OBSERVATION_KEYS=ALL` でロード済み`translationMap`の全キーを辞書順に観測できるようにした。件数と各キーの loaded/missing/value を記録するためログが大きくなり得る。これは辞書ロード後の直接観測であり、ゲーム本体のフック、実機表示、`SetText`引数との対応証拠ではない。以前に複数指定した6キーがmissingになった現象は未解決で、ALL指定だけで原因が解決するとは断定しない。
-- 実機ALL観測は`key_count=6923`、全件loaded/missing=0だった。欠落した6キーは`EU4_l_english.yml`（3件）と`text_l_english.yml`（3件）に実在し、後者はロード時に`Mapping values are not allowed here`等でファイル単位スキップされていた。両ファイルはUTF-8 BOM付きで、EU4形式の`:1`〜`:3`も含むため、`:0 "`だけの変換では不十分だった。
-- `mod.d`でBOMを除去し、`:0`〜`:9`の数値localisation suffixをYAMLの`: `へ変換してから`l_english:`を補完するよう修正した。最小テストでBOM・ヘッダー補完・6つの`MENU_BAR_*`キーのtranslationMap登録を確認した。実機再確認は未実施。
-- `translationMap` のロードと既知キーの値はユニットテストで確認できる。これはゲーム本体の表示経路を確認するものではない。
-- `LocalizeAddLocalization`、`YmlParse`、`PdxLocalize` 系、`CTextBox` の安全なLinux v1.37.5呼び出し境界は未確認であり、シンボルフックやインラインパッチは追加していない。
-- `readelf -Ws` では上記候補シンボルの存在を確認した。これは実行時の呼び出し経路、引数、文字列形式を確認したものではない。
-- `tools/trace_eu4_runtime.sh` はGDBブレークポイントのみを設定し、EU4本体へパッチを適用しない。実機でlocalisation読み込み経路の追跡結果を取得した。
-- `runtime-trace.log`では表示時の `PdxLocalize` 実体や `CTextBox::ChangeTextBox` のヒットは確認できず、今回の短いTRACEでも `MENU_BAR_LOAD_GAME` との直接対応は未確定である。
-- 前回の候補 `CTextBuffer::ChangeString()` / `CTextBox::ChangeString(CString const&)` は、`/tmp/eu4dll-candidate-trace.log`（9484 bytes）でTRACE 0件だった。GDB breakpointはそれぞれ `0x20d8c7e` / `0x20d3a9a` に設定できたが、今回の起動・操作では呼ばれず、表示経路は未確定のままである。
-- 前回の表示更新候補は `CTextBox::UpdateTextSprite()` と `CTextBox::ChangeString(CString const&, FontFormatting, bool)` の2つに限定していた。前者は `CTextBox`内spriteへの仮想dispatch、後者は `CString` の比較・コピー後にsprite更新系dispatchを行う命令列を `objdump -dC` で確認した。
-- 現在のGDB補助は新しい2候補のみを停止し、各ヒットで `symbol/tid/pc` の1行だけを出力する。既存のlocalisation読み込み300回ログと全レジスタ・バックトレース出力は廃止した。
-- 新候補は `CTextSprite::SetText(...)`（`0x20d9da4`, 2151 bytes）と `CGraphics::CreateTextSprite(...)`（`0x2079b00`, 443 bytes）に更新した。前者は文字列を内部バッファへコピーしてフォント・テクスチャ処理と頂点再計算を行い、後者はスプライト生成後にテキスト設定の仮想関数へ引数を渡す。今回の実機TRACEでは前者442回、後者236回のヒットを確認したが、`MENU_BAR_LOAD_GAME`との直接対応、引数、文字列形式、寿命は未確認である。
-- `CTextBox::UpdateTextSprite()` と `CTextBox::ChangeString(CString const&, FontFormatting, bool)` は、実機TRACE 0件のため候補から除外した。
-- `MENU_BAR_LOAD_GAME` のASCII/UTF-8/UTF-16相当ポインタを安全に読める根拠は未確認のため、未確認アドレスの大量 `x/s` は実施していない。
-- 未確認事項は、既知キーがゲーム内部で保持される形式、表示時の受け渡し関数、呼び出しスレッド、候補文字列のメモリアドレスである。
-- 次に実機を再度止める必要がある場合も、候補2関数のTRACEで未確認ポインタを無条件に読む処理は追加せず、まず静的解析または安全な条件付き観測方法を検討する。全 `PdxLocalize` テンプレート一括フック、`open`/`read` フック、インラインパッチは行わない。
-- `/proc/<pid>/maps` を利用する外部監視はGDBバッチスクリプトだけでは完結せず、現時点の置換候補絞り込みにも不可欠でないため追加しない。文字列一致が必要になった場合だけ、単一候補・単一ヒットの別プロセス監視を安全条件とともに再評価する。
-- `ReloadPdxLocalize` のフックコールバック通過と復帰は実機で確認できたが、既存UIの表示は更新されなかった。localisation辞書の再構築だけでは生成済みUI要素へ反映されない可能性が高く、表示更新境界の証拠とは扱わない。
-- `CTextSprite::SetText` のネイティブprobeを絶対JMP方式へ変更し、誤検出していた汎用push列を実関数固有のAOBへ絞った。実機ログで `SetText probe installed` と `SetText replacement applied` 2件、EU4正常終了を確認し、`Back=Home` のUI反映も確認できた。`Connect to ID=Connect to JP` も同時にnative置換されたと判断する。
-
-## 次: 置換地点の選定
-
-- [ ] localization key検索地点を候補にする。
-- [ ] 内部文字列化・コピー地点を候補にする。
-- [ ] グリフID配列への変換地点を候補にする。
-- [ ] `SDL_RenderCopy`、OpenGL、フレーム交換は原則として候補から除外する。
-- [ ] 候補関数の呼び出し頻度、引数、文字列の寿命、スレッドを確認する。
-- [ ] 置換に必要な最小限の候補関数を1つに絞る。
-- [ ] 候補関数をGhidra、`readelf`、`objdump`、GDBで解析する。
-- [ ] Linux版専用の命令境界、呼び出し規約、レジスタ引数を確定する。
-
-## 現行の次作業
-
-- [ ] CStringの所有権・容量・寿命を確認し、可変長置換の可否を判断する。
-- [ ] EU4バージョン更新時にAOB一意性・命令境界・絶対JMPを再検証する。
-- [ ] 必要なら置換ログへmapping idを追加する。
+1. CStringの所有権・容量・寿命を確認する。確認できるまで可変長置換を実装しない。
+2. 置換ログにmapping id、対象長、成功/skip理由を追加し、各マッピングの実行結果を個別に追跡できるようにする。
+3. EU4バージョン更新時に、AOBの一意性・17バイトの命令境界・絶対JMPを再検証する。
+4. 対象外のゲーム操作で影響がないことを確認する。
+5. `translationMap`のキーとSetText実引数の対応を確認できた場合のみ、環境変数probeから翻訳辞書連携へ進む。
 
 ## 保留
 
-- 可変長置換、SetTextの全面対応、全`PdxLocalize`一括、Windows流用は保留する。
-- 未確認の文字列対応・CString所有権・寿命を成功扱いしない。
+- `Back=戻る`などの可変長置換。
+- SetText以外の全UI経路への一括hook。
+- `PdxLocalize`一括hook、`open`/`read` hook、SDL/OpenGL描画層hook。
+- FreeType/HarfBuzz専用hook。
+- Windows版アドレス・命令列の直接流用。
+- Ghidraによる「テキスト処理ループ2」の全面探索。
 
-## フック方式の判断
+## 検証方針
 
-- [ ] `LD_PRELOAD`のシンボルインターポジションが対象呼び出しに有効か確認する。
-    - [ ] EU4本体内の直接呼び出し、内部シンボル、遅延解決の影響を確認する。
-- [ ] 外部シンボルのフックで足りる場合は、インラインパッチを追加しない。
-- [ ] 内部関数しか対象にならない場合だけ、既存のAOBスキャンと`PatchManager`を使う。
-- [ ] インラインパッチでは、命令境界、トランポリン、相対アドレス、復元処理を検証する。
-- [ ] `mprotect`はW^Xを維持し、書き込み後に実行権限へ戻す。
-- [ ] パッチ適用対象が一意であることを確認し、複数一致時は適用しない。
-- [ ] Linux版とWindows版のフック実装を別管理する。
-
-## 検証
-
-- [x] LD_PRELOADによる最小ロードPoCを実行する。
-- [x] 1件の文字列置換PoCを実機で確認する。
-- [ ] 対象外のゲーム起動、メニュー、入力、保存処理に影響がないことを確認する。
-- [ ] EU4のバージョン変更時に、パターン不一致で安全に停止することを確認する。
-- [ ] ログを確認し、未検証の機能を成功扱いにしない。
-
-## 後回し
-
-- [ ] Ghidraで「テキスト処理ループ2」を先に全体探索する作業。
-- [ ] FreeType/HarfBuzz専用フック。
-- [ ] SDL/OpenGL描画APIでの文字列置換。
-- [ ] すべてのUI経路への一括フック。
-- [ ] 残存するC++/アセンブリ機能の全面移植。
-- [ ] パフォーマンス最適化。
-- [ ] テストカバレッジ拡充。
-- [ ] CI/CDの拡張。
+- 正常終了だけでは成功扱いにしない。hook設置、置換結果、UI反映を分けて確認する。
+- 実機ログはGDB出力とDLL側`pattern_eu4jps.log`を混同しない。
+- 未確認の文字列対応、所有権、寿命、可変長容量を成功扱いしない。
+- 生成ログや一時ファイルはリポジトリへ追加しない。
 
 ## 完了条件
 
-次の条件をすべて満たした時点で、最初の実装段階を完了とする。
-
 1. Linux版EU4で対象文字列の実際の経路を動的に観測できる。
 2. 置換地点の根拠をログと逆アセンブル結果で説明できる。
-3. 既存機構を使った最小の1件置換が動作する。
-4. EU4が継続して操作可能である。
+3. 最小の同一長置換が動作する。
+4. EU4が継続操作可能である。
 5. `make test`と`make all`が成功する。
 6. 未検証のUI経路を未完了として記録している。
