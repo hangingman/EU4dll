@@ -63,6 +63,15 @@ Windows版が行っている「`VirtualProtect` による実行時メモリ書�
 5.  **D言語での実装**:
     -   D言語から `mprotect` などのC言語関数を呼び出すことは容易です。`core.sys.posix.sys.mman` モジュールに `mprotect` が既に定義されているか、あるいはCの関数として宣言すれば、直接呼び出すことができます。
 
+## 3. 旧C++版のfar jump実装
+
+旧Windows/Plugin64版の`Plugin64/injector.hpp`では、`MakeJMP`がジャンプ先との距離を確認していた。
+
+- ±2GiB以内: `E9 rel32`（5バイト）
+- 範囲外: `FF 25 00 00 00 00` と、その直後の64bit絶対アドレス（14バイト）
+
+つまり、旧C++版はfar jumpを考慮済みだった。Linux/D版の`makeJmp`は5バイトrel32専用だったため、`CTextSprite::SetText`のhookでは不十分だった。実装したSetText PoCでは、完全な命令境界まで17バイトを退避し、14バイト絶対間接JMPと3バイトNOPを適用する。
+
 ## 結論
 
 `mmap`/`mprotect` の利用は、Windows版が行っている「`VirtualProtect` による実行時メモリ書き換え」の、Linuxにおける正当な代替手段です。`eu4` が非PIEであるという制約も `byte_pattern` と同様のスキャン手法で回避できるため、`get_module_ranges` 部分を `/proc/self/maps` または `dl_iterate_phdr` を使うロジックに置き換え、`VirtualProtect` の呼び出しを `mprotect`（W^Xを考慮した2回呼び出し）に置き換えることで、Linux上でも同様のパッチ（フック）が実現可能です。

@@ -17,6 +17,7 @@ else
 fi
 printf '%s\n' 'Values are UTF-8 byte strings; only one exact match per mapping and equal byte lengths are eligible.' >&2
 printf '%s\n' 'Variable-length replacements, such as Back=戻る, are skipped; no CString pointer or length is changed.' >&2
+printf '%s\n' 'The native bounded probe additionally requires EU4DLL_SETTEXT_PROBE=1; this workflow never enables it implicitly.' >&2
 printf '%s\n' 'Real EU4 replacement remains unverified; stop the run if any uncertainty or crash occurs.' >&2
 
 TRACE_GDB=$script_dir/replace_eu4_settext_string.gdb \

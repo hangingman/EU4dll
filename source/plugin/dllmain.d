@@ -25,6 +25,7 @@ import DateFormat = plugin.date;
 import ListFieldAdj = plugin.list_field_adjustment;
 import NameOrder = plugin.localization.entry; // 修正
 import ReloadTrace = plugin.localization.reload_trace;
+import SetTextHook = plugin.localization.settext_hook;
 import ButtonAndToolTip = plugin.tooltip_and_button;
 import EventDialog = plugin.event_dialog;
 import FileSave = plugin.file_save.entry; // 修正
@@ -76,6 +77,7 @@ void hijackProcess()
     }
 
     ReloadTrace.initReloadTrace(eu4Version);
+    SetTextHook.initSetTextHook(eu4Version);
 
     // TODO: フォント関連の修正
     // success = success | Font.init(eu4Version);
