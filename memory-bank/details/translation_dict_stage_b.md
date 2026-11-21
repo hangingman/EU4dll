@@ -115,3 +115,46 @@ No EU4 smoke run (per instruction). The first real-game run with
 `EU4DLL_SETTEXT_PROBE=1 EU4DLL_SETTEXT_FROM_TRANSLATIONS=1` still
 has to confirm the load log line against the real dictionary and
 observe `result=applied` for a string whose capacity allows it.
+
+
+## Real-machine verification (2026-11-21, after the commit above)
+
+Run runs/20261121-212246-multiplayer: throwaway mod in the agent user
+folder with all 145 placed localisation files plus the 32 item 23 font
+files, EU4DLL_SETTEXT_PROBE=1, EU4DLL_SETTEXT_FROM_TRANSLATIONS=1, no
+EU4DLL_SETTEXT_REPLACEMENTS, decode at its new default. Throwaway mod
+removed afterwards, user folder restored.
+
+- Dictionary load line: japanese-keys=125959, english-keys=55090,
+  joined=46845, deduplicated=6787, ambiguous=491, loaded=42886,
+  skipped-source-length=3003, skipped-replacement-length=953,
+  skipped-empty-replacement=3, skipped-unencodable=0.
+- One SetText replacement applied (id=20578, length=3). Menu and
+  multiplayer screens reached, no crash.
+
+### Finding: the game's own localisation load renders Japanese as '?'
+
+With the localisation mod enabled, the game itself loads the Japanese
+values (the placed yml are raw UTF-8 under an l_english header) and
+the Game Browser screenshot shows '?' for essentially every Japanese
+character: window title, column headers, checkboxes, and the Back
+button ("??", two glyphs for the two characters of the Japanese
+word). The '?' counts match the Japanese strings, so the text IS the
+translation; it is converted to '?' where the yml text becomes
+game-internal text, before fonts or decode hooks can help. The fonts
+were present in the same mod and did not change this.
+
+Consequences:
+
+- The SetText dictionary works mechanically, but its coverage is
+  limited to strings that reach CTextSprite::SetText in English form.
+  With the mod enabled, the game no longer holds English for those
+  keys, so that path shrinks instead of growing.
+- Broad coverage therefore needs the localisation load conversion
+  point: hook where yml text is converted into the game's internal
+  strings and escape-encode UTF-8 Japanese there. This is the
+  "Localisation-load injection" alternative in
+  translation_file_loading_design.md, whose conversion point was not
+  identified at design time. It is the next investigation.
+- The join/encode machinery built here (dictionary build, collision
+  rules, escape encoder) carries over to that hook unchanged.
