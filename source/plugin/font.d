@@ -5,7 +5,8 @@ import plugin.byte_pattern;
 import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
-import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp;
+import plugin.glyph_table : wideGlyphLookup, wideGlyphRegister; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
 
 extern(C) {
@@ -85,6 +86,177 @@ DllError charCodePointLimiterPatchInjector(RunOptions options) {
     }
     }
 
+    return e;
+}
+
+
+// ---------------------------------------------------------------------------
+// Item 28 step 2: ParseFontFile registration redirect (Linux v1.37.5).
+//
+// Duplicate check VA 0x204e385 and glyph store VA 0x204e55e (patched span
+// starts 8 bytes before the store instruction at 0x204e563 so the 18-byte
+// patch covers exactly three whole instructions and ends at 0x204e570,
+// whose instruction is an entry point from another branch and must stay).
+// For ids < 0x100 both trampolines reproduce the original instructions;
+// for ids >= 0x100 they go through the side table in plugin.glyph_table.
+// Design: memory-bank/details/glyph_table_expansion_item28.md
+// ---------------------------------------------------------------------------
+
+private __gshared size_t glyphDuplicateEmptyReturnAddress;
+private __gshared size_t glyphDuplicateOccupiedReturnAddress;
+private __gshared size_t glyphStoreReturnAddress;
+private __gshared size_t glyphLookupFuncAddress;
+private __gshared size_t glyphRegisterFuncAddress;
+
+extern (C)
+{
+    // At entry: RAX = font base, RCX = zero-extended char id (from R13D).
+    // Original: cmpq $0,0x100(%rax,%rcx,8); je empty(0x204e527)
+    //           fallthrough occupied(0x204e394, Duplicate log path)
+    void glyphDuplicateCheck_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                cmp ECX, 0x100;
+                jb VANILLA;
+                push RAX;
+                push RCX;
+                mov RDI, RAX;
+                mov ESI, ECX;
+                lea R11, [RIP + glyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov R11, RAX;
+                pop RCX;
+                pop RAX;
+                test R11, R11;
+                jz EMPTY;
+                lea R11, [RIP + glyphDuplicateOccupiedReturnAddress];
+                jmp qword ptr [R11];
+            EMPTY:
+                lea R11, [RIP + glyphDuplicateEmptyReturnAddress];
+                jmp qword ptr [R11];
+            VANILLA:
+                cmp qword ptr [RAX + RCX*8 + 0x100], 0;
+                jz EMPTY;
+                lea R11, [RIP + glyphDuplicateOccupiedReturnAddress];
+                jmp qword ptr [R11];
+            }
+        }
+    }
+
+    // At entry (patch start VA 0x204e55e): RAX = new glyph pointer,
+    // R13 = char id (zero-extended at 0x204e527), font base at 0x8(%rsp).
+    // Original span: mov 0x8(%rsp),%rcx; mov %rax,0x100(%rcx,%r13,8);
+    //                jmp 0x204e0aa (loop head)
+    void glyphStore_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov RCX, qword ptr [RSP + 0x8];
+                cmp R13, 0x100;
+                jb VANILLA;
+                push RAX;
+                push RCX;
+                push R13;
+                push R11;
+                mov RDI, RCX;
+                mov ESI, R13D;
+                mov RDX, RAX;
+                lea R11, [RIP + glyphRegisterFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                pop R11;
+                pop R13;
+                pop RCX;
+                pop RAX;
+                lea R11, [RIP + glyphStoreReturnAddress];
+                jmp qword ptr [R11];
+            VANILLA:
+                mov qword ptr [RCX + R13*8 + 0x100], RAX;
+                lea R11, [RIP + glyphStoreReturnAddress];
+                jmp qword ptr [R11];
+            }
+        }
+    }
+}
+
+DllError glyphDuplicateCheckInjector(RunOptions options)
+{
+    DllError e;
+    switch (options.eu4Version)
+    {
+    case EU4Ver.v1_37_5:
+        {
+            // VA 0x204e385: cmpq $0,0x100(%rax,%rcx,8) (9 bytes)
+            //               je 0x204e527 (6 bytes) = 15-byte patch span.
+            BytePattern.tempInstance().findPattern(
+                "48 83 BC C8 00 01 00 00 00 0F 84 93 01 00 00");
+            if (BytePattern.tempInstance().hasSize(1, "Glyph duplicate check"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                glyphDuplicateEmptyReturnAddress = address + 0x1A2; // 0x204e527
+                glyphDuplicateOccupiedReturnAddress = address + 0xF; // 0x204e394
+                glyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*) &glyphDuplicateCheck_hook, 15);
+                writeln("JMP for glyphDuplicateCheckInjector (v1.37.5) called.");
+            }
+            else
+            {
+                e.unmatchdGlyphDuplicateCheckInjector = true;
+            }
+            break;
+        }
+    default:
+        {
+            e.versionGlyphDuplicateCheckInjector = true;
+            break;
+        }
+    }
+    return e;
+}
+
+DllError glyphStoreInjector(RunOptions options)
+{
+    DllError e;
+    switch (options.eu4Version)
+    {
+    case EU4Ver.v1_37_5:
+        {
+            // VA 0x204e55e: mov 0x8(%rsp),%rcx (5 bytes)
+            //               mov %rax,0x100(%rcx,%r13,8) (8 bytes, at 0x204e563)
+            //               jmp 0x204e0aa (5 bytes) = 18-byte patch span,
+            //               ending exactly at 0x204e570.
+            BytePattern.tempInstance().findPattern(
+                "48 8B 4C 24 08 4A 89 84 E9 00 01 00 00 E9 3A FB FF FF");
+            if (BytePattern.tempInstance().hasSize(1, "Glyph store"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                glyphStoreReturnAddress = address - 0x4B4; // 0x204e0aa
+                glyphRegisterFuncAddress = cast(size_t) &wideGlyphRegister;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*) &glyphStore_hook, 18);
+                writeln("JMP for glyphStoreInjector (v1.37.5) called.");
+            }
+            else
+            {
+                e.unmatchdGlyphStoreInjector = true;
+            }
+            break;
+        }
+    default:
+        {
+            e.versionGlyphStoreInjector = true;
+            break;
+        }
+    }
     return e;
 }
 
@@ -350,6 +522,8 @@ DllError init(EU4Ver eu4Version) {
     result = result | fontBufferClear2Injector(options);
     result = result | fontBufferExpansionInjector(options);
     result = result | fontSizeLimitInjector(options);
+    result = result | glyphDuplicateCheckInjector(options);
+    result = result | glyphStoreInjector(options);
 
     return result;
 }

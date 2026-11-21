@@ -239,3 +239,40 @@ The vanilla game without the generated fonts is unaffected.
   behaviour is unchanged. Next: step 2, ParseFontFile
   registration redirect (duplicate check 0x204e385 and store
   0x204e563), verified with the item 26 minimal font.
+
+## Implementation step 2 (2026-11-21, third run of item 28)
+
+- ParseFontFile registration redirect implemented in
+  source/plugin/font.d (opt-in via Font.init, EU4DLL_ENABLE_DECODE=1):
+  - Duplicate check: patch at VA 0x204e385, pattern
+    `48 83 BC C8 00 01 00 00 00 0F 84 93 01 00 00` (1 hit),
+    15-byte absolute jump (cmpq 9 bytes + je 6 bytes) to
+    glyphDuplicateCheck_hook. For id < 0x100 the hook reproduces
+    the original cmpq; for id >= 0x100 it calls wideGlyphLookup
+    and branches to 0x204e527 (empty) or 0x204e394 (occupied),
+    reproducing the je decision as planned.
+  - Glyph store: patch span starts at VA 0x204e55e (not the
+    store instruction itself), pattern
+    `48 8B 4C 24 08 4A 89 84 E9 00 01 00 00 E9 3A FB FF FF`
+    (1 hit), 18-byte absolute jump covering exactly
+    mov 0x8(%rsp),%rcx + the store at 0x204e563 + jmp 0x204e0aa,
+    ending at 0x204e570 (an entry point from another branch,
+    left intact). glyphStore_hook reproduces the load and, for
+    id >= 0x100, calls wideGlyphRegister instead of the
+    embedded-table store, then returns to 0x204e0aa.
+  - Both trampolines call the extern(C) wrappers through
+    __gshared function-address globals, preserve the live
+    registers (RAX/RCX at the check; RAX/RCX/R13 at the store)
+    and keep RSP 16-byte aligned for the calls (verified from
+    the ParseFontFile prologue: RSP % 16 == 0 in the body).
+  - New DllError flags for both injectors in
+    source/plugin/input/package.d.
+- Verification: throwaway test mod (standard.fnt plus ids
+  256/1000/8199, copies of the id=65 line; removed after the
+  run, user folder restored), smoke runs/20261121-174423 with
+  EU4DLL_ENABLE_DECODE=1: both injector log lines present,
+  Duplicate character ID = 0 (was 6 in item 26), Invalid
+  character ID = 0, no crash, ended_by_exit_button,
+  eu4_wait=0, menu screenshot visually normal English.
+- make test: 10 modules passed. Next: step 3, item 19 hook
+  change (>= 0x100 guard becomes a side-table lookup).

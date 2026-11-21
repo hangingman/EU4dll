@@ -56,6 +56,10 @@ public struct DllError
     bool versionFontBufferExpansionInjector;
     bool unmatchdFontSizeLimitInjector;
     bool versionFontSizeLimitInjector;
+    bool unmatchdGlyphDuplicateCheckInjector;
+    bool versionGlyphDuplicateCheckInjector;
+    bool unmatchdGlyphStoreInjector;
+    bool versionGlyphStoreInjector;
 
     // ime.d
     bool unmatchdImeProc1Injector;
