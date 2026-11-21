@@ -632,6 +632,94 @@ extern (C)
             }
         }
     }
+// mainTextBitmapWidthV137_hook (Linux v1.37.5, item 29 step 1)
+    // CBitmapFont::GetWidthOfString fetch site (VA 0x2054027).
+    // Entry state (verified by disassembly): RDI = font (this),
+    // RSI = zero-extended current byte, RBX = raw const char*
+    // string, R15 = sign-extended loop index (R14D), RDX = length.
+    // The 14-byte patch covers the glyph fetch (8), the test (3),
+    // the je (2) and the first byte of the following movswl, so
+    // this hook reproduces all of them: on a null glyph it jumps
+    // straight to the je target (VA 0x20540a6, +0x7F from the
+    // patch start); otherwise it performs the movswl of the
+    // glyph advance and returns after it (VA 0x2054038, +0x11).
+    // On an escape byte it decodes the following word with the
+    // same shifts as the five TextView hooks, advances R14D by 2
+    // (the loop tail at VA 0x205419a adds the third byte), maps
+    // the NO_FONT band to NOT_DEF, fetches ids < 0x100 from the
+    // embedded table and ids >= 0x100 via wideGlyphLookup.
+    // RSP stays 16-byte aligned for the lookup call: the function
+    // runs with RSP % 16 == 0 at this point (4 pushes + sub 0xa8
+    // from an entry RSP % 16 == 8) and the hook pushes 4 registers.
+    void mainTextBitmapWidthV137_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                lea       R11, [RBX + R15];
+                movzx     EAX, byte ptr [R11];
+                cmp       EAX, ESCAPE_SEQ_1;
+                jz        JMP_A;
+                cmp       EAX, ESCAPE_SEQ_2;
+                jz        JMP_B;
+                cmp       EAX, ESCAPE_SEQ_3;
+                jz        JMP_C;
+                cmp       EAX, ESCAPE_SEQ_4;
+                jz        JMP_D;
+                jmp       JMP_E;
+            JMP_A:
+                movzx     EAX, word ptr [R11 + 1];
+                jmp       JMP_F;
+            JMP_B:
+                movzx     EAX, word ptr [R11 + 1];
+                sub       EAX, SHIFT_2;
+                jmp       JMP_F;
+            JMP_C:
+                movzx     EAX, word ptr [R11 + 1];
+                add       EAX, SHIFT_3;
+                jmp       JMP_F;
+            JMP_D:
+                movzx     EAX, word ptr [R11 + 1];
+                add       EAX, SHIFT_4;
+            JMP_F:
+                movzx     EAX, AX;
+                add R14D, 2;
+                cmp       EAX, NO_FONT;
+                ja        JMP_E;
+                mov       EAX, NOT_DEF;
+            JMP_E:
+                cmp       EAX, 0x100;
+                jae       JMP_G;
+                mov RBP, qword ptr [RDI + RAX*8 + 0x100];
+                jmp       JMP_H;
+            JMP_G:
+                push RAX;
+                push RCX;
+                push RDX;
+                push RDI;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov RBP, RAX;
+                pop RDI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H:
+                test RBP, RBP;
+                jz        JMP_Z;
+                movsx EAX, word ptr [RBP + 0xC];
+                lea       R11, [RIP + mainTextBitmapWidthV137ReturnAddress];
+                jmp       qword ptr [R11];
+            JMP_Z:
+                lea       R11, [RIP + mainTextBitmapWidthV137ZeroReturnAddress];
+                jmp       qword ptr [R11];
+            }
+        }
+    }
 }
 
 private __gshared size_t mainTextProc1V137SiteAReturnAddress;
@@ -639,6 +727,8 @@ private __gshared size_t mainTextProc1V137SiteBReturnAddress;
 private __gshared size_t mainTextProc4V137GetActualReturnAddress;
 private __gshared size_t mainTextProc4V137GetRequiredReturnAddress;
 private __gshared size_t mainTextProc4V137GetActualRealReturnAddress;
+private __gshared size_t mainTextBitmapWidthV137ReturnAddress;
+private __gshared size_t mainTextBitmapWidthV137ZeroReturnAddress;
 private __gshared size_t mainTextGlyphLookupFuncAddress;
 private __gshared size_t mainTextProc1ReturnAddress;
 private __gshared size_t mainTextProc2ReturnAddress;
@@ -1056,6 +1146,33 @@ DllError mainTextProc4Injector(RunOptions options)
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextProc4V137GetActualReal_hook, 14);
                 writeln("JMP for mainTextProc4Injector (v1.37.5 GetActualRealRequiredSizeActually) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
+            // Item 29 step 1: CBitmapFont::GetWidthOfString is a
+            // byte-width measuring path (item 28 step 4 inventory);
+            // its fetch (VA 0x2054027) is hooked with the same
+            // decode-at-fetch design so escaped text is measured
+            // with the wide glyph instead of three byte glyphs.
+            // The pattern is the fetch + test + je + movswl head,
+            // exactly 1 hit in the whole binary (verified by a
+            // full byte scan in the item 29 step 1 run).
+            BytePattern.tempInstance()
+                .findPattern("48 8B AC F7 00 01 00 00 48 85 ED 74 72 0F BF 45 0C");
+            if (BytePattern.tempInstance().hasSize(1, "MainText BitmapWidth v1.37.5 GetWidthOfString"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                // Return after the reproduced movswl (+0x11); a null
+                // glyph goes to the original je target (+0x7F).
+                mainTextBitmapWidthV137ReturnAddress = address + 0x11;
+                mainTextBitmapWidthV137ZeroReturnAddress = address + 0x7F;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextBitmapWidthV137_hook, 14);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 GetWidthOfString, item 29) created.");
             }
             else
             {
