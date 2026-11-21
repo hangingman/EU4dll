@@ -2,142 +2,39 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。可変長置換の過去の試行整理と容量の実測は完了し、`memory-bank/details/variable_length_history.md` に記録した（対象2件はどちらもSSO容量15）。文字化けの原因の切り分けは完了し、`memory-bank/details/mojibake_settext.md` に記録した（SetText置換は変換を通らず、復号側のテキスト処理ループ／フォントフックがLinux版では未有効のため、UTF-8バイト列が1バイト文字として解釈されて化ける）。翻訳ファイル読み込みへの移行設計は完了し、`memory-bank/details/translation_file_loading_design.md` に記録した（設計のみ、実装は所有者の確認待ち）。翻訳本体の所在確認は完了し、`memory-bank/details/translation_body_location.md` に記録した（JSON形式の本体は環境内に無く、実在するのはuser側に配置されたyml形式145ファイルで、値は素のUTF-8・エスケープ無し）。
+Linux版EU4 v1.37.5で、翻訳Modを有効にした状態の全面日本語表示が実機確認済み（メニュー、Game Browser、国選択画面。所有者の環境でも直接起動で確認済み、2026-11-21）。現在の作業対象はフォントサイズ調整と表示品質で、残課題は TODO.txt に集約した。項目1〜32と2026-11-21夜の追加作業は全て master へマージ・push 済み。読み込みフックの既定有効化とSetText辞書の廃止も2026-11-22にマージ済み。
 
 ## 確定事項
 
-- `ReloadPdxLocalize` のフック通過だけでは、生成済みUIの表示は更新されなかった。
-- `CTextSprite::SetText` はGDB観測でMENU画面を頻繁に通過し、第1 `CString` はSysV x86-64の`rdx`にある。
-- v1.37.5の`SetText`固有AOBは、先頭17バイトと続く`44 89 4C 24 3C`を含めて一意化している。
-- 5バイトrel32 JMPはstub配置の都合で使用できなかった。旧C++版にも遠距離時の14バイト絶対間接JMPが実装されていたため、Linux版も`FF 25 00 00 00 00 + 64bit address`を使用する。
-- 絶対JMP、17バイトの完全命令境界、ABI保存stub、CStringの境界付きread/writeを実装した。
-- `EU4DLL_SETTEXT_PROBE=1` と `EU4DLL_SETTEXT_REPLACEMENTS='Back=Home;Connect to ID=Connect to JP'` で実機起動し、`SetText probe installed` と `SetText replacement applied` 2件を確認した。EU4は正常終了し、`Back → Home` のUI反映を確認した。
-- `make test`、`make all`、`git diff --check` は成功。依存ライブラリ由来のdeprecation warningは残る。
+- 日本語表示は次の組合せで成立する。(1) 生成フォント（Noto Sans CJK JP、翻訳ymlの3,130字）とグリフ表サイドテーブル（id >= 0x100 のグリフ保持）。(2) 描画・計測経路の復号フック（既定で有効、EU4DLL_ENABLE_DECODE=0 で無効化）。(3) ローカライズ読み込みフック（LocalizeYmlAddKey、既定で有効、EU4DLL_LOCALIZE_ESCAPE=0 で無効化。値をエスケープ形式のまま SLanguageData::AddKeyValuePair へ格納し、ConvertUTF8ToLatin1 の「？」化を回避する）。
+- 内部表現は UTF-8 → UCS2 → Clausewitz エスケープ形式（0x10〜0x13 の3バイト表現、CP1252特殊ケースを含む）。変換器は source/plugin/localization/escape_codec.d。
+- DLL は非EU4プロセスでは即座に戻る（preload ガード、/proc/self/exe の basename が "eu4" のときだけ動作）。Steam の起動連鎖を壊さないため。
+- SetText 置換 PoC（CTextSprite::SetText の第1 CString、14バイト絶対JMP、同一長から容量内可変長まで）は実装済みだが、翻訳の本線ではない。基礎調査の記録は details/cstring_ownership.md、details/variable_length_history.md、details/mojibake_settext.md。
+- make test の後は必ず make all を実行する。unittest ビルドが通常版 libeu4dll.so を上書きし、DLL が無効化される（details/dll_inactivation_item25.md）。
 
 ## 未確定・制約
 
-- 可変長置換は容量以下の場合に限って実装済み。容量超過は `exceeds-capacity` で見送る。`Back=戻る`は実機で `result=applied` を確認済みだが、表示は文字化けする（原因は `details/mojibake_settext.md`）。
-- `translationMap`のキーとSetText実引数の直接対応はないことを確認した（詳細は `details/translationmap_settext_correspondence.md`）。キーはローカライズキーで、SetTextへ渡るのは英語値側。`MENU_BAR_LOAD_GAME` の英語値 `Load Game` はメインメニュー実行ではSetText到達を観測できなかった。実データの日本語値はサブモジュール未初期化のため未取得。PoCは明示的な環境変数マッピングを使う。
-- フックはLinux・EU4 v1.37.5・明示opt-inに限定。全UI経路やWindows版への展開は未実施。
-- GDB診断スクリプト末尾の`no registers`は、EU4終了後にレジスタを読む後処理エラーであり、native置換成功とは別問題。
+- ゲーム内マップの国名表示（Render3d site 2 の wide path）は修正済みだが実機未踏。
+- 生成フォントが全体的に2〜3pt大きく見える（所有者指摘）。チェックボックスのラベル重なり、狭い見出しの省略、メニューボタンの文字切れも未解消。
+- フックは Linux・EU4 v1.37.5 に限定。バージョン更新時は AOB 一意性と命令境界の再検証が要る。
 
-## 次の作業
+## 2026/08/29 の調査結果（要約）
 
-1. この変更をコミットする。
-2. 必要なら置換ログへmapping idを追加し、2件の対応を個別に記録する。
-3. 可変長置換を実機で確認する（Game Browser で長さの違う置換と日本語置換の表示）。
-4. EU4のバージョン更新時はAOB一意性と完全命令境界を再検証する。
+- CString 所有権・容量・寿命: details/cstring_ownership.md、details/variable_length_history.md。
+- SetText 置換が文字化けした原因（復号側未有効のため UTF-8 が1バイト文字として解釈された）: details/mojibake_settext.md。
+- translationMap のキーと SetText 実引数に直接対応は無い: details/translationmap_settext_correspondence.md。
+- 翻訳本体の所在（yml 145ファイル、素のUTF-8）と読み込み設計: details/translation_body_location.md、details/translation_file_loading_design.md。
 
-## 可変長置換調査結果（2026/08/29）
+## 2026-11-21 の作業記録（details 一覧）
 
-- `CString`の`+0=data pointer`、`+8=length`は、`CString::operator==`、`CString(char const*)`、実機観測と整合する。`+0x10`は`std::string`のSBO領域またはcapacity union候補だが、値の意味・capacity・所有権は未証明。
-- `CTextSprite::SetText`の先頭（`0x20d9da4`）は、`rdx`のCStringから`+0`を取得し、`strlen`を実行した後、`std::string::_M_replace`でテキストスプライト内部（`this+0x220`）へコピーする。第1入力CStringのpointer/lengthを変更する命令はない。
-- したがって「SetText内部でコピーされる」は確定したが、「入力CStringのpointerを一時差し替えれば安全」「length/capacityを変更できる」「元バッファを拡張できる」はいずれも未証明。
-- 方針を補正し、TLS上の一時CStringビューによる1ケース限定の診断PoCを実験した。ASCII可変長は成功したが、日本語UTF-8は文字化けしたため、実験コードは恒久コードから削除し、同一長PoCへ戻した。
-- 実験ビューは正規CStringオブジェクトではなく、SetTextが読む`+0/+8`だけを満たす借用ビューだった。SetText呼出し期間中はTLSバッファを保持し、callbackの戻り値をstubが保存済み`rdx`へ反映した。実験は終了済みである。
-- これは安全性の証明でもUI成功の証明でもない。実機では対象範囲を`Back=戻る`の1ケースに限定し、DLLログとGDBログを分離して、ビュー生成・元CString非破壊・SetText継続・UI反映・クラッシュなしを個別確認する。
-- 追加の所有権観測（constructor/copy/move/destructor、`+0/+8/+0x10`、allocation/free）は継続する。capacity推測、lengthだけの変更、任意アドレス探索は行わない。
-
-## 可変長PoC実機結果（2026/08/29）
-
-- 強制通常版ビルド後、提示された成功時と同じGDB wrapperで実機起動した。`crt_constructor entered`、`hijackProcess entered`、`SetText probe installed`を確認した。
-- `Back=戻る`は9回`VARIABLE_VIEW_READY`となり、元CStringを変更せず一時TLSビューをSetTextへ渡す経路は実行された。EU4は正常終了した。
-- しかしUIは日本語を文字化け表示した。判定は「Approach Bのpointer/lifetime検証は通過」「UTF-8バイト列の直接投入による日本語表示は失敗」。SetText入口のCString差し替えだけでは、EU4側が期待する文字コード/内部変換/フォント経路を満たさない。
-- 今後はUTF-8変換を仮定して再試行せず、文字化けの実バイト列とEU4の期待形式を限定観測する。可変長PoCは診断状態のまま、翻訳機能として成功扱いにしない。
-- 再発防止として`make all`を強制通常ビルドにし、`tools/trace_eu4_text_with_dll.sh`が通常版constructor markerを検証してからEU4を起動するようにした。
-
-## ASCII可変長PoC実機結果（2026/08/29）
-
-- `Back=Go Back`で再起動し、`VARIABLE_VIEW_READY source_length=4 replacement_length=7`を9件確認した。
-- UI上で`Back → Go Back`を確認し、EU4は正常終了した。ログ上もSIGSEGV/SIGBUSはない。
-- これにより、SetText呼出し中の一時CStringビュー差し替え、stubによる`rdx`差し替え、短期寿命保持はASCII可変長で動作確認済み。
-- `Back=戻る`の失敗は可変長制御経路ではなく、日本語バイト列の入力形式・文字コード・フォント/後段変換の問題に絞る。次は既存日本語表示成功箇所のSetText生バイト列を観測する。
-
-## SetText全CString候補の非ASCII観測結果（2026/08/29）
-
-- `EU4DLL_SETTEXT_HEX_NONASCII=1`で`SetText`の`rdx`・`rcx`・`r8`を観測した。各候補はNULL、read失敗、負数/過大length、終端NUL不一致を除外し、length 1..64の高ビット列だけを最大64件記録した。
-- 非ASCII列は0件だった。今回の実機操作では、`ロード`のUTF-8列や独自高ビットマッピング列がSetTextの3候補に現れた証拠はない。EU4は正常終了し、SIGSEGV/SIGBUSもない。
-- 判定は未完了。日本語UIの実表示が別経路、別引数、ASCII相当の内部コード、または今回の操作対象外である可能性を残す。次はCreateTextSprite候補または日本語表示を確実に発生させる入口を同じ境界付き観測で調べる。
-
-## Back限定再観測（2026/08/29）
-
-- 専用ログ`/tmp/eu4dll-back-only-observe.log`で、`Back=戻る`の`VARIABLE_VIEW_READY`を9件確認した。`source_length=4`、`replacement_length=6`。
-- constructor、hook設置、元入力一致、一時ビュー生成、EU4正常終了を確認したが、UI表示は文字化けした。
-- Back経路については「可変長制御は通るが、日本語を表示可能な入力表現は未同定」という状態を確定する。
-
-## 旧C++版のエンコード処理確認（git履歴 `c649f5c^`）
-
-- `Plugin64/injector.hpp`にはASCII/UTF-8切替処理はなく、`MakeJMP`等の命令patchと`VirtualProtect`によるメモリ保護だけがある。
-- `Plugin64/plugin_64.h`の`ParadoxTextObject`は、`char text[0x10]`/`char* p` union、`UINT64 len`、`UINT64 len2`。短文字列はinline、長文字列はpointerで、長文字列時の`len2=0x1F`を含む独自表現を使う。
-- `Plugin64/escape_tool.cpp`はUTF-8をWindows `MultiByteToWideChar(CP_UTF8)`でUCS2へ変換し、UCS2をClausewitz用escaped text（`0x10`〜`0x13`の3-byte表現、CP1252互換byteを含む）へ変換する。UTF-8 bytesをそのままSetTextへ渡していない。
-- `Plugin64/font.cpp`はchar code point上限、font buffer zero-clear/clear/expansion、font size limitをpatchする。旧`dll_main.cpp`は`Font::Init`と`Input::Init`を実行していた。
-- 判定: 日本語表示に必要なのは、単純なCStringフラグではなく、少なくともUTF-8→escaped表現変換とフォント側容量/上限patchの組合せである可能性が高い。旧実装のWindows APIやアドレスをLinuxへ直接流用しない。
-
-## 復号の有効化方法の調査（2026/11/21追記）
-
-- 詳細は `memory-bank/details/decode_enablement_investigation.md` に記録した（調査のみ）。`Font.init`／`TextView.init` は、インジェクタにv1.37.5のケースが無く、ローカル／上流v1.37（Windows）の全パターンがLinuxバイナリで0件のため、コメントアウトを外すだけでは有効にならない。有効化にはLinux版 `CBitmapFont` 系関数からのフック箇所特定とLinux用パターン／アセンブリの新規作成が要る。
-
-
-## UTF-8→エスケープ変換器の実装（2026/11/21追記）
-
-- 詳細は `memory-bank/details/escape_codec.md` に記録した。`source/plugin/localization/escape_codec.d` に純粋な変換器を実装し、復号テストダブルとの往復テストと4帯域の固定ベクタで検証した（`make test` 7モジュール通過）。変換表は上流 matanki-saito/EU4dll の `Plugin64/escape_tool.cpp` の移植で、回避バイト集合とCP1252特殊ケースを含む。フックへの配線は未実施（項目7設計の段階B、所有者の判断待ち事項が残る）。項目11の画面確認は復号側の有効化が済んでいないため実施しない。
-
-## Font側のLinux用パターン導出（2026/11/21追記）
-
-- 詳細は `memory-bank/details/font_linux_patterns.md` に記録した（導出のみ、注入は無効のまま）。Font側6注入のうち、リミッタ（`ParseFontFile` VA 0x204e366、`41 81 FD FF 00 00 00 0F 87 25 01 00 00`、全体で1件）だけが一意パターンまで確定した。HeapZeroClear はLinuxに対応箇所なし、BufferClear／Expansion の 0x3D88 は存在せず候補は `GfxCreateVertexBuffer` の即値 0x4B0 の2箇所（役割の同一性は未証明）、FontSizeLimit は未発見。
-
-## TextView側のLinux用パターン導出（2026/11/21追記）
-
-- 詳細は `memory-bank/details/main_text_linux_patterns.md` に記録した（導出のみ、注入は無効のまま）。Proc1は `FillVertexBuffer` の2箇所（VA 0x2055562／0x2055ac1）、Proc4はループ1の3関数に各1箇所（VA 0x2056198／0x2056872／0x20570b6）が文脈込みで各1件に一意化できた。Proc2はWindowsの形（バッファ `lea`＋全文字コピー）がLinuxに無く、Proc3はフック形がループ2側に1件あるのみで戻り先2が無い。文字取得は `CString::operator[]` 経由、グリフ表+0x100、スケール+0x940。
-
-## Linux注入方式の整備（2026/11/21追記、項目14）
-
-- 詳細は `memory-bank/details/linux_injection_method.md` に記録した。patcherの `makeJmp` は14バイト絶対ジャンプになり、BytePatternは全件数え＋`hasSize` 実判定になった。`Font.init`／`TextView.init` はまだ無効。次は項目15（復号の有効化、opt-in）。絶対ジャンプを使う注入は「完全な命令を14バイト以上上書きし、トランポリンのコピー長と一致させる」ことが条件で、ReloadPdxLocalize（コピー長8バイト）は相対ジャンプのまま明示した。
-
-## 復号の有効化配線（2026/11/21追記、項目15）
-
-- 詳細は `memory-bank/details/decode_optin_enablement.md` に記録した。`EU4DLL_ENABLE_DECODE=1` の場合だけ `Font.init`／`TextView.init` を呼ぶ。v1.37.5では各注入にケースが無くパッチは当たらないため、復号はまだ機能しない（項目16の前提は未充足）。配線の過程で `DllError` の `|` 演算子が無限再帰する潜在バグが見つかり、フィールド単位ORへ修正済み（初回smoke runs/20261121-145211 は eu4_wait=139 で落ち、修正後の runs/20261121-145625 は正常終了・英語表示正常）。
-
-## Font側リミッタ注入の実装（2026/11/21追記、項目17）
-
-- 詳細は `memory-bank/details/font_limiter_linux_injection.md` に記録した。リミッタは v1.37.5 で実装済み（パターン1件一致時のみ、即値 0xFF→0xFFFF、opt-in時のみ）。他のFont注入（BufferClear／Expansion／FontSizeLimit）は項目18で整理する。リミッタ単独では日本語表示は有効にならず、項目19のTextViewフックと項目20の変換器接続が要る。
-
-## Font側の残り注入の整理（2026/11/21追記、項目18）
-
-- 詳細は `memory-bank/details/font_remaining_linux_injectors.md` に記録した。FontSizeLimit は `CTextureHandler::LoadTexture` VA 0x22a7edb のファイルサイズ上限（16MiB）だと特定して v1.37.5 で実装済み（1件一致時のみ 04000000h へ、opt-in時のみ）。BufferClear1/2 はLinuxに対応箇所なし、BufferExpansion の候補 0x4B0 は頂点数であり同等性が否定されたため実装しない。Font側で残る未実装はこの3件（＋HeapZeroClear）で、いずれも理由を記録して閉じた。
-
-## TextView側フックの実装（2026/11/21追記、項目19）
-
-- 詳細は `memory-bank/details/main_text_linux_injection.md` に記録した。TextView側は v1.37.5 で実装済み: `FillVertexBuffer` の2箇所と計測側3関数の取得箇所に、取得箇所そのものでエスケープ復号するフックを入れた（各パターン1件一致時のみ、絶対ジャンプ、opt-in時のみ）。Proc2／Proc3 はLinuxに対応箇所が無く未実装のまま（理由は項目13の記録どおり）。残るは項目20（変換器をSetText置換経路へ接続）と項目21（日本語表示の実機確認）。
-
-## 変換器の接続（2026/11/21追記、項目20）
-
-- 詳細は `memory-bank/details/settext_escape_wiring.md` に記録した。SetText置換経路への変換器接続は完了し、前回異常の原因だった項目19フックの範囲外グリフ参照も修正済み（コードポイント 0x100 以上は null グリフ扱い）。残るは項目21（日本語表示の実機確認）で、通常フォントには日本語グリフが無いため、現状では日本語は描かれず飛ばされる見込みである点に注意する。
-
-## 文字集合とフォント生成方法（2026/11/21追記、項目22）
-
-- 詳細は `memory-bank/details/charset_and_font_generation.md` に記録した。翻訳yml 145ファイルの値から3,130字種を収集した（BMP外なし、(0x100,0xA00) のずらし帯域は0件）。フォントIDは原則コードポイントどおりで、CP1252特殊ケース5字だけバイトIDとコードポイントの両方へ登録する。本家EU4fontcreateとはCP1252と+0xE000ずらしの方向で一致し、帯域の食い違いは実データに影響が無いため変換器側を正とした。生成方法は Pillow＋fontTools の自前生成（フォントは Noto Sans CJK JP Regular、カバー率3,127/3,130）に決定し、PoC済み。項目23/24の前提として、項目20のガード（0x100以上はnullグリフ）と項目21のGame Browser側の未特定経路が残る。
-
-## フォント生成と配置（2026/11/21追記、項目23）
-
-- 詳細は `memory-bank/details/font_generation_item23.md` に記録した。項目22の方法でUIテキストフォント16種を生成済み（各3,218〜3,240グリフ）。翻訳Modフォルダは agent から書き込めないため、生成物は `~/work/eu4-run/item23/gfx/fonts/` に置き、配置は所有者の帰宅後作業として手順を残した。使い捨てテストModでの実機確認では、英語メニューは新しいフォントで正常表示され正常終了した。
-- 重要な発見: バニラの .fnt パーサは char id >= 0x100 を全て弾く（bitmapfont.cpp:436、vic_18で受理されたのは 0xFF 以下の218件だけ）。生成フォントだけでは日本語グリフは読み込まれない。復号opt-inの実行でも同じ件数が出たが、その実行ではDLLの有効化マーカー（DIAGNOSTIC-RAW、pattern_eu4jps.log）が確認できなかった（16:07までの実行では確認できていた。同 .so・同バイナリで原因未確認）。項目17のリミッタがこのパーサ側チェックまで効くかは未検証。項目24の前に、パーサ側チェックの調査とsmokeでのDLL有効化の再確認が要る。
-
-## フォント配置後の日本語表示確認（2026/11/21追記、項目24）
-
-- 詳細は `memory-bank/details/font_display_check_item24.md` に記録した。配置は使い捨てテストModで再現し（項目23のフォント32ファイル、実行後に撤去しユーザーフォルダを復元）、復号opt-in＋SetTextプローブ＋Backの日本語置換で Game Browser を確認した（runs/20261121-165545-multiplayer）。
-- 結果は negative: 左下ボタンは英語の "Back" のままで、日本語は表示されなかった。メニューと Game Browser の英語表示は生成フォントで正常で、崩れは無い。
-- 理由は2点とも再確認済み: (1) この実行でもDLLが有効にならなかった（DIAGNOSTIC-RAW皆無、pattern_eu4jps.log新規なし。16:07以降の未解明の現象が、変数を明示した実行でも再現。同 .so・同バイナリ、原因未確認）。置換自体が走らなかった。(2) フォントを読み込んだ状態でも bitmapfont.cpp:436 の Invalid character ID がちょうど120,880件出て、id >= 0x100 のグリフは読み込み時点で全て落ちる。
-- 項目1〜24は全て消化済み。残るのは (a) DLL有効化の復旧・原因特定、(b) .fntパーサ側チェックの調査と対処、および項目22で記録した2件（0x100以上のnullグリフ・ガード、Game Browserの未特定経路）で、新規項目は始めていない。
-
-## DLL無効化の原因特定（2026/11/21追記、項目25）
-
-- 詳細は `memory-bank/details/dll_inactivation_item25.md` に記録した。16:07以降「DLLが有効にならない」現象の原因は `make test` だった。dub の unittest ビルドが通常ビルドと同じ libeu4dll.so を上書きし、unittest 版では crt_constructor の hijack() が version(unittest) で NOP になるため、.so は黙って読み込まれるだけで何もしない。再現で証明済み: make test 直後の .so は md5 24a49710b4b6eeee5042b9da6958a633（項目24が失敗期間中に記録した値と一致）で /bin/true への LD_PRELOAD でも無出力、make all で通常版 md5 2e645e64952315dacad5ed762024a6dd に戻る。
-- 復旧確認済み: smoke runs/20261121-170719（復号opt-in＋SetTextプローブ Back=Home）で DIAGNOSTIC-RAW、新規 pattern_eu4jps.log（SetText id=0 applied）、DLL [OK]、ended_by_exit_button、eu4_wait=0。メニューのスクリーンショットも目視確認し、英語表示は正常で崩れなし。
-- 今後の決まり: make test の後は必ず make all を実行し、smoke の前に /bin/true への LD_PRELOAD で DIAGNOSTIC-RAW が出ることを確認する。項目24の Invalid character ID 120,880件は DLL が無効な状態での計測なので、項目17のリミッタが効くかの証拠にはならない。項目26で DLL が有効な状態で再確認する。
-
-## フォント文字集合テーブルの上限（2026/11/21追記、項目26）
-
-- 詳細は `memory-bank/details/font_charset_table_limit_item26.md` に記録した。DLLが有効な状態では bitmapfont.cpp:436 の Invalid character ID は0件で、項目17のリミッタがパーサ側チェックまで効いている。専用パッチは不要。
-- 新しい阻害要因が判明した: CBitmapFont+0x100 に埋め込まれた CBitmapCharacterSet のグリフ表は256ポインタ分しかなく（コンストラクタの memset 0x800バイト、デストラクタは256件だけ走査し、その後ろはカーニング用 unordered_map）、ParseFontFile は範囲確認なしに id で添字アクセスする。そのため id >= 0x100 は全て Duplicate character ID（bitmapfont.cpp:431）と誤判定されるか、ゼロの場所では無関係なメモリへグリフポインタを書き込む。最小再現（id 256/1000/8199 の3件だけ追加した standard.fnt、runs/20261121-172215）でも3件とも Duplicate になり、ゲームは正常終了した。全フォント読み込み時の segfault（runs/20261121-171402）もこの上書きで説明が付く。
-- 生成フォントの日本語グリフは読み込まれていない。項目27は、サイドテーブル等の実効ある対処を新しい項目として実装するまで実施しない。
+- 復号有効化の調査と配線: decode_enablement_investigation.md、decode_optin_enablement.md、decode_default_enablement.md
+- エスケープ変換器: escape_codec.md
+- Font／TextView のパターン導出と注入: font_linux_patterns.md、main_text_linux_patterns.md、linux_injection_method.md、font_limiter_linux_injection.md、font_remaining_linux_injectors.md、main_text_linux_injection.md
+- 変換器の SetText 接続: settext_escape_wiring.md
+- 文字集合とフォント生成: charset_and_font_generation.md、font_generation_item23.md
+- 表示確認と阻害要因: font_display_check_item24.md、dll_inactivation_item25.md、font_charset_table_limit_item26.md、font_display_recheck_item27.md、glyph_table_expansion_item28.md、bitmapfont_bytewidth_decode_item29.md、font_display_final_item30.md、ellipsis_distinguish_item31.md、ellipsis_fix_item32.md
+- SetText辞書: translation_dict_stage_b.md、settext_dict_position_review.md、settext_dict_removal.md（辞書経路は2026-11-22に廃止。記録として残す）
+- 読み込みフック: localisation_load_conversion_survey.md、localize_escape_hook.md
+- wide path 修正: getheightofstring_decode_survey.md、decode_widepath_fix.md
+- preload ガード: preload_guard.md
+- 初期調査: runtime_trace.md、linux_patching_details.md
