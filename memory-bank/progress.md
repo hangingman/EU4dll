@@ -407,3 +407,6 @@
 ## 2026-11-21 - Memory-bank cleanup
 - TODO.txt rewritten: the 2026/08/29 content (SetText PoC era, all superseded) replaced by the current state, six remaining issues (font size adjustment, Render3d site 2 map labels, layout quality, LOCALIZE_ESCAPE default-on decision, SetText dictionary positioning, version-update AOB re-verification), verification policy, and completion criteria.
 - activeContext.md rewritten: focus updated to the confirmed full-screen Japanese display, confirmed facts trimmed to those still in force, the 2026/08/29 survey sections compressed to details references, and the 2026-11-21 sections replaced by an item-to-details index. History remains in progress.md and details/.
+
+## 2026-11-22 - TODO follow-up: LOCALIZE_ESCAPE default-on and SetText dictionary issues closed
+- PR #7 (merged as b796de4) settled the two decisions the 2026-11-21 TODO still listed as open: the localisation escape hook is on by default (EU4DLL_LOCALIZE_ESCAPE=0 opts out) and the SetText file dictionary was removed. TODO.txt updated in PR #8: both items moved to a completed-decisions section, the remaining list renumbered (font size adjustment, in-game map labels, layout quality, version-update AOB re-verification), the completion criteria updated, and activeContext.md corrected on the same two points.

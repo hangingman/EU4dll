@@ -1,12 +1,12 @@
 # EU4dll 開発 TODO
 
-## 現在の状態（2026-11-21）
+## 現在の状態（2026-11-22）
 
 - 対象は Linux x86-64 版 EU4 v1.37.5。
 - 翻訳Mod（eu4dll_translations、yml 145ファイル＋生成フォント32ファイル）を有効にすると、メニュー、Game Browser、国選択画面の全面に日本語が表示されることを実機で確認済み。所有者の環境でも直接起動で日本語表示を確認済み（2026-11-21）。
-- 日本語表示の仕組みは3点の組合せである。(1) 生成フォント（Noto Sans CJK JP）とグリフ表のサイドテーブル拡張、(2) 描画・計測経路の復号フック（既定で有効、EU4DLL_ENABLE_DECODE=0 で無効化）、(3) ローカライズ読み込みフック（LocalizeYmlAddKey で値をエスケープ形式のまま辞書へ格納、EU4DLL_LOCALIZE_ESCAPE=1 で有効化）。
+- 日本語表示の仕組みは3点の組合せである。(1) 生成フォント（Noto Sans CJK JP）とグリフ表のサイドテーブル拡張、(2) 描画・計測経路の復号フック（既定で有効、EU4DLL_ENABLE_DECODE=0 で無効化）、(3) ローカライズ読み込みフック（LocalizeYmlAddKey で値をエスケープ形式のまま辞書へ格納、既定で有効、EU4DLL_LOCALIZE_ESCAPE=0 で無効化）。
 - DLL は非EU4プロセスでは何もしない（preload ガード）。Steam 経由・直接起動のどちらでも使える。
-- 項目1〜32と2026-11-21夜の追加作業（復号既定化、SetText辞書、読み込みフック、wide path 修正、preload ガード）は全て master へマージ・push 済み。経緯は progress.md と details/ に記録がある。
+- 項目1〜32と2026-11-21夜の追加作業（復号既定化、SetText辞書の実装、読み込みフック、wide path 修正、preload ガード）は全て master へマージ・push 済み。2026-11-22には、読み込みフックの既定有効化とSetText辞書の廃止も master へマージ済み。経緯は progress.md と details/ に記録がある。
 
 ### 過去の経緯（要約）
 
@@ -18,9 +18,12 @@
 1. フォントサイズ調整: 生成フォントが全体的に2〜3pt大きく見える（所有者の指摘、2026-11-21）。生成時のサイズ指定と .fnt メトリクスの調整方法を調査中。関連: details/font_generation_item23.md、details/charset_and_font_generation.md。
 2. ゲーム内マップの国名表示の実機確認: Render3d site 2 の wide path は修正済み（details/decode_widepath_fix.md）だが、ゲーム内マップで実際に踏んだ確認がまだ無い。
 3. 表示品質: チェックボックスのラベル重なり、狭い見出しの「…」省略、メニューボタンの文字切れ。日本語が英語より幅を取るためのレイアウト側の問題。
-4. EU4DLL_LOCALIZE_ESCAPE の既定ON化の判断: 現在は opt-in のみ。実績が安定したら既定化を検討する。
-5. SetText辞書の位置づけ見直し: 読み込みフックが本線になったため、EU4DLL_SETTEXT_FROM_TRANSLATIONS の辞書経路（details/translation_dict_stage_b.md）を残すか畳むか決める。
-6. バージョン更新時の再検証: EU4のバージョンが上がったら、各フックの AOB 一意性と命令境界を再検証する（恒常項目）。
+4. バージョン更新時の再検証: EU4のバージョンが上がったら、各フックの AOB 一意性と命令境界を再検証する（恒常項目）。
+
+### 完了した判断（2026-11-22）
+
+- EU4DLL_LOCALIZE_ESCAPE の既定ON化: 実施済み。既定で有効になり、無効化は EU4DLL_LOCALIZE_ESCAPE=0 で行う（details/localize_escape_default_enablement.md）。
+- SetText辞書の位置づけ: 廃止で確定。辞書経路と環境変数 EU4DLL_SETTEXT_FROM_TRANSLATIONS、EU4DLL_GAME_LOCALISATION_DIR を削除した（details/settext_dict_removal.md）。検討の経緯は details/settext_dict_position_review.md に残す。
 
 ## 検証方針
 
@@ -33,6 +36,5 @@
 ## 完了条件
 
 1. 残課題1〜3が解消し、実機のスクリーンショットで確認できる。
-2. 課題4・5の判断が決まり、コードと記録に反映されている。
-3. make test と make all が成功する。
-4. 未検証のUI経路を未完了として記録している。
+2. make test と make all が成功する。
+3. 未検証のUI経路を未完了として記録している。

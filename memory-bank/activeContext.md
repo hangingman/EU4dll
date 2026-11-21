@@ -2,11 +2,11 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、翻訳Modを有効にした状態の全面日本語表示が実機確認済み（メニュー、Game Browser、国選択画面。所有者の環境でも直接起動で確認済み、2026-11-21）。現在の作業対象はフォントサイズ調整と表示品質で、残課題は TODO.txt に集約した。項目1〜32と2026-11-21夜の追加作業は全て master へマージ・push 済み。
+Linux版EU4 v1.37.5で、翻訳Modを有効にした状態の全面日本語表示が実機確認済み（メニュー、Game Browser、国選択画面。所有者の環境でも直接起動で確認済み、2026-11-21）。現在の作業対象はフォントサイズ調整と表示品質で、残課題は TODO.txt に集約した。項目1〜32と2026-11-21夜の追加作業は全て master へマージ・push 済み。読み込みフックの既定有効化とSetText辞書の廃止も2026-11-22にマージ済み。
 
 ## 確定事項
 
-- 日本語表示は次の組合せで成立する。(1) 生成フォント（Noto Sans CJK JP、翻訳ymlの3,130字）とグリフ表サイドテーブル（id >= 0x100 のグリフ保持）。(2) 描画・計測経路の復号フック（既定で有効、EU4DLL_ENABLE_DECODE=0 で無効化）。(3) ローカライズ読み込みフック（LocalizeYmlAddKey、EU4DLL_LOCALIZE_ESCAPE=1 で有効化。値をエスケープ形式のまま SLanguageData::AddKeyValuePair へ格納し、ConvertUTF8ToLatin1 の「？」化を回避する）。
+- 日本語表示は次の組合せで成立する。(1) 生成フォント（Noto Sans CJK JP、翻訳ymlの3,130字）とグリフ表サイドテーブル（id >= 0x100 のグリフ保持）。(2) 描画・計測経路の復号フック（既定で有効、EU4DLL_ENABLE_DECODE=0 で無効化）。(3) ローカライズ読み込みフック（LocalizeYmlAddKey、既定で有効、EU4DLL_LOCALIZE_ESCAPE=0 で無効化。値をエスケープ形式のまま SLanguageData::AddKeyValuePair へ格納し、ConvertUTF8ToLatin1 の「？」化を回避する）。
 - 内部表現は UTF-8 → UCS2 → Clausewitz エスケープ形式（0x10〜0x13 の3バイト表現、CP1252特殊ケースを含む）。変換器は source/plugin/localization/escape_codec.d。
 - DLL は非EU4プロセスでは即座に戻る（preload ガード、/proc/self/exe の basename が "eu4" のときだけ動作）。Steam の起動連鎖を壊さないため。
 - SetText 置換 PoC（CTextSprite::SetText の第1 CString、14バイト絶対JMP、同一長から容量内可変長まで）は実装済みだが、翻訳の本線ではない。基礎調査の記録は details/cstring_ownership.md、details/variable_length_history.md、details/mojibake_settext.md。
@@ -16,7 +16,6 @@ Linux版EU4 v1.37.5で、翻訳Modを有効にした状態の全面日本語表�
 
 - ゲーム内マップの国名表示（Render3d site 2 の wide path）は修正済みだが実機未踏。
 - 生成フォントが全体的に2〜3pt大きく見える（所有者指摘）。チェックボックスのラベル重なり、狭い見出しの省略、メニューボタンの文字切れも未解消。
-- EU4DLL_LOCALIZE_ESCAPE は opt-in のまま。既定化は未判断。
 - フックは Linux・EU4 v1.37.5 に限定。バージョン更新時は AOB 一意性と命令境界の再検証が要る。
 
 ## 2026/08/29 の調査結果（要約）
@@ -34,7 +33,7 @@ Linux版EU4 v1.37.5で、翻訳Modを有効にした状態の全面日本語表�
 - 変換器の SetText 接続: settext_escape_wiring.md
 - 文字集合とフォント生成: charset_and_font_generation.md、font_generation_item23.md
 - 表示確認と阻害要因: font_display_check_item24.md、dll_inactivation_item25.md、font_charset_table_limit_item26.md、font_display_recheck_item27.md、glyph_table_expansion_item28.md、bitmapfont_bytewidth_decode_item29.md、font_display_final_item30.md、ellipsis_distinguish_item31.md、ellipsis_fix_item32.md
-- SetText辞書: translation_dict_stage_b.md
+- SetText辞書: translation_dict_stage_b.md、settext_dict_position_review.md、settext_dict_removal.md（辞書経路は2026-11-22に廃止。記録として残す）
 - 読み込みフック: localisation_load_conversion_survey.md、localize_escape_hook.md
 - wide path 修正: getheightofstring_decode_survey.md、decode_widepath_fix.md
 - preload ガード: preload_guard.md
