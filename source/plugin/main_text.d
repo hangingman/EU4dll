@@ -947,6 +947,236 @@ extern (C)
             }
         }
     }
+
+    // mainTextRenderToTextureV137Site1_hook (Linux v1.37.5, item 29 step 4)
+    // CBitmapFont::RenderToTexture measuring / line-break pass
+    // fetch site (VA 0x204ef59, patch starts at the preceding
+    // movzbl, VA 0x204ef51).
+    // Entry state (verified by disassembly): RAX = pointer to the
+    // current byte (return value of CString::operator[] at the
+    // loop head, VA 0x204ef41), R14D = loop index, font pointer
+    // at 0x38(%rsp) (loaded into RCX by the overwritten code).
+    // The 16-byte patch covers the movzbl (3), the font load (5)
+    // and the glyph fetch (8), so this hook reproduces all of
+    // them plus the test and the je: on a null glyph it jumps
+    // straight to the je target (VA 0x204f018, patch start
+    // +0xC7); otherwise it returns after the je (VA 0x204ef6a,
+    // +0x19), where the original movswl uses RBP and RCX (the
+    // font, restored after the lookup call below). On an escape
+    // byte it decodes the word at charPtr+1 with the same shifts
+    // as the five TextView hooks, advances R14D by 2 (the common
+    // loop tail at VA 0x204f576 adds the third byte), maps the
+    // NO_FONT band to NOT_DEF, fetches ids < 0x100 from the
+    // embedded table and ids >= 0x100 via wideGlyphLookup.
+    // Register safety: the function prologue is 6 pushes + sub
+    // 0x2888 from an entry RSP % 16 == 8, so RSP % 16 == 0 at
+    // the fetch; the wide path pushes 4 registers and subs 48,
+    // preserving the alignment. Accumulators in this loop are
+    // stack-kept, but the wide path spills XMM0-XMM5 low halves
+    // around the lookup call as insurance, the same as the
+    // RenderToScreen site 2 hook. Kerning after the fetch stays
+    // byte-keyed, the same recorded approximation as the other
+    // byte-width hooks; the null target re-reads the byte at the
+    // (already advanced) index for its newline checks, which
+    // are never true for a payload byte in practice, so a null
+    // wide glyph is simply skipped.
+    void mainTextRenderToTextureV137Site1_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov R11, RAX;
+                mov RCX, qword ptr [RSP + 0x38];
+                movzx EAX, byte ptr [R11];
+                cmp EAX, ESCAPE_SEQ_1;
+                jz JMP_A;
+                cmp EAX, ESCAPE_SEQ_2;
+                jz JMP_B;
+                cmp EAX, ESCAPE_SEQ_3;
+                jz JMP_C;
+                cmp EAX, ESCAPE_SEQ_4;
+                jz JMP_D;
+                jmp JMP_E;
+            JMP_A:
+                movzx EAX, word ptr [R11 + 1];
+                jmp JMP_F;
+            JMP_B:
+                movzx EAX, word ptr [R11 + 1];
+                sub EAX, SHIFT_2;
+                jmp JMP_F;
+            JMP_C:
+                movzx EAX, word ptr [R11 + 1];
+                add EAX, SHIFT_3;
+                jmp JMP_F;
+            JMP_D:
+                movzx EAX, word ptr [R11 + 1];
+                add EAX, SHIFT_4;
+            JMP_F:
+                movzx EAX, AX;
+                add R14D, 2;
+                cmp EAX, NO_FONT;
+                ja JMP_E;
+                mov EAX, NOT_DEF;
+            JMP_E:
+                cmp EAX, 0x100;
+                jae JMP_G;
+                mov RBP, qword ptr [RCX + RAX*8 + 0x100];
+                jmp JMP_H;
+            JMP_G:
+                push RAX;
+                push RCX;
+                push RDX;
+                push RDI;
+                sub RSP, 48;
+                movss dword ptr [RSP], XMM0;
+                movss dword ptr [RSP + 4], XMM1;
+                movss dword ptr [RSP + 8], XMM2;
+                movss dword ptr [RSP + 12], XMM3;
+                movss dword ptr [RSP + 16], XMM4;
+                movss dword ptr [RSP + 20], XMM5;
+                mov RDI, RCX;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov RBP, RAX;
+                movss XMM0, dword ptr [RSP];
+                movss XMM1, dword ptr [RSP + 4];
+                movss XMM2, dword ptr [RSP + 8];
+                movss XMM3, dword ptr [RSP + 12];
+                movss XMM4, dword ptr [RSP + 16];
+                movss XMM5, dword ptr [RSP + 20];
+                add RSP, 48;
+                pop RDI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H:
+                test RBP, RBP;
+                jz JMP_Z;
+                lea R11, [RIP + mainTextRenderToTextureV137Site1ReturnAddress];
+                jmp qword ptr [R11];
+            JMP_Z:
+                lea R11, [RIP + mainTextRenderToTextureV137Site1ZeroReturnAddress];
+                jmp qword ptr [R11];
+            }
+        }
+    }
+    // mainTextRenderToTextureV137Site2_hook (Linux v1.37.5, item 29 step 4)
+    // CBitmapFont::RenderToTexture draw pass fetch site
+    // (VA 0x2051088, patch starts at the preceding movzbl,
+    // VA 0x2051085).
+    // Entry state (verified by disassembly): RAX = pointer to
+    // the current byte (return value of CString::operator[] at
+    // the loop head, VA 0x205107a; the CString itself is in
+    // R12), R14D = loop index, R13 = font (this). The 14-byte
+    // patch covers the movzbl (3), the glyph fetch (8) and the
+    // test (3), so this hook reproduces all of them plus the
+    // je: on a null glyph it jumps straight to the je target
+    // (VA 0x20513d9, patch start +0x354); otherwise it returns
+    // after the je (VA 0x2051099, +0x14), where the original
+    // code reloads the scale into XMM8. On an escape byte it
+    // decodes the word at charPtr+1 with the same shifts,
+    // advances R14D by 2 (the common loop tail at VA 0x2051489
+    // adds the third byte), maps the NO_FONT band to NOT_DEF,
+    // fetches ids < 0x100 from the embedded table and ids
+    // >= 0x100 via wideGlyphLookup. The char pointer is kept in
+    // R10 because the glyph result register is R11 itself.
+    // Register safety: same function and alignment argument as
+    // site 1; the wide path pushes 4 registers and subs 48 and
+    // spills XMM0-XMM5 plus XMM8 (the scale register of this
+    // loop, recorded live in the step 3 analysis) low halves
+    // around the lookup call. R13 is callee-saved and is
+    // preserved by the lookup call. The null target re-reads
+    // the byte at the (already advanced) index for its newline
+    // checks; see the site 1 comment.
+    void mainTextRenderToTextureV137Site2_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov R10, RAX;
+                movzx EAX, byte ptr [R10];
+                cmp EAX, ESCAPE_SEQ_1;
+                jz JMP_A;
+                cmp EAX, ESCAPE_SEQ_2;
+                jz JMP_B;
+                cmp EAX, ESCAPE_SEQ_3;
+                jz JMP_C;
+                cmp EAX, ESCAPE_SEQ_4;
+                jz JMP_D;
+                jmp JMP_E;
+            JMP_A:
+                movzx EAX, word ptr [R10 + 1];
+                jmp JMP_F;
+            JMP_B:
+                movzx EAX, word ptr [R10 + 1];
+                sub EAX, SHIFT_2;
+                jmp JMP_F;
+            JMP_C:
+                movzx EAX, word ptr [R10 + 1];
+                add EAX, SHIFT_3;
+                jmp JMP_F;
+            JMP_D:
+                movzx EAX, word ptr [R10 + 1];
+                add EAX, SHIFT_4;
+            JMP_F:
+                movzx EAX, AX;
+                add R14D, 2;
+                cmp EAX, NO_FONT;
+                ja JMP_E;
+                mov EAX, NOT_DEF;
+            JMP_E:
+                cmp EAX, 0x100;
+                jae JMP_G;
+                mov R11, qword ptr [R13 + RAX*8 + 0x100];
+                jmp JMP_H;
+            JMP_G:
+                push RAX;
+                push RCX;
+                push RDX;
+                push RDI;
+                sub RSP, 48;
+                movss dword ptr [RSP], XMM0;
+                movss dword ptr [RSP + 4], XMM1;
+                movss dword ptr [RSP + 8], XMM2;
+                movss dword ptr [RSP + 12], XMM3;
+                movss dword ptr [RSP + 16], XMM4;
+                movss dword ptr [RSP + 20], XMM5;
+                movss dword ptr [RSP + 24], XMM8;
+                mov RDI, R13;
+                mov ESI, EAX;
+                lea R10, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R10, qword ptr [R10];
+                call R10;
+                mov R11, RAX;
+                movss XMM0, dword ptr [RSP];
+                movss XMM1, dword ptr [RSP + 4];
+                movss XMM2, dword ptr [RSP + 8];
+                movss XMM3, dword ptr [RSP + 12];
+                movss XMM4, dword ptr [RSP + 16];
+                movss XMM5, dword ptr [RSP + 20];
+                movss XMM8, dword ptr [RSP + 24];
+                add RSP, 48;
+                pop RDI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H:
+                test R11, R11;
+                jz JMP_Z;
+                lea R10, [RIP + mainTextRenderToTextureV137Site2ReturnAddress];
+                jmp qword ptr [R10];
+            JMP_Z:
+                lea R10, [RIP + mainTextRenderToTextureV137Site2ZeroReturnAddress];
+                jmp qword ptr [R10];
+            }
+        }
+    }
 }
 
 private __gshared size_t mainTextProc1V137SiteAReturnAddress;
@@ -960,6 +1190,10 @@ private __gshared size_t mainTextRenderToScreenV137Site1ReturnAddress;
 private __gshared size_t mainTextRenderToScreenV137Site1ZeroReturnAddress;
 private __gshared size_t mainTextRenderToScreenV137Site2ReturnAddress;
 private __gshared size_t mainTextRenderToScreenV137Site2ZeroReturnAddress;
+private __gshared size_t mainTextRenderToTextureV137Site1ReturnAddress;
+private __gshared size_t mainTextRenderToTextureV137Site1ZeroReturnAddress;
+private __gshared size_t mainTextRenderToTextureV137Site2ReturnAddress;
+private __gshared size_t mainTextRenderToTextureV137Site2ZeroReturnAddress;
 private __gshared size_t mainTextGlyphLookupFuncAddress;
 private __gshared size_t mainTextProc1ReturnAddress;
 private __gshared size_t mainTextProc2ReturnAddress;
@@ -1461,6 +1695,55 @@ DllError mainTextProc4Injector(RunOptions options)
             {
                 e.unmatchdMainTextProc4Injector = true;
             }
+            // Item 29 step 4: CBitmapFont::RenderToTexture has
+            // two byte-width fetch sites in the same function.
+            // Site 1 (fetch VA 0x204ef59, patch at the preceding
+            // movzbl, VA 0x204ef51) is the measuring / line-break
+            // pass over a stack CString; site 2 (fetch VA
+            // 0x2051088, patch at the preceding movzbl, VA
+            // 0x2051085) is the draw pass over the CString in
+            // R12. Both patterns were verified exactly 1 hit in
+            // a full binary scan (item 29 step 3).
+            BytePattern.tempInstance()
+                .findPattern("0F B6 00 48 8B 4C 24 38 48 8B AC C1 00 01 00 00 48 85 ED 0F 84 AE 00 00 00");
+            if (BytePattern.tempInstance().hasSize(1, "MainText RenderToTexture v1.37.5 site 1"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                // Return after the reproduced test+je (+0x19); a
+                // null glyph goes to the original je target
+                // (+0xC7).
+                mainTextRenderToTextureV137Site1ReturnAddress = address + 0x19;
+                mainTextRenderToTextureV137Site1ZeroReturnAddress = address + 0xC7;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextRenderToTextureV137Site1_hook, 16);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 RenderToTexture site 1, item 29) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
+            BytePattern.tempInstance()
+                .findPattern("0F B6 00 4D 8B 9C C5 00 01 00 00 4D 85 DB 0F 84 40 03 00 00");
+            if (BytePattern.tempInstance().hasSize(1, "MainText RenderToTexture v1.37.5 site 2"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                // Return after the reproduced test+je (+0x14); a
+                // null glyph goes to the original je target
+                // (+0x354).
+                mainTextRenderToTextureV137Site2ReturnAddress = address + 0x14;
+                mainTextRenderToTextureV137Site2ZeroReturnAddress = address + 0x354;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextRenderToTextureV137Site2_hook, 14);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 RenderToTexture site 2, item 29) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
             break;
         }
     default:

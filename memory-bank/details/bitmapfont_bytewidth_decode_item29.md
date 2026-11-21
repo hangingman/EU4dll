@@ -370,3 +370,73 @@ Item 29 is NOT complete; no hook is installed in this step.
 - Verification of this step: record-only change, no runtime
   code changed; `make test` / `make all` are run as usual
   and the tree is committed on the work branch.
+
+# Step 4 (2026-11-21, item 29 step 4): RenderToTexture site 1 + site 2 hooks
+
+Implemented: both RenderToTexture byte-width fetch sites now
+decode escapes and resolve wide glyphs via the side table, in
+source/plugin/main_text.d (mainTextRenderToTextureV137Site1_hook /
+Site2_hook, installed from the Proc4 injector v1.37.5 case,
+opt-in only). Both sites are in the same function
+(CBitmapFont::RenderToTexture, VA 0x204e886; prologue 6 pushes +
+sub 0x2888, so RSP % 16 == 0 at both fetches).
+
+- Site 1 (measuring / line-break pass, fetch VA 0x204ef59, patch
+  at the preceding movzbl VA 0x204ef51, patch length 16 = movzbl
+  3 + font load 5 + fetch 8): hook keeps the operator[] result
+  pointer in R11, loads the font into RCX from 0x38(%rsp),
+  reproduces fetch + test + je. Normal return VA 0x204ef6a
+  (+0x19, the original movswl, which also reuses RCX for the
+  scale), null return VA 0x204f018 (+0xC7). On escape it adds 2
+  to R14D (common tail at VA 0x204f576 adds the third byte).
+  Wide path pushes RAX/RCX/RDX/RDI + sub 48 and spills
+  XMM0-XMM5 low halves around the lookup call (insurance; the
+  accumulators of this loop are stack-kept); RCX (font) is
+  restored by the pop after the call.
+- Site 2 (draw pass, fetch VA 0x2051088, patch at the preceding
+  movzbl VA 0x2051085, patch length 14 = movzbl 3 + fetch 8 +
+  test 3): hook keeps the operator[] result pointer in R10
+  (the glyph result register is R11 itself, so the return jump
+  also goes through R10), font is R13 (callee-saved, preserved
+  by the lookup call). Normal return VA 0x2051099 (+0x14, the
+  XMM8 scale reload), null return VA 0x20513d9 (+0x354). On
+  escape it adds 2 to R14D (common tail at VA 0x2051489 adds
+  the third byte). Wide path spills XMM0-XMM5 plus XMM8 low
+  halves (XMM8 recorded live for this loop in step 3).
+- Both AOBs re-verified in this run by a full byte scan of the
+  58 MiB binary: site 1 pattern (from the movzbl, 25 bytes)
+  exactly 1 hit at VA 0x204ef51, site 2 pattern (19 bytes)
+  exactly 1 hit at VA 0x2051085.
+- Recorded approximation (both sites, same as steps 1-2):
+  kerning after the fetch stays byte-keyed, and the null
+  targets re-read the byte at the already-advanced index for
+  their newline checks (0x0A/0x0D); a payload byte is not a
+  newline in practice, so a null wide glyph is simply skipped
+  and the total advance stays 3 bytes.
+
+## Verification (step 4)
+
+- make test: 10 modules passed. make all run last; final .so
+  md5 54a84fbd4cc3d52fa3d84496c3d33a1a, DIAGNOSTIC-RAW lines
+  present on the /bin/true preload check (normal build,
+  item 25 rule).
+- Smoke runs/20261121-190418-multiplayer (eu4_multiplayer.sh,
+  EU4DLL_ENABLE_DECODE=1, EU4DLL_SETTEXT_PROBE=1, Back replaced
+  with the Japanese word, vanilla fonts): both RenderToTexture
+  JMP lines present alongside all earlier JMP lines, DLL [OK],
+  SetText id=0 result=applied, no crash, process alive at the
+  Game Browser screen (script ended by kill, the known
+  behaviour there).
+- Screenshots checked visually: main menu renders normally in
+  English, no corruption. The Game Browser bottom-left button
+  is now EMPTY (no text), where steps 1-2 still showed the
+  byte glyphs (I, b, boxed-X, 0). With vanilla fonts a decoded
+  wide glyph resolves to null and is skipped, so an empty
+  button is exactly the expected result if this button draws
+  through RenderToTexture: the byte-wise display is gone and
+  the decode now reaches this button's path. Whether the
+  glyph actually appears with the generated fonts placed is
+  the item 30 check (after step 5).
+- Item 29 is NOT complete. Next: step 5 - GetHeightOfString +
+  Render3d site 1 + site 2 hooks, after pinning the Render3d
+  draw-pass loop tail (still open from step 3).
