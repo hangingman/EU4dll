@@ -126,7 +126,7 @@ extern (C)
                 push RCX;
                 mov RDI, RAX;
                 mov ESI, ECX;
-                lea R11, [RIP + glyphLookupFuncAddress];
+                lea R11, [glyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov R11, RAX;
@@ -134,15 +134,15 @@ extern (C)
                 pop RAX;
                 test R11, R11;
                 jz EMPTY;
-                lea R11, [RIP + glyphDuplicateOccupiedReturnAddress];
+                lea R11, [glyphDuplicateOccupiedReturnAddress];
                 jmp qword ptr [R11];
             EMPTY:
-                lea R11, [RIP + glyphDuplicateEmptyReturnAddress];
+                lea R11, [glyphDuplicateEmptyReturnAddress];
                 jmp qword ptr [R11];
             VANILLA:
                 cmp qword ptr [RAX + RCX*8 + 0x100], 0;
                 jz EMPTY;
-                lea R11, [RIP + glyphDuplicateOccupiedReturnAddress];
+                lea R11, [glyphDuplicateOccupiedReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -169,18 +169,18 @@ extern (C)
                 mov RDI, RCX;
                 mov ESI, R13D;
                 mov RDX, RAX;
-                lea R11, [RIP + glyphRegisterFuncAddress];
+                lea R11, [glyphRegisterFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 pop R11;
                 pop R13;
                 pop RCX;
                 pop RAX;
-                lea R11, [RIP + glyphStoreReturnAddress];
+                lea R11, [glyphStoreReturnAddress];
                 jmp qword ptr [R11];
             VANILLA:
                 mov qword ptr [RCX + R13*8 + 0x100], RAX;
-                lea R11, [RIP + glyphStoreReturnAddress];
+                lea R11, [glyphStoreReturnAddress];
                 jmp qword ptr [R11];
             }
         }

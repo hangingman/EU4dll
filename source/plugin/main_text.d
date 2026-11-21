@@ -1,5 +1,10 @@
 module plugin.main_text;
 
+// 注意: naked asm内のメモリ参照は [symbol] と書くこと。[RIP + symbol] と書くと
+// LDC 1.43以降では (%rip) が二重に生成されてアセンブルエラーになる。
+// 逆に [symbol] は LDC 1.42以前では絶対アドレス参照になり共有ライブラリにリンクできない。
+// そのためビルドには LDC 1.43以降が必要。
+
 import std.stdio;
 import plugin.byte_pattern;
 import plugin.constant;
@@ -82,7 +87,7 @@ extern (C)
                 mov       RBX, qword ptr [R15+RAX*8];
                 mov       qword ptr [RBP+0x100], RBX;
 
-                lea       R11, [RIP + mainTextProc1ReturnAddress]; // LEAでアドレスをロード
+                lea       R11, [mainTextProc1ReturnAddress]; // LEAでアドレスをロード
                 jmp       qword ptr [R11]; // ロードしたアドレスにジャンプ
             }
         }
@@ -105,7 +110,7 @@ extern (C)
                 mov       R10, qword ptr [RSP + 0x78]; // RSP+858h-7E0h = RSP+78h
 
                 movzx     EAX, byte ptr [RDX+R10];
-                lea       R9, [RIP + mainTextProc2BufferAddress]; // LEAでアドレスをロード
+                lea       R9, [mainTextProc2BufferAddress]; // LEAでアドレスをロード
                 mov       R9, qword ptr [R9]; // グローバル変数の値をR9にロード
                 mov       byte ptr [RCX+R9], AL;
 
@@ -157,10 +162,10 @@ extern (C)
                 add       RDX, 2;
                 add       EDI, 2;
             JMP_E:
-                lea       R11, [RIP + s_lastCodePoint]; // LEAでアドレスをロード
+                lea       R11, [s_lastCodePoint]; // LEAでアドレスをロード
                 mov       dword ptr [R11], EAX; // 対策3: __gshared変数に保存
                 
-                lea       R11, [RIP + mainTextProc2ReturnAddress]; // LEAでアドレスをロード
+                lea       R11, [mainTextProc2ReturnAddress]; // LEAでアドレスをロード
                 jmp       qword ptr [R11]; // ロードしたアドレスにジャンプ
             }
         }
@@ -188,7 +193,7 @@ extern (C)
                 mov       R10, qword ptr [RSP + 0x78]; // RSP+858h-7E0h = RSP+78h
 
                 movzx     EAX, byte ptr [RDX+R10];
-                lea       R9, [RIP + mainTextProc2BufferAddress]; // LEAでアドレスをロード
+                lea       R9, [mainTextProc2BufferAddress]; // LEAでアドレスをロード
                 mov       R9, qword ptr [R9]; // グローバル変数の値をR9にロード
                 mov       byte ptr [RCX+R9], AL;
 
@@ -240,10 +245,10 @@ extern (C)
                 add       RDX, 2;
                 add       EDI, 2;
             JMP_E:
-                lea       R11, [RIP + s_lastCodePoint]; // LEAでアドレスをロード
+                lea       R11, [s_lastCodePoint]; // LEAでアドレスをロード
                 mov       dword ptr [R11], EAX; // 対策3: __gshared変数に保存
                 
-                lea       R11, [RIP + mainTextProc2ReturnAddress]; // LEAでアドレスをロード
+                lea       R11, [mainTextProc2ReturnAddress]; // LEAでアドレスをロード
                 jmp       qword ptr [R11]; // ロードしたアドレスにジャンプ
             }
         }
@@ -262,17 +267,17 @@ extern (C)
                 jmp JMP_B;
 
             JMP_A:
-                cmp dword ptr [RIP + s_lastCodePoint], 0xFF; // 対策3: __gshared変数から読み込み
+                cmp dword ptr [s_lastCodePoint], 0xFF; // 対策3: __gshared変数から読み込み
                 ja JMP_B;
 
-                mov R11, qword ptr[RIP + mainTextProc3ReturnAddress2];
+                mov R11, qword ptr[mainTextProc3ReturnAddress2];
                 jmp R11;
 
             JMP_B:
                 lea EAX, dword ptr[RBX + RBX];
                 movd XMM1, EAX;
 
-                mov R11, qword ptr[RIP + mainTextProc3ReturnAddress1];
+                mov R11, qword ptr[mainTextProc3ReturnAddress1];
                 jmp R11;
             }
         }
@@ -287,21 +292,21 @@ extern (C)
             {
                 naked;
                 // check code point saved proc1
-                cmp dword ptr [RIP + s_lastCodePoint], 0xFF; // 対策3: __gshared変数から読み込み
+                cmp dword ptr [s_lastCodePoint], 0xFF; // 対策3: __gshared変数から読み込み
                 ja JMP_A;
 
                 movzx EAX, byte ptr[RDX + R10]; // Original instruction
                 jmp JMP_B;
 
             JMP_A:
-                mov EAX, dword ptr [RIP + s_lastCodePoint]; // 対策3: __gshared変数から読み込み
+                mov EAX, dword ptr [s_lastCodePoint]; // 対策3: __gshared変数から読み込み
 
             JMP_B:
                 mov RCX, qword ptr[R15 + RAX * 8];
                 mov qword ptr[RBP - 0x60], RCX;
                 test RCX, RCX;
 
-                mov R11, qword ptr[RIP + mainTextProc4ReturnAddress];
+                mov R11, qword ptr[mainTextProc4ReturnAddress];
                 jmp R11;
             }
         }
@@ -365,7 +370,7 @@ extern (C)
                 jae       JMP_G;
                 mov RCX, qword ptr [RSP + 0x68];
                 mov R15, qword ptr [RCX + RAX*8 + 0x100];
-                lea       R11, [RIP + mainTextProc1V137SiteAReturnAddress];
+                lea       R11, [mainTextProc1V137SiteAReturnAddress];
                 jmp       qword ptr [R11];
             JMP_G:
                 mov RCX, qword ptr [RSP + 0x68];
@@ -373,13 +378,13 @@ extern (C)
                 push RCX;
                 mov RDI, RCX;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov R15, RAX;
                 pop RCX;
                 pop RAX;
-                lea       R11, [RIP + mainTextProc1V137SiteAReturnAddress];
+                lea       R11, [mainTextProc1V137SiteAReturnAddress];
                 jmp       qword ptr [R11];
             }
         }
@@ -433,14 +438,14 @@ extern (C)
                 push RDX;
                 mov RDI, R12;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 pop RDX;
                 pop RCX;
             JMP_H:
                 test RAX, RAX;
-                lea       R11, [RIP + mainTextProc1V137SiteBReturnAddress];
+                lea       R11, [mainTextProc1V137SiteBReturnAddress];
                 jmp       qword ptr [R11];
             }
         }
@@ -489,7 +494,7 @@ extern (C)
                 jae       JMP_G;
                 mov RCX, qword ptr [RSP + 0x28];
                 mov RBP, qword ptr [RCX + RAX*8 + 0x100];
-                lea       R11, [RIP + mainTextProc4V137GetActualReturnAddress];
+                lea       R11, [mainTextProc4V137GetActualReturnAddress];
                 jmp       qword ptr [R11];
             JMP_G:
                 mov RCX, qword ptr [RSP + 0x28];
@@ -497,13 +502,13 @@ extern (C)
                 push RCX;
                 mov RDI, RCX;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
                 pop RCX;
                 pop RAX;
-                lea       R11, [RIP + mainTextProc4V137GetActualReturnAddress];
+                lea       R11, [mainTextProc4V137GetActualReturnAddress];
                 jmp       qword ptr [R11];
             }
         }
@@ -557,7 +562,7 @@ extern (C)
                 push RDX;
                 mov RDI, R13;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
@@ -565,7 +570,7 @@ extern (C)
                 pop RCX;
             JMP_H:
                 test RBP, RBP;
-                lea       R11, [RIP + mainTextProc4V137GetRequiredReturnAddress];
+                lea       R11, [mainTextProc4V137GetRequiredReturnAddress];
                 jmp       qword ptr [R11];
             }
         }
@@ -619,7 +624,7 @@ extern (C)
                 push RDX;
                 mov RDI, R15;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
@@ -627,7 +632,7 @@ extern (C)
                 pop RCX;
             JMP_H:
                 test RBP, RBP;
-                lea       R11, [RIP + mainTextProc4V137GetActualRealReturnAddress];
+                lea       R11, [mainTextProc4V137GetActualRealReturnAddress];
                 jmp       qword ptr [R11];
             }
         }
@@ -700,7 +705,7 @@ extern (C)
                 push RDX;
                 push RDI;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
@@ -712,10 +717,10 @@ extern (C)
                 test RBP, RBP;
                 jz        JMP_Z;
                 movsx EAX, word ptr [RBP + 0xC];
-                lea       R11, [RIP + mainTextBitmapWidthV137ReturnAddress];
+                lea       R11, [mainTextBitmapWidthV137ReturnAddress];
                 jmp       qword ptr [R11];
             JMP_Z:
-                lea       R11, [RIP + mainTextBitmapWidthV137ZeroReturnAddress];
+                lea       R11, [mainTextBitmapWidthV137ZeroReturnAddress];
                 jmp       qword ptr [R11];
             }
         }
@@ -818,7 +823,7 @@ extern (C)
                 movss dword ptr [RSP + 8], XMM3;
                 mov RDI, RDX;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
@@ -833,10 +838,10 @@ extern (C)
             JMP_H:
                 test RBP, RBP;
                 jz JMP_Z;
-                lea R11, [RIP + mainTextRenderToScreenV137Site1ReturnAddress];
+                lea R11, [mainTextRenderToScreenV137Site1ReturnAddress];
                 jmp qword ptr [R11];
             JMP_Z:
-                lea R11, [RIP + mainTextRenderToScreenV137Site1ZeroReturnAddress];
+                lea R11, [mainTextRenderToScreenV137Site1ZeroReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -921,7 +926,7 @@ extern (C)
                 movss dword ptr [RSP + 16], XMM4;
                 movss dword ptr [RSP + 20], XMM5;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov R13, RAX;
@@ -939,10 +944,10 @@ extern (C)
             JMP_H:
                 test R13, R13;
                 jz JMP_Z;
-                lea R11, [RIP + mainTextRenderToScreenV137Site2ReturnAddress];
+                lea R11, [mainTextRenderToScreenV137Site2ReturnAddress];
                 jmp qword ptr [R11];
             JMP_Z:
-                lea R11, [RIP + mainTextRenderToScreenV137Site2ZeroReturnAddress];
+                lea R11, [mainTextRenderToScreenV137Site2ZeroReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -1045,7 +1050,7 @@ extern (C)
                 sub ESI, 2;
                 mov EDX, EAX;
                 mov ECX, 1;
-                lea R11, [RIP + mainTextRawLogFuncAddress];
+                lea R11, [mainTextRawLogFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 pop R11;
@@ -1054,7 +1059,7 @@ extern (C)
                 pop RAX;
                 mov RDI, RCX;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
@@ -1072,10 +1077,10 @@ extern (C)
             JMP_H:
                 test RBP, RBP;
                 jz JMP_Z;
-                lea R11, [RIP + mainTextRenderToTextureV137Site1ReturnAddress];
+                lea R11, [mainTextRenderToTextureV137Site1ReturnAddress];
                 jmp qword ptr [R11];
             JMP_Z:
-                lea R11, [RIP + mainTextRenderToTextureV137Site1ZeroReturnAddress];
+                lea R11, [mainTextRenderToTextureV137Site1ZeroReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -1173,7 +1178,7 @@ extern (C)
                 sub ESI, 2;
                 mov EDX, EAX;
                 mov ECX, 2;
-                lea R10, [RIP + mainTextRawLogFuncAddress];
+                lea R10, [mainTextRawLogFuncAddress];
                 mov R10, qword ptr [R10];
                 call R10;
                 pop R11;
@@ -1182,7 +1187,7 @@ extern (C)
                 pop RAX;
                 mov RDI, R13;
                 mov ESI, EAX;
-                lea R10, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R10, [mainTextGlyphLookupFuncAddress];
                 mov R10, qword ptr [R10];
                 call R10;
                 mov R11, RAX;
@@ -1201,10 +1206,10 @@ extern (C)
             JMP_H:
                 test R11, R11;
                 jz JMP_Z;
-                lea R10, [RIP + mainTextRenderToTextureV137Site2ReturnAddress];
+                lea R10, [mainTextRenderToTextureV137Site2ReturnAddress];
                 jmp qword ptr [R10];
             JMP_Z:
-                lea R10, [RIP + mainTextRenderToTextureV137Site2ZeroReturnAddress];
+                lea R10, [mainTextRenderToTextureV137Site2ZeroReturnAddress];
                 jmp qword ptr [R10];
             }
         }
@@ -1306,7 +1311,7 @@ extern (C)
             APP_DONE:
                 add RSP, 8;
                 pop RBX;
-                lea R11, [RIP + mainTextRenderToTextureV137LineBufReturnAddress];
+                lea R11, [mainTextRenderToTextureV137LineBufReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -1386,7 +1391,7 @@ extern (C)
                 movss dword ptr [RSP + 20], XMM5;
                 mov RDI, RBX;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 movss XMM0, dword ptr [RSP + 0];
@@ -1402,10 +1407,10 @@ extern (C)
             JMP_H:
                 test RAX, RAX;
                 jz JMP_Z;
-                lea R11, [RIP + mainTextGetHeightV137ReturnAddress];
+                lea R11, [mainTextGetHeightV137ReturnAddress];
                 jmp qword ptr [R11];
             JMP_Z:
-                lea R11, [RIP + mainTextGetHeightV137ZeroReturnAddress];
+                lea R11, [mainTextGetHeightV137ZeroReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -1480,7 +1485,7 @@ extern (C)
                 movss dword ptr [RSP + 20], XMM5;
                 mov RDI, R12;
                 mov ESI, EAX;
-                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R11, [mainTextGlyphLookupFuncAddress];
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBX, RAX;
@@ -1498,10 +1503,10 @@ extern (C)
             JMP_H:
                 test RBX, RBX;
                 jz JMP_Z;
-                lea R11, [RIP + mainTextRender3dV137Site1ReturnAddress];
+                lea R11, [mainTextRender3dV137Site1ReturnAddress];
                 jmp qword ptr [R11];
             JMP_Z:
-                lea R11, [RIP + mainTextRender3dV137Site1ZeroReturnAddress];
+                lea R11, [mainTextRender3dV137Site1ZeroReturnAddress];
                 jmp qword ptr [R11];
             }
         }
@@ -1579,7 +1584,7 @@ extern (C)
                 movss dword ptr [RSP + 24], XMM10;
                 mov RDI, R12;
                 mov ESI, EAX;
-                lea R10, [RIP + mainTextGlyphLookupFuncAddress];
+                lea R10, [mainTextGlyphLookupFuncAddress];
                 mov R10, qword ptr [R10];
                 call R10;
                 movss XMM0, dword ptr [RSP + 0];
@@ -1596,10 +1601,10 @@ extern (C)
             JMP_H:
                 test RAX, RAX;
                 jz JMP_Z;
-                lea R10, [RIP + mainTextRender3dV137Site2ReturnAddress];
+                lea R10, [mainTextRender3dV137Site2ReturnAddress];
                 jmp qword ptr [R10];
             JMP_Z:
-                lea R10, [RIP + mainTextRender3dV137Site2ZeroReturnAddress];
+                lea R10, [mainTextRender3dV137Site2ZeroReturnAddress];
                 jmp qword ptr [R10];
             }
         }

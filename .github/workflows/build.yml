@@ -4,11 +4,17 @@ on:
     branches:
       - master
       - 'issues/**'
+      - 'work/**'
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     if: "! contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [ldc-1.43.0, ldc-latest]
 
     steps:
     - name: Get source
@@ -16,18 +22,19 @@ jobs:
 
     - uses: dlang-community/setup-dlang@v1.4.0
       with:
-        compiler: ldc-latest
+        compiler: ${{ matrix.compiler }}
 
     - name: Cache dub
       uses: actions/cache@v4
       with:
         path: ~/.dub
-        key: ${{ runner.os }}-dub-${{ hashFiles('**/dub.json', '**/dub.selections.json') }}
+        key: ${{ runner.os }}-dub-${{ matrix.compiler }}-${{ hashFiles('**/dub.json', '**/dub.selections.json') }}
         restore-keys: |
+          ${{ runner.os }}-dub-${{ matrix.compiler }}-
           ${{ runner.os }}-dub-
 
     - name: Build
-      run: make
+      run: make all
 
     - name: Test
       run: make test
