@@ -146,6 +146,19 @@ string formatGlyphDebugLine(string kind, size_t fontBase, uint codePoint,
             kind, fontBase, codePoint, cast(size_t) glyph, total);
 }
 
+// caller is logged as an offset from &wideGlyphLookup (item 32),
+// resolvable against nm output of libeu4dll.so.
+string formatGlyphDebugLineCaller(string kind, size_t fontBase, uint codePoint,
+        void* glyph, size_t total, size_t caller)
+{
+    import std.format : format;
+    return format("[GLYPH-DEBUG] %s font=0x%x cp=0x%x glyph=0x%x total=%d caller=0x%x\n",
+            kind, fontBase, codePoint, cast(size_t) glyph, total, caller);
+}
+
+pragma(LDC_intrinsic, "llvm.returnaddress")
+private void* llvm_returnaddress(uint level);
+
 private void glyphDebugWrite(string line)
 {
     import core.sys.posix.unistd : write;
@@ -167,9 +180,10 @@ extern (C) void* wideGlyphLookup(size_t fontBase, uint codePoint)
 {
     auto glyph = g_wideGlyphTable.lookupGlyph(fontBase, codePoint);
     if (glyphDebugEnabled() && glyphDebugInteresting(codePoint))
-        glyphDebugWrite(formatGlyphDebugLine(
+        glyphDebugWrite(formatGlyphDebugLineCaller(
                 glyph is null ? "lookup-miss" : "lookup-hit",
-                fontBase, codePoint, glyph, g_wideGlyphTable.length));
+                fontBase, codePoint, glyph, g_wideGlyphTable.length,
+                cast(size_t) llvm_returnaddress(0) - cast(size_t) &wideGlyphLookup));
     return glyph;
 }
 
@@ -296,4 +310,6 @@ unittest
     assert(!glyphDebugInteresting(0x100));
     const line = formatGlyphDebugLine("lookup-miss", 0x1234, 0x623B, null, 42);
     assert(line == "[GLYPH-DEBUG] lookup-miss font=0x1234 cp=0x623b glyph=0x0 total=42\n");
+    const cline = formatGlyphDebugLineCaller("lookup-hit", 0x1234, 0x2026, cast(void*) 0x5000, 42, 0x7000);
+    assert(cline == "[GLYPH-DEBUG] lookup-hit font=0x1234 cp=0x2026 glyph=0x5000 total=42 caller=0x7000\n");
 }
