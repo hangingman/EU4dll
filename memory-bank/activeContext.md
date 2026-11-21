@@ -60,3 +60,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## Font側の残り注入の整理（2026/11/21追記、項目18）
 
 - 詳細は `memory-bank/details/font_remaining_linux_injectors.md` に記録した。FontSizeLimit は `CTextureHandler::LoadTexture` VA 0x22a7edb のファイルサイズ上限（16MiB）だと特定して v1.37.5 で実装済み（1件一致時のみ 04000000h へ、opt-in時のみ）。BufferClear1/2 はLinuxに対応箇所なし、BufferExpansion の候補 0x4B0 は頂点数であり同等性が否定されたため実装しない。Font側で残る未実装はこの3件（＋HeapZeroClear）で、いずれも理由を記録して閉じた。
+
+## TextView側フックの実装（2026/11/21追記、項目19）
+
+- 詳細は `memory-bank/details/main_text_linux_injection.md` に記録した。TextView側は v1.37.5 で実装済み: `FillVertexBuffer` の2箇所と計測側3関数の取得箇所に、取得箇所そのものでエスケープ復号するフックを入れた（各パターン1件一致時のみ、絶対ジャンプ、opt-in時のみ）。Proc2／Proc3 はLinuxに対応箇所が無く未実装のまま（理由は項目13の記録どおり）。残るは項目20（変換器をSetText置換経路へ接続）と項目21（日本語表示の実機確認）。

@@ -210,3 +210,10 @@
 - BufferClear1/2 は実装しない: Linuxのフォントバッファ経路に 3D88h のクリア箇所は無く、`GfxCreateVertexBuffer` へはデータポインタ NULL で生成され、対応する memset が存在しない。
 - BufferExpansion は実装しない: 候補だった 0x4B0 は `GfxCreateVertexBuffer` 本体の確認でバイトサイズではなく頂点数（1200、ストライド 01Ch）だと分かり、埋める側に 1200 の上限チェックが無いため、割り当てだけ広げても効果が実証できない。項目19/21で実際に頂点数の切り捨てが出たら再検討する。
 - 検証: smoke runs/20261121-151742（opt-in＋SetTextプローブ）で FontSizeLimit とリミッタ両方の WriteMemory ログを確認し、件数不一致は無かった。DLL [OK]、Exitで正常終了（eu4_wait=0）、メニュー画面の英語表示は正常だった。
+
+## TextView側フックの実装（2026/11/21、項目19）
+
+- 詳細は `memory-bank/details/main_text_linux_injection.md` に記録した。項目13のパターンを使い、`main_text.d` に v1.37.5 のケースを追加した: Proc1インジェクタが `FillVertexBuffer` の2箇所（VA 0x2055562／0x2055ac1）、Proc4インジェクタが計測側3関数（GetActualRequiredSize VA 0x2056198／GetRequiredSize VA 0x2056872／GetActualRealRequiredSizeActually VA 0x20570b6）を担当する。各箇所とも `hasSize(1)` で1件一致を確認した場合だけ、項目14の絶対ジャンプ（`addJmpPatch`、パッチ長は箇所ごとに16／14バイト）で当てる。
+- フックは取得箇所そのもので復号する設計（WindowsのProc2経由の受け渡しはLinuxに無いため）。`CString::operator[]` の戻りポインタが指すバイトがエスケープバイト（0x10〜0x13）なら続くワードを既存フックと同じずらし量で復号し、その箇所のループ添字を2進め、グリフ取得（+0x100）を再現して戻る。戻り先が条件分岐の箇所では、フック末尾で元の `test` を実行してフラグを立てる。Proc2／Proc3 はLinuxに対応箇所が無いため未変更で、v1.37.5では従来どおりバージョンエラーを返す（opt-in配線では致命的ではない）。
+- 添字を2進める先（レジスタかスタック上のdwordか）は箇所ごとに逆アセンブルで特定したが、エスケープ経路は通常の英語表示では通らないため、実証は項目21に残る。
+- 検証: `make test` 9モジュール通過、`make all` 成功。smoke runs/20261121-152852（opt-in＋SetTextプローブ）で5箇所全てのJMP作成ログを確認し、件数不一致は無かった。DLL [OK]、SetText id=0 result=applied、Exitで正常終了（eu4_wait=0）。メニュー画面のスクリーンショットで通常の英語表示に崩れが無いことを目視確認した。
