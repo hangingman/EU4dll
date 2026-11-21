@@ -410,3 +410,6 @@
 
 ## 2026-11-22 - TODO follow-up: LOCALIZE_ESCAPE default-on and SetText dictionary issues closed
 - PR #7 (merged as b796de4) settled the two decisions the 2026-11-21 TODO still listed as open: the localisation escape hook is on by default (EU4DLL_LOCALIZE_ESCAPE=0 opts out) and the SetText file dictionary was removed. TODO.txt updated in PR #8: both items moved to a completed-decisions section, the remaining list renumbered (font size adjustment, in-game map labels, layout quality, version-update AOB re-verification), the completion criteria updated, and activeContext.md corrected on the same two points.
+
+## 2026-11-22 - Debian package
+- Added debian/ packaging (branch work/debian-package): one .deb bundles libeu4dll.so (usr/lib/eu4dll/), the eu4dll_translations mod data (localisation 145 yml + generated fonts 32 files, usr/share/eu4dll/mod/), and the eu4dll-launch / eu4dll-install-mod helper scripts. Mod data is copied at build time from EU4DLL_MOD_SRC because it is not stored in this repository. Build succeeds on the build machine (12.7 MB package); contents, the packaged library's preload-guard behaviour, and eu4dll-install-mod against a scratch data home were verified. Installing on a second machine and an in-game run from the package alone are not verified yet. Details: memory-bank/details/debian_packaging.md.

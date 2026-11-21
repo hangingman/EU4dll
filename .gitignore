@@ -271,3 +271,12 @@ dummy
 .ccls-cache/
 .gemini/extensions/**/*.json
 tests/eu4dll
+
+# Debian build artifacts
+/debian/eu4dll/
+/debian/eu4dll-dbgsym/
+/debian/.debhelper/
+/debian/files
+/debian/*.substvars
+/debian/debhelper-build-stamp
+/debian/*.debhelper.log

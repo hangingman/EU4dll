@@ -1,0 +1,18 @@
+#!/bin/sh
+# Start Europa Universalis IV with the eu4dll preload library.
+#
+# The game directory can be overridden with EU4_DIR. The default is
+# the Steam install location used by the Debian Steam package.
+set -eu
+
+EU4_DIR="${EU4_DIR:-$HOME/.steam/debian-installation/steamapps/common/Europa Universalis IV}"
+LIB="${EU4DLL_LIB:-/usr/lib/eu4dll/libeu4dll.so}"
+
+if [ ! -x "$EU4_DIR/eu4" ]; then
+    echo "eu4 executable not found in: $EU4_DIR" >&2
+    echo "Set EU4_DIR to the Europa Universalis IV install directory." >&2
+    exit 1
+fi
+
+cd "$EU4_DIR"
+exec env LD_PRELOAD="$LIB" ./eu4 "$@"

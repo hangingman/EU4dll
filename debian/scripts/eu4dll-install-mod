@@ -1,0 +1,55 @@
+#!/bin/sh
+# Install the eu4dll_translations mod into the current user's
+# Paradox Interactive directory and enable it in dlc_load.json.
+#
+# Run this once per user after installing the eu4dll package.
+# Re-running it refreshes the mod files and keeps the mod enabled.
+set -eu
+
+SRC="${EU4DLL_DATA_DIR:-/usr/share/eu4dll/mod}"
+PARADOX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/Paradox Interactive/Europa Universalis IV"
+MOD_DIR="$PARADOX_DIR/mod"
+
+if [ ! -d "$SRC/eu4dll_translations" ]; then
+    echo "Mod data not found in $SRC (is the eu4dll package installed?)" >&2
+    exit 1
+fi
+
+mkdir -p "$MOD_DIR"
+rm -rf "$MOD_DIR/eu4dll_translations"
+cp -a "$SRC/eu4dll_translations" "$MOD_DIR/eu4dll_translations"
+cp -a "$SRC/eu4dll_translations.mod" "$MOD_DIR/eu4dll_translations.mod"
+echo "Mod files installed to: $MOD_DIR/eu4dll_translations"
+
+# Enable the mod in dlc_load.json, keeping any other entries.
+python3 - "$PARADOX_DIR/dlc_load.json" <<'PYEOF'
+import json
+import os
+import shutil
+import sys
+
+path = sys.argv[1]
+entry = "mod/eu4dll_translations.mod"
+
+data = {"enabled_mods": [], "disabled_dlcs": []}
+if os.path.exists(path):
+    shutil.copyfile(path, path + ".bak")
+    with open(path, encoding="utf-8") as f:
+        loaded = json.load(f)
+    if isinstance(loaded, dict):
+        data.update(loaded)
+
+mods = data.get("enabled_mods")
+if not isinstance(mods, list):
+    mods = []
+if entry not in mods:
+    mods.append(entry)
+data["enabled_mods"] = mods
+
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=4)
+print("Enabled in dlc_load.json:", entry)
+PYEOF
+
+echo "Done. Start the game with eu4dll-launch or with"
+echo "LD_PRELOAD=/usr/lib/eu4dll/libeu4dll.so in the game directory."

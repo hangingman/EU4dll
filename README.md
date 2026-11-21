@@ -39,3 +39,24 @@ MIT Licence
 This dll was forked by the following project. Thank you so much.
 
 [EU4DLL](https://github.com/matanki-saito/EU4dll)
+
+## Debian package
+
+The library, the eu4dll_translations mod data (localisation files and
+generated fonts) and two helper scripts can be bundled into a .deb:
+
+```sh
+EU4DLL_MOD_SRC=/path/to/mod/eu4dll_translations dpkg-buildpackage -us -uc -b
+```
+
+The mod data is not stored in this repository. `EU4DLL_MOD_SRC` must
+point at a eu4dll_translations mod directory; without it, the current
+user's Paradox mod directory is used.
+
+Install the package and set up the mod for your user:
+
+```sh
+sudo apt install ../eu4dll_0.1_amd64.deb
+eu4dll-install-mod
+eu4dll-launch
+```
