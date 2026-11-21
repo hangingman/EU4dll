@@ -145,3 +145,13 @@
 - 形式: UTF-8 BOM付き、`l_english:` ヘッダー、行は ` KEY:N "日本語"`。値は素のUTF-8で、エスケープバイト（0x10〜0x13）は含まれない（text_l_english.ymlで0件）。例: BACK="戻る"、CONNECT_TO_IP="ID接続"、MENU_BAR_LOAD_GAME="ロード"。
 - JSONはリポジトリのテスト用 `tests/resources/test_translation.json`（`{"KEY":{"text":"value"}}` 形式、4件）のみで、読み込むコードは無い。Steam／Paradox配下のJSONはランチャー等のデータだった。Workshopの日本語化Mod（1359233579）はアーカイブ実体がディスクに無く確認できなかった。
 - 項目9以降は、このyml本体を翻訳の入力として扱う。agent自身のParadox modディレクトリは無いため、従来の実機実行でtranslationMapが0件だった点も再確認した。
+
+## 復号の有効化方法の調査（2026/11/21）
+
+- 詳細は `memory-bank/details/decode_enablement_investigation.md` に記録した。調査のみで実装は変更していない。
+- 結論: `dllmain.d` の `Font.init`／`TextView.init` のコメントアウトを外すだけでは有効にならない。`font.d`／`main_text.d` の全インジェクタは `EU4Ver.v1_37_5` のケースを持たず（上限はv1.33.3.0）、defaultでバージョンエラーになる。
+- パターン実測: ローカル（〜v1.33）の全パターンと、上流 matanki-saito/EU4dll の `develop` ブランチ（Windows版1.37対応、ビルド番号370〜375を `v1_37_0_0` に割当）のv1.37用パターンの両方をLinux版v1.37.5バイナリ（60,526,352バイト）へ走査し、**全て0件**だった。Linux版は別ビルド（SysV ABI、レジスタ割当が異なる、Windowsヒープ無し）のため、パターンもフックもLinuxバイナリから新規に導出する必要がある。
+- 上流v1.37の知見: Font側はリミッタのパターンが分岐オフセットのみ変更、BufferClear1/2はパターン変更。MainText側はProc1/2/4でパターンとアセンブリの両方が新規（V137版、レジスタ変更）、Proc3は戻り先パターンのみ変更。つまり1.37ではゲーム側のループが再コンパイルされており、Windows側でも流用はできなかった。
+- その他の障害: この移植の `BytePattern.hasSize()` は常時trueのスタブで、ヒット0件でも `getFirst()` を参照しかねない。`font.d`／`main_text.d` は5バイトrel32 `makeJmp` を使うが、Linuxでは遠距離で使えなかった実績があり、実証済みのSetText方式（14バイト絶対JMP＋命令境界検証）への置き換えが要る。HeapZeroClear（WindowsのHeapAlloc前提）と0x3D88前提のバッファパッチはLinuxに同形の箇所が無い（0x3D88の出現7件は全てトークンID等の無関係箇所だった）。
+- Linux側の候補箇所はシンボルから特定した: テキスト処理ループの実体は `CBitmapFont::GetRequiredSize`（0x20565aa）、`GetActualRequiredSize`（0x2055f92）、`FillVertexBuffer`（0x2055448）、`RenderToTexture`（0x204e886）等で、フォントバッファ側は `CreateBuffers`（0x204d524）／`ParseFontFile`（0x204de66）。有効化の作業手順（箇所特定→Linux用AOBとアセンブリ→v1_37_5ケース追加→opt-in配線→段階確認）を詳細ファイルに残した。
+- この調査が済むまで項目11（日本語の画面確認）は実施できない。項目10の変換器は単体テスト（復号規則との往復）までの検証になる。

@@ -27,3 +27,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 2. 必要なら置換ログへmapping idを追加し、2件の対応を個別に記録する。
 3. 可変長置換を実機で確認する（Game Browser で長さの違う置換と日本語置換の表示）。
 4. EU4のバージョン更新時はAOB一意性と完全命令境界を再検証する。
+
+## 復号の有効化方法の調査（2026/11/21追記）
+
+- 詳細は `memory-bank/details/decode_enablement_investigation.md` に記録した（調査のみ）。`Font.init`／`TextView.init` は、インジェクタにv1.37.5のケースが無く、ローカル／上流v1.37（Windows）の全パターンがLinuxバイナリで0件のため、コメントアウトを外すだけでは有効にならない。有効化にはLinux版 `CBitmapFont` 系関数からのフック箇所特定とLinux用パターン／アセンブリの新規作成が要る。
