@@ -374,3 +374,35 @@ Notes:
   10 byte-width sites needing no patch. Remaining for
   item 28: step 5, the full check with all 16 generated
   fonts placed via the throwaway test mod.
+
+## Implementation step 5 (2026-11-21, sixth run of item 28) - item 28 complete
+
+- Full check with all 16 generated fonts (32 files, hardlinks
+  from ~/work/eu4-run/item23/gfx/fonts/) placed via the
+  throwaway test mod testfonts_item28 in agent's own EU4 user
+  folder, enabled by a temporary dlc_load.json; the mod and
+  dlc_load.json were removed after the run and the user folder
+  restored (no mod/ directory, no dlc_load.json).
+- Smoke runs/20261121-180844 with EU4DLL_ENABLE_DECODE=1,
+  normal build verified first (md5
+  e89d5a3d2c25c4d3d514056043eb2f9e, DIAGNOSTIC-RAW present on
+  /bin/true preload, make all run last before the smoke):
+  DLL [OK] count = 1, both registration patterns found
+  (0x204e385 duplicate check, 0x204e55e store span) and all
+  five fetch patterns found, Duplicate character ID = 0
+  (item 26 full-font run: 116,338 lines and a segfault),
+  Invalid character ID = 0, error.log has only the 4 usual
+  unrelated lines, no crash, ended_by_exit_button,
+  eu4_wait=0.
+- Menu screenshot shot_menu.png checked visually: normal
+  English main menu in the generated fonts (Single Player /
+  Multiplayer / Tutorial / Credits / Options / Exit and the
+  EU4 v1.37.5.0 version line all legible), no corruption.
+- The "Decode init reported injector errors" log line is
+  present exactly as in the step 2/3 runs; it does not cover
+  the glyph injectors, whose patterns are all found above.
+- Item 28 is complete: registration (step 2) and the five
+  hooked fetch sites (step 3) use the side table, and the
+  remaining ten fetch sites are proven byte-width only
+  (step 4). Next: item 27, the Japanese display re-check
+  with the generated fonts in place.

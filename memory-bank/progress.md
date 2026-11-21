@@ -284,3 +284,8 @@
 
 - Recorded in memory-bank/details/glyph_table_expansion_item28.md (implementation step 4). All eight not-hooked fetch sites (RenderToTexture x2, RenderToScreen x2, GetHeightOfString, GetWidthOfString, Render3d x2) index the glyph table with a zero-extended single byte (movzbl from a CString::operator[] result or a direct string byte), and the two second fetches in GetRequiredSize (0x205664f) and GetActualRealRequiredSizeActually (0x2056df7) use a sign-extended single byte (movsbq, range -128..127). No wide code point >= 0x100 can reach any of them, so no redirect is needed; no runtime code changed in this step.
 - Next: item 28 step 5 - full check with all 16 generated fonts placed via the throwaway test mod, decode opt-in on (no Duplicate flood, no Invalid lines, no crash, English menu screenshot normal). Item 27 stays blocked until item 28 completes.
+
+## Wide glyph full-font check (2026/11/21, item 28 step 5) - item 28 complete
+
+- Recorded in memory-bank/details/glyph_table_expansion_item28.md (implementation step 5). Smoke runs/20261121-180844 with all 16 generated fonts (32 files) via the throwaway test mod testfonts_item28 (removed afterwards, user folder restored) and EU4DLL_ENABLE_DECODE=1: Duplicate character ID = 0, Invalid character ID = 0, no crash, ended_by_exit_button, eu4_wait=0, menu screenshot visually normal English. The item 26 full-font segfault is gone.
+- Item 28 is complete. Next: item 27 - Japanese display re-check (Game Browser) with the generated fonts placed.
