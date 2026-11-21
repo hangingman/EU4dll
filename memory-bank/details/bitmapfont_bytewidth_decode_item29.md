@@ -149,3 +149,58 @@ before any patch.
    any of them cannot carry a wide glyph.
 3. Only then item 30: full check with the generated
    fonts placed.
+# Step 2 draft (to append to bitmapfont_bytewidth_decode_item29.md)
+
+## 5. Implemented: RenderToScreen site 1 + site 2 (step 2)
+
+Decision on pText: site 1 keeps the full escape sequence in pText; site 2 decodes independently.
+
+- Site 1 (width/line-break pass, fetch VA 0x2052189, patch at VA 0x2052184):
+  hook mainTextRenderToScreenV137Site1_hook in source/plugin/main_text.d.
+  Reproduces font load (RDX = [rsp+0x30]), fetch and test.
+  Normal return VA 0x205219a (+0x16), null return VA 0x2052310 (+0x18C).
+  On escape: writes payload bytes to scratch[RBX+1..+2] (scratch at
+  0x3345190, RBX = current scratch index), adds 2 to R12D (tail copies
+  R12D to EBX) and 2 to R13D (tail adds third byte). Scratch is
+  strcat-ed into pText (0x333d450), so pText carries the full 3-byte
+  sequence. Wide path spills XMM1-XMM3 low halves (movss) around the
+  lookup call because they are live across this fetch; pushes
+  RAX/RDX/RDI/RSI + sub 48 keeps RSP % 16 == 0.
+  Index sign extension uses shl/sar pair (LDC asm rejects movsxd).
+- Site 2 (draw pass, fetch VA 0x2053084, patch at VA 0x205307f):
+  hook mainTextRenderToScreenV137Site2_hook. Reproduces font load
+  (RDI = [rsp+0x30]), fetch and test. Normal return VA 0x2053095
+  (+0x16), null return VA 0x20533e1 (+0x362). Byte is re-read from
+  pText at RBX (sign-extended R15D); on escape decodes the word at
+  pText[index+1], advances R15D by 2 (tail at VA 0x2053959 adds the
+  third). RBP (pText length) is not touched. Wide path spills
+  XMM0-XMM5 low halves and restores RDI (font) after the call.
+- Both AOBs re-verified exactly 1 hit in a full binary scan in this run.
+- Kerning in both passes stays byte-keyed (recorded approximation,
+  same as GetWidthOfString).
+
+## 6. Verification (step 2)
+
+- make test: 10 modules passed. make all run last; final .so md5
+  049ffb5c6c7cc8583ab0abc888bbc8c0, DIAGNOSTIC-RAW lines present
+  on the /bin/true preload check (normal build, item 25 rule).
+- Smoke runs/20261121-184743-multiplayer (eu4_multiplayer.sh,
+  EU4DLL_ENABLE_DECODE=1, EU4DLL_SETTEXT_PROBE=1, Back replaced
+  with the Japanese word, vanilla fonts): both RenderToScreen
+  JMP lines present alongside all earlier JMP lines, DLL [OK],
+  SetText id=0 result=applied, no crash, process alive at the
+  Game Browser screen (script ended by kill, the known
+  behaviour there).
+- Screenshots checked visually: main menu and Game Browser
+  render normally in English, no corruption. The Game Browser
+  bottom-left button still shows the byte glyphs (I, b, dot,
+  0). With vanilla fonts a decoded wide glyph would resolve to
+  null and be skipped (empty button), so the continued byte
+  display indicates this button is most likely drawn through
+  one of the remaining unhooked paths (RenderToTexture x2 are
+  the prime candidates; GUI buttons commonly render to a
+  texture once). This is the first analysis target of step 3.
+- Item 29 is NOT complete. Next: step 3 - per-site analysis
+  and hooks for RenderToTexture x2, GetHeightOfString and
+  Render3d x2, or a recorded reason any of them cannot carry
+  a wide glyph.
