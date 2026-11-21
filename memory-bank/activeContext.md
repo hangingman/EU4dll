@@ -2,7 +2,7 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。次は実装の安定化とコミット後、同一長制約を外すためのCString所有権・容量調査へ進む。
+Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。次はヘッダ32バイト化による容量の実測へ進む。
 
 ## 確定事項
 
