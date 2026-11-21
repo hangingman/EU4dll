@@ -224,3 +224,9 @@
 - 前回の項目20で出た異常（画面真っ黒・eu4_wait=7）は、実はクラッシュだった（ミニダンプ生成を確認）。切り分けの結果、原因は項目19フックの復号経路にあると特定した: Linuxのグリフ表は +0x100 に256件しかないのに、フックが復号後のコードポイント（漢字・かな、NOT_DEF 0x2026 を含む）でそのまま引いており、範囲外のゴミポインタを呼び出し側が参照していた。
 - 修正: 5フック全てで、コードポイントが 0x100 以上ならグリフポインタを null にする（全ての呼び出し箇所は null を安全にスキップする）。通常フォントでは日本語は描かれず飛ばされる。実際に描くには日本語グリフを含むフォントが要り、それは項目21で見る。
 - 検証: `make test` 9モジュール通過、`make all` 成功。smoke は復号OFF＋日本語（runs/20261121-155643）、復号ON＋日本語（runs/20261121-155958）、復号ON＋英語（runs/20261121-160231）の3本とも正常終了（eu4_wait=0）で、メニュー画面の目視でも英語表示に崩れは無かった。
+
+## Character set and font generation method (2026/11/21, item 22)
+
+- Recorded in `memory-bank/details/charset_and_font_generation.md`. Collected the value character set from the 145 yml files (126,796 entries): 3,130 distinct characters, none above the BMP, none in the (0x100, 0xA00) shift band. Font ids equal the code points except the 5 CP1252 specials, which will be registered at both the byte id and the code point. EU4fontcreate agrees with escape_codec on CP1252 and on the +0xE000 shift direction; its stated shift band (0x100-0x1FF, example U+03BB) differs from the codec band (0x100, 0xA00), but with zero affected characters the codec stays ground truth. Its 0x0E/0x0F date glyphs are not adopted.
+- Generation method decided: a self-contained Python Pillow + fontTools generator with Noto Sans CJK JP Regular (coverage 3,127/3,130; the 3 missing are non-printing and become empty glyphs), emitting a vanilla-form text .fnt + TGA atlas. PoC in ~/work/eu4-run/item22/poc/. BMFont/bmfont64.exe (Windows) and fontforge (not installed) were rejected with reasons.
+- Blockers for items 23/24 recorded in the same file: the item 20 guard (null glyph for code points >= 0x100 on hooked paths) and the item 21 Game Browser path that bypasses the hooks.
