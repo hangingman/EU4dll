@@ -1,0 +1,24 @@
+Source: eu4dll
+Section: games
+Priority: optional
+Maintainer: muse <muse@localhost>
+Build-Depends: debhelper-compat (= 13), ldc, dub
+Standards-Version: 4.6.2
+Homepage: https://github.com/hangingman/EU4dll
+Rules-Requires-Root: no
+
+Package: eu4dll
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Japanese display support for Europa Universalis IV (Linux)
+ This package provides the EU4dll preload library, which makes
+ Europa Universalis IV (Linux, v1.37.5) render double-byte text,
+ together with the eu4dll_translations mod: Japanese localisation
+ files and generated fonts (Noto Sans CJK JP) that the library
+ needs to display Japanese in game.
+ .
+ The library is installed as /usr/lib/eu4dll/libeu4dll.so and the
+ mod data as /usr/share/eu4dll/mod/. Run eu4dll-install-mod once
+ per user to copy the mod into the Paradox user directory and
+ enable it, and start the game with the eu4dll-launch wrapper or
+ with LD_PRELOAD=/usr/lib/eu4dll/libeu4dll.so.

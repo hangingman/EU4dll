@@ -1,0 +1,7 @@
+eu4dll (0.1) unstable; urgency=low
+
+  * Initial Debian package: preload library, eu4dll_translations mod
+    data (localisation and generated fonts), and the eu4dll-launch
+    and eu4dll-install-mod helper scripts.
+
+ -- muse <muse@localhost>  Sat, 22 Nov 2026 07:50:00 +0900

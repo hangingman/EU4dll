@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+
+# Mod source data (localisation yml files and generated fonts) is not
+# stored in this repository. At build time it is copied from a local
+# eu4dll_translations mod directory. Point EU4DLL_MOD_SRC at that
+# directory; the default is the Paradox user mod directory of the
+# user running the build.
+EU4DLL_MOD_SRC ?= $(HOME)/.local/share/Paradox Interactive/Europa Universalis IV/mod/eu4dll_translations
+
+PKG := debian/eu4dll
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# dpkg-buildflags exports a DFLAGS value that ldc2 rejects
+	# (-frelease), so build with it cleared.
+	DFLAGS= dub build --force --compiler=ldc2
+
+override_dh_auto_test:
+	# Upstream tests are run with "make test" during development.
+	# They are skipped during the package build.
+
+override_dh_auto_install:
+	# Preload library
+	install -D -m 0644 libeu4dll.so $(PKG)/usr/lib/eu4dll/libeu4dll.so
+	# Helper scripts
+	install -D -m 0755 debian/scripts/eu4dll-launch $(PKG)/usr/bin/eu4dll-launch
+	install -D -m 0755 debian/scripts/eu4dll-install-mod $(PKG)/usr/bin/eu4dll-install-mod
+	# Mod data
+	test -d "$(EU4DLL_MOD_SRC)/localisation" || { echo "EU4DLL_MOD_SRC=$(EU4DLL_MOD_SRC): localisation/ not found. Set EU4DLL_MOD_SRC to a eu4dll_translations mod directory."; exit 1; }
+	test -d "$(EU4DLL_MOD_SRC)/gfx/fonts" || { echo "EU4DLL_MOD_SRC=$(EU4DLL_MOD_SRC): gfx/fonts/ not found. Set EU4DLL_MOD_SRC to a eu4dll_translations mod directory."; exit 1; }
+	install -d $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/localisation
+	install -m 0644 "$(EU4DLL_MOD_SRC)"/localisation/*.yml $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/localisation/
+	install -d $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/gfx/fonts
+	install -m 0644 "$(EU4DLL_MOD_SRC)"/gfx/fonts/* $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/gfx/fonts/
+	install -D -m 0644 debian/eu4dll_translations.mod $(PKG)/usr/share/eu4dll/mod/eu4dll_translations.mod
+
+override_dh_auto_clean:
+	dub clean || true
+	rm -f libeu4dll.so
+	dh_auto_clean
