@@ -138,3 +138,10 @@
 - 前提条件: 変換器、Linux v1.37.5での復号側（`Font.init`／`TextView.init`、テキスト処理ループとフォントパッチ）の有効化、実データのためのサブモジュール初期化＋ `PARATRANZ_SECRET` による生成。復号側が無い間、ファイル読み込みの検証はロード／結合／変換のログとフィクスチャ、英文同士の組の表示、フックでの `result=applied` までに限る。
 - 段階案: A 変換器＋テスト、B opt-inスイッチ（提案名 `EU4DLL_SETTEXT_FROM_TRANSLATIONS=1`）の後ろで結合とファイル読み込み（現行の表の上限のまま、既知2件で検証、環境変数は設定時に優先する上書きとして残す）、C 全辞書向けの保存／検索の拡張と実測、D 復号側の有効化と日本語の画面確認。
 - 所有者の判断待ち: 英語側の入手方法（ゲームのymlをロード時に読む／生成した対応ファイルを同梱する）、衝突ルール、環境変数の優先扱い、サブモジュール初期化と秘密情報の用意、段階DをB・Cより前に置くかどうか。
+
+## 翻訳本体の所在と形式の確認（2026/11/21）
+
+- 詳細は `memory-bank/details/translation_body_location.md` に記録した。結論: 環境内にJSON形式の翻訳本体は見つからなかった。実在する翻訳本体はyml形式で、配置先は `~/.local/share/Paradox Interactive/Europa Universalis IV/mod/eu4dll_translations/localisation/`（145ファイル、約16MB）。本人の別チェックアウト `~/git/EU4dll/submodules/EU4JPModAppendixI/source/localisation/` の生成物と同一であることをdiffで確認した。
+- 形式: UTF-8 BOM付き、`l_english:` ヘッダー、行は ` KEY:N "日本語"`。値は素のUTF-8で、エスケープバイト（0x10〜0x13）は含まれない（text_l_english.ymlで0件）。例: BACK="戻る"、CONNECT_TO_IP="ID接続"、MENU_BAR_LOAD_GAME="ロード"。
+- JSONはリポジトリのテスト用 `tests/resources/test_translation.json`（`{"KEY":{"text":"value"}}` 形式、4件）のみで、読み込むコードは無い。Steam／Paradox配下のJSONはランチャー等のデータだった。Workshopの日本語化Mod（1359233579）はアーカイブ実体がディスクに無く確認できなかった。
+- 項目9以降は、このyml本体を翻訳の入力として扱う。agent自身のParadox modディレクトリは無いため、従来の実機実行でtranslationMapが0件だった点も再確認した。

@@ -2,7 +2,7 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。可変長置換の過去の試行整理と容量の実測は完了し、`memory-bank/details/variable_length_history.md` に記録した（対象2件はどちらもSSO容量15）。文字化けの原因の切り分けは完了し、`memory-bank/details/mojibake_settext.md` に記録した（SetText置換は変換を通らず、復号側のテキスト処理ループ／フォントフックがLinux版では未有効のため、UTF-8バイト列が1バイト文字として解釈されて化ける）。翻訳ファイル読み込みへの移行設計は完了し、`memory-bank/details/translation_file_loading_design.md` に記録した（設計のみ、実装は所有者の確認待ち）。
+Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。可変長置換の過去の試行整理と容量の実測は完了し、`memory-bank/details/variable_length_history.md` に記録した（対象2件はどちらもSSO容量15）。文字化けの原因の切り分けは完了し、`memory-bank/details/mojibake_settext.md` に記録した（SetText置換は変換を通らず、復号側のテキスト処理ループ／フォントフックがLinux版では未有効のため、UTF-8バイト列が1バイト文字として解釈されて化ける）。翻訳ファイル読み込みへの移行設計は完了し、`memory-bank/details/translation_file_loading_design.md` に記録した（設計のみ、実装は所有者の確認待ち）。翻訳本体の所在確認は完了し、`memory-bank/details/translation_body_location.md` に記録した（JSON形式の本体は環境内に無く、実在するのはuser側に配置されたyml形式145ファイルで、値は素のUTF-8・エスケープ無し）。
 
 ## 確定事項
 
