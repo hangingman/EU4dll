@@ -40,3 +40,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## Font側のLinux用パターン導出（2026/11/21追記）
 
 - 詳細は `memory-bank/details/font_linux_patterns.md` に記録した（導出のみ、注入は無効のまま）。Font側6注入のうち、リミッタ（`ParseFontFile` VA 0x204e366、`41 81 FD FF 00 00 00 0F 87 25 01 00 00`、全体で1件）だけが一意パターンまで確定した。HeapZeroClear はLinuxに対応箇所なし、BufferClear／Expansion の 0x3D88 は存在せず候補は `GfxCreateVertexBuffer` の即値 0x4B0 の2箇所（役割の同一性は未証明）、FontSizeLimit は未発見。
+
+## TextView側のLinux用パターン導出（2026/11/21追記）
+
+- 詳細は `memory-bank/details/main_text_linux_patterns.md` に記録した（導出のみ、注入は無効のまま）。Proc1は `FillVertexBuffer` の2箇所（VA 0x2055562／0x2055ac1）、Proc4はループ1の3関数に各1箇所（VA 0x2056198／0x2056872／0x20570b6）が文脈込みで各1件に一意化できた。Proc2はWindowsの形（バッファ `lea`＋全文字コピー）がLinuxに無く、Proc3はフック形がループ2側に1件あるのみで戻り先2が無い。文字取得は `CString::operator[]` 経由、グリフ表+0x100、スケール+0x940。

@@ -173,3 +173,12 @@
 - HeapZeroClear はLinuxに対応箇所が無い（`CreateBuffers`／`CreateBuffer` は `GfxCreateVertexBuffer` を直接呼び、ゼロクリアの呼び出しは無い）。Linux計画からは外す。
 - BufferClear1/2 と BufferExpansion の前提だった即値 0x3D88 はLinuxのフォントコードに無い（`mov edx,0x3d88` は0件、全レジスタでも7件全て無関係）。Linuxで頂点バッファの大きさに当たる即値は 0x4B0（ストライド 0x1C）で、`GfxCreateVertexBuffer` 呼び出しは2箇所のみ。文脈込みパターンでは各1件に一意化できるが、0x4B0 がWindowsの 0x3D88 と同じ役割かは未証明のため、候補として記録するに留めた。
 - FontSizeLimit は見つからなかった: `cmp r14d, 1000000h` は0件、マスクした汎用形でも20件全て `CBitmapFont` の範囲外で、フォント範囲内に大きな即値の比較は無い。別定数か呼び出し側へのインライン化の可能性は未証明。
+
+## TextView側のLinux用パターン導出（2026/11/21）
+
+- 詳細は `memory-bank/details/main_text_linux_patterns.md` に記録した。導出のみで、注入は有効にしていない（`main_text.d` は無変更、`TextView.init` はコメントアウトのまま）。
+- LinuxのテキストループはWindowsと構造が違う: 文字取得は `CString::operator[]` 呼び出し経由（戻り値ポインタへ `movzbl`）、グリフ表は +0x100、スケールは +0x940（Windowsは +0x848）。`movzbl (%rax),%eax` 単独は全体で305件、グリフ参照込みの短い形でも12件あるため、文脈込みパターンが要る。
+- Proc1（ループ2）は `FillVertexBuffer` 内に取得箇所が2つあり（VA 0x2055562 と 0x2055ac1）、文脈込みで各1件に一意化できた。どちらを対象にするかは未決定。
+- Proc4（ループ1）はループ1が3関数（GetRequiredSize／GetActualRequiredSize／GetActualRealRequiredSizeActually）に分かれており、各関数に取得箇所が1つずつあり（VA 0x2056872／0x2056198／0x20570b6）、各1件に一意化できた。
+- Proc2はWindowsの形では見つからなかった: バッファアドレスを取り出す `lea`（グローバルバッファ）が無く、カウント側は文字列を scratch バッファへ写さない。唯一のバイトコピーは色コード（0xA3）の名前をスタックへ写す処理（上限0x7E、各関数で一意だが役割が違う）。
+- Proc3は、フック形（グリフ+6の word 比較＋分岐）は `FillVertexBuffer` VA 0x2055619 に1件だけあるがループ2側で、戻り先2（グローバルフラグ比較 `80 3D ...`）は候補関数内に存在しない。Proc2→Proc3/Proc4 の `s_lastCodePoint` の受け渡しにもLinux側の足場が無いため、項目14/15ではWindowsのProc1〜4の移植ではなく、取得箇所そのもので復号する設計が要る。
