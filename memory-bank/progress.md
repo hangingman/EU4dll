@@ -202,3 +202,11 @@
 - 詳細は `memory-bank/details/font_limiter_linux_injection.md` に記録した。`font.d` の `charCodePointLimiterPatchInjector` に v1.37.5 のケースを追加した。パターンは項目12の一意パターン（`ParseFontFile` VA 0x204e366、`41 81 FD FF 00 00 00 0F 87 25 01 00 00`）で、`hasSize(1)` が一致件数1を確認した場合だけ当てる。即値はオフセット3から `FF 00 00 00` で、オフセット4へ `0xFF` を書くと `0xFFFF` へ広がる（Windows版の+3はREX接頭辞が無い分で、Linux版は+4）。
 - 動作は従来どおり opt-in（`EU4DLL_ENABLE_DECODE=1` で `Font.init` が呼ばれる場合だけ）。他のFont注入は項目18の範囲で未変更のため、decode全体のエラーログは引き続き出る（致命的ではない、項目15の配線どおり）。
 - 検証: `make test` 9モジュール通過、`make all` 成功。smoke runs/20261121-150649（opt-in＋SetTextプローブ）で `WriteMemory for charCodePointLimiterPatchInjector (v1.37.5) called.` を確認し、リミッタの件数不一致ログは無かった。DLL [OK]、Exitで正常終了（eu4_wait=0）、メニュー画面の英語表示は正常だった。
+
+## Font側の残り注入の整理（2026/11/21、項目18）
+
+- 詳細は `memory-bank/details/font_remaining_linux_injectors.md` に記録した。
+- FontSizeLimit は実装した: 全レジスタ形の `cmp imm 1000000h` を再走査し、グラフィックス／テクスチャ関係で唯一の箇所が `CTextureHandler::LoadTexture` VA 0x22a7edb（`cmp ebx,1000000h`、ebx は `CVirtualFile::GetSize()`、16MiB以上は読み込み拒否）だと特定した。他の汎用形19件は lua／curl／OpenSSL／ネットワーク等の無関係箇所。`font.d` に v1.37.5 ケースを追加し、`hasSize(1)` のときだけ即値末尾へ 0x04 を書いて上限を 04000000h（64MiB）へ広げる（opt-in時のみ）。
+- BufferClear1/2 は実装しない: Linuxのフォントバッファ経路に 3D88h のクリア箇所は無く、`GfxCreateVertexBuffer` へはデータポインタ NULL で生成され、対応する memset が存在しない。
+- BufferExpansion は実装しない: 候補だった 0x4B0 は `GfxCreateVertexBuffer` 本体の確認でバイトサイズではなく頂点数（1200、ストライド 01Ch）だと分かり、埋める側に 1200 の上限チェックが無いため、割り当てだけ広げても効果が実証できない。項目19/21で実際に頂点数の切り捨てが出たら再検討する。
+- 検証: smoke runs/20261121-151742（opt-in＋SetTextプローブ）で FontSizeLimit とリミッタ両方の WriteMemory ログを確認し、件数不一致は無かった。DLL [OK]、Exitで正常終了（eu4_wait=0）、メニュー画面の英語表示は正常だった。

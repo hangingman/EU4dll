@@ -272,6 +272,35 @@ DllError fontSizeLimitInjector(RunOptions options) {
     DllError e;
 
     switch (options.eu4Version) {
+    case EU4Ver.v1_37_5: {
+        // Linux v1.37.5, CTextureHandler::LoadTexture (VA 0x22a7edb):
+        //   81 FB 00 00 00 01   cmp ebx, 1000000h
+        //   72 19               jb  +0x19 (read the file)
+        // ebx is CVirtualFile::GetSize() of the texture being loaded;
+        // at or above 16 MiB the load is rejected. This is the only
+        // cmp with immediate 1000000h in any graphics/texture function
+        // in the whole binary (item 18 re-search, see
+        // memory-bank/details/font_remaining_linux_injectors.md):
+        // the Windows pattern (41 81 FE ..., cmp r14d) has 0 hits and
+        // the other masked-generic hits are in unrelated code (lua,
+        // curl, OpenSSL, minidump, network protocol parsing, ...).
+        // The short pattern alone is exactly 1 hit in the whole
+        // binary; the extended pattern below keeps that guarantee if
+        // a future build adds a second cmp ebx site. Patch semantics
+        // mirror the Windows case: the immediate is 00 00 00 01 at
+        // pattern offset 2, so writing 0x04 at offset 5 (its last
+        // byte) changes the limit to 04000000h (64 MiB).
+        BytePattern.tempInstance().findPattern("81 FB 00 00 00 01 72 19 BB 01 00 00 00");
+        if (BytePattern.tempInstance().hasSize(1, "Font size limit")) {
+            size_t address = BytePattern.tempInstance().getFirst().address;
+            PatchManager.instance().addPatch(cast(void*)(address + 5), cast(ubyte[])[0x04]);
+            writeln("WriteMemory for fontSizeLimitInjector (v1.37.5) called.");
+        }
+        else {
+            e.unmatchdFontSizeLimitInjector = true;
+        }
+        break;
+    }
     case EU4Ver.v1_29_0_0:
     case EU4Ver.v1_29_1_0:
     case EU4Ver.v1_29_2_0:
