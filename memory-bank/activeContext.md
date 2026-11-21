@@ -52,3 +52,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## 復号の有効化配線（2026/11/21追記、項目15）
 
 - 詳細は `memory-bank/details/decode_optin_enablement.md` に記録した。`EU4DLL_ENABLE_DECODE=1` の場合だけ `Font.init`／`TextView.init` を呼ぶ。v1.37.5では各注入にケースが無くパッチは当たらないため、復号はまだ機能しない（項目16の前提は未充足）。配線の過程で `DllError` の `|` 演算子が無限再帰する潜在バグが見つかり、フィールド単位ORへ修正済み（初回smoke runs/20261121-145211 は eu4_wait=139 で落ち、修正後の runs/20261121-145625 は正常終了・英語表示正常）。
+
+## Font側リミッタ注入の実装（2026/11/21追記、項目17）
+
+- 詳細は `memory-bank/details/font_limiter_linux_injection.md` に記録した。リミッタは v1.37.5 で実装済み（パターン1件一致時のみ、即値 0xFF→0xFFFF、opt-in時のみ）。他のFont注入（BufferClear／Expansion／FontSizeLimit）は項目18で整理する。リミッタ単独では日本語表示は有効にならず、項目19のTextViewフックと項目20の変換器接続が要る。

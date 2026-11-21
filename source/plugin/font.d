@@ -40,6 +40,29 @@ DllError charCodePointLimiterPatchInjector(RunOptions options) {
         /* 1.33.0.0 betaで初めて確認された */
         break;
 
+    case EU4Ver.v1_37_5: {
+        // Linux v1.37.5, CBitmapFont::ParseFontFile (VA 0x204e366):
+        //   41 81 FD FF 00 00 00   cmp r13d, 0FFh
+        //   0F 87 25 01 00 00      ja  +0x125 (skip glyph registration)
+        // Pattern derived in item 12 (font_linux_patterns.md): exactly
+        // 1 hit in the whole binary; the cmp alone has 23 hits, so the
+        // ja displacement must be part of the pattern. Widening the
+        // limit works like the Windows case below: the immediate is
+        // FF 00 00 00 at pattern offset 3, so writing 0xFF at offset 4
+        // (the second immediate byte) changes it to FF FF 00 00,
+        // i.e. cmp r13d, 0FFFFh. hasSize(1) gates the patch: when the
+        // count is not exactly 1 nothing is patched.
+        BytePattern.tempInstance().findPattern("41 81 FD FF 00 00 00 0F 87 25 01 00 00");
+        if (BytePattern.tempInstance().hasSize(1, "Char Code Point Limiter")) {
+            size_t address = BytePattern.tempInstance().getFirst().address;
+            PatchManager.instance().addPatch(cast(void*)(address + 4), cast(ubyte[])[0xFF]);
+            writeln("WriteMemory for charCodePointLimiterPatchInjector (v1.37.5) called.");
+        }
+        else {
+            e.unmatchdCharCodePointLimiterPatchInjector = true;
+        }
+        break;
+    }
     case EU4Ver.v1_33_0_0:
     case EU4Ver.v1_33_3_0: {
         // cmp     edi, 0FFh

@@ -196,3 +196,9 @@
 - 詳細は `memory-bank/details/decode_optin_enablement.md` に記録した。`dllmain.d` で `EU4DLL_ENABLE_DECODE=1` の場合だけ `Font.init`→`TextView.init` を呼ぶ配線を追加した（順序は上流どおり）。結果の `DllError` は集約してログへ出すが致命的にはしない（PluginVersion の判定が従来どおり唯一の終了条件）。v1.37.5では各注入にケースが無いため現状パッチは当たらず、復号自体はまだ機能しない。項目16の前提（取得箇所フックの実装）は未充足のまま。
 - 初回smoke（runs/20261121-145211）でEU4が起動直後に落ちた（eu4_wait=139）。原因は `DllError.opBinary("|")` が `return this | rhs;` という無限再帰で、これまで集約する経路が有効でなかったため踏まれていなかった。フィールド単位のORへ直し、単体テストを追加した（`make test` は8→9モジュール通過）。
 - 検証: smoke runs/20261121-145625（EU4DLL_ENABLE_DECODE=1＋SetTextプローブ）でメニュー到達、DLL [OK]、Exitで正常終了（eu4_wait=0）。メニュー画面のスクリーンショットで通常の英語表示に崩れが無いことを目視確認した。
+
+## Font側リミッタ注入の実装（2026/11/21、項目17）
+
+- 詳細は `memory-bank/details/font_limiter_linux_injection.md` に記録した。`font.d` の `charCodePointLimiterPatchInjector` に v1.37.5 のケースを追加した。パターンは項目12の一意パターン（`ParseFontFile` VA 0x204e366、`41 81 FD FF 00 00 00 0F 87 25 01 00 00`）で、`hasSize(1)` が一致件数1を確認した場合だけ当てる。即値はオフセット3から `FF 00 00 00` で、オフセット4へ `0xFF` を書くと `0xFFFF` へ広がる（Windows版の+3はREX接頭辞が無い分で、Linux版は+4）。
+- 動作は従来どおり opt-in（`EU4DLL_ENABLE_DECODE=1` で `Font.init` が呼ばれる場合だけ）。他のFont注入は項目18の範囲で未変更のため、decode全体のエラーログは引き続き出る（致命的ではない、項目15の配線どおり）。
+- 検証: `make test` 9モジュール通過、`make all` 成功。smoke runs/20261121-150649（opt-in＋SetTextプローブ）で `WriteMemory for charCodePointLimiterPatchInjector (v1.37.5) called.` を確認し、リミッタの件数不一致ログは無かった。DLL [OK]、Exitで正常終了（eu4_wait=0）、メニュー画面の英語表示は正常だった。
