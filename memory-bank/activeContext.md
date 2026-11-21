@@ -48,3 +48,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## Linux注入方式の整備（2026/11/21追記、項目14）
 
 - 詳細は `memory-bank/details/linux_injection_method.md` に記録した。patcherの `makeJmp` は14バイト絶対ジャンプになり、BytePatternは全件数え＋`hasSize` 実判定になった。`Font.init`／`TextView.init` はまだ無効。次は項目15（復号の有効化、opt-in）。絶対ジャンプを使う注入は「完全な命令を14バイト以上上書きし、トランポリンのコピー長と一致させる」ことが条件で、ReloadPdxLocalize（コピー長8バイト）は相対ジャンプのまま明示した。
+
+## 復号の有効化配線（2026/11/21追記、項目15）
+
+- 詳細は `memory-bank/details/decode_optin_enablement.md` に記録した。`EU4DLL_ENABLE_DECODE=1` の場合だけ `Font.init`／`TextView.init` を呼ぶ。v1.37.5では各注入にケースが無くパッチは当たらないため、復号はまだ機能しない（項目16の前提は未充足）。配線の過程で `DllError` の `|` 演算子が無限再帰する潜在バグが見つかり、フィールド単位ORへ修正済み（初回smoke runs/20261121-145211 は eu4_wait=139 で落ち、修正後の runs/20261121-145625 は正常終了・英語表示正常）。

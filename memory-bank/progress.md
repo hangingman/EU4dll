@@ -190,3 +190,9 @@
 - BytePattern: `findIndexes` が全件を数えるようになり（従来はセクションごとに最初の1件だけ）、スタブだった `hasSize` が実判定になった。注入側の `hasSize(1, ...)` の一意性確認がこれで実際に効く。最初の1件だけを使う正当な利用向けに `hasAtLeast` を追加した。
 - 全件化で見つかった既存の不整合を同項目で直した: (1) SetTextパターンは22バイトでは2件（もう1件は VA 0x2140660）あったため文脈を延長して VA 0x20d9da4 の1件に一意化した。(2) バージョン文字列は4件あるため PluginVersion は `hasAtLeast(1)` で明示した。(3) ReloadPdxLocalize はコピー長8バイトと結びついているため相対ジャンプを明示的に使う形に留めた（絶対ジャンプを流した中間ビルドではEU4が起動直後に落ちた。runs/20261121-144008、eu4_wait=11）。
 - 検証: `make test` 8モジュール通過、`make all` 成功。smoke runs/20261121-144447 でDLL [OK]、SetText target=0x20d9da4 に適用成功（id=0 result=applied）、Exitで正常終了（eu4_wait=0）、メニュー画面の英語表示は正常だった。
+
+## 復号の有効化配線（opt-in、2026/11/21、項目15）
+
+- 詳細は `memory-bank/details/decode_optin_enablement.md` に記録した。`dllmain.d` で `EU4DLL_ENABLE_DECODE=1` の場合だけ `Font.init`→`TextView.init` を呼ぶ配線を追加した（順序は上流どおり）。結果の `DllError` は集約してログへ出すが致命的にはしない（PluginVersion の判定が従来どおり唯一の終了条件）。v1.37.5では各注入にケースが無いため現状パッチは当たらず、復号自体はまだ機能しない。項目16の前提（取得箇所フックの実装）は未充足のまま。
+- 初回smoke（runs/20261121-145211）でEU4が起動直後に落ちた（eu4_wait=139）。原因は `DllError.opBinary("|")` が `return this | rhs;` という無限再帰で、これまで集約する経路が有効でなかったため踏まれていなかった。フィールド単位のORへ直し、単体テストを追加した（`make test` は8→9モジュール通過）。
+- 検証: smoke runs/20261121-145625（EU4DLL_ENABLE_DECODE=1＋SetTextプローブ）でメニュー到達、DLL [OK]、Exitで正常終了（eu4_wait=0）。メニュー画面のスクリーンショットで通常の英語表示に崩れが無いことを目視確認した。
