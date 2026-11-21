@@ -6,7 +6,7 @@ import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
-import plugin.glyph_table : wideGlyphLookup;
+import plugin.glyph_table : wideGlyphLookup, wideGlyphRawLog;
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
  // @naked を使用するため
 
@@ -1036,6 +1036,22 @@ extern (C)
                 movss dword ptr [RSP + 12], XMM3;
                 movss dword ptr [RSP + 16], XMM4;
                 movss dword ptr [RSP + 20], XMM5;
+                push RAX;
+                push RCX;
+                push R10;
+                push R11;
+                mov RDI, R11;
+                mov ESI, R14D;
+                sub ESI, 2;
+                mov EDX, EAX;
+                mov ECX, 1;
+                lea R11, [RIP + mainTextRawLogFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                pop R11;
+                pop R10;
+                pop RCX;
+                pop RAX;
                 mov RDI, RCX;
                 mov ESI, EAX;
                 lea R11, [RIP + mainTextGlyphLookupFuncAddress];
@@ -1148,6 +1164,22 @@ extern (C)
                 movss dword ptr [RSP + 16], XMM4;
                 movss dword ptr [RSP + 20], XMM5;
                 movss dword ptr [RSP + 24], XMM8;
+                push RAX;
+                push RCX;
+                push R10;
+                push R11;
+                mov RDI, R10;
+                mov ESI, R14D;
+                sub ESI, 2;
+                mov EDX, EAX;
+                mov ECX, 2;
+                lea R10, [RIP + mainTextRawLogFuncAddress];
+                mov R10, qword ptr [R10];
+                call R10;
+                pop R11;
+                pop R10;
+                pop RCX;
+                pop RAX;
                 mov RDI, R13;
                 mov ESI, EAX;
                 lea R10, [RIP + mainTextGlyphLookupFuncAddress];
@@ -1495,6 +1527,7 @@ private __gshared size_t mainTextRender3dV137Site1ZeroReturnAddress;
 private __gshared size_t mainTextRender3dV137Site2ReturnAddress;
 private __gshared size_t mainTextRender3dV137Site2ZeroReturnAddress;
 private __gshared size_t mainTextGlyphLookupFuncAddress;
+private __gshared size_t mainTextRawLogFuncAddress;
 private __gshared size_t mainTextProc1ReturnAddress;
 private __gshared size_t mainTextProc2ReturnAddress;
 private __gshared size_t mainTextProc2BufferAddress;
@@ -2014,6 +2047,7 @@ DllError mainTextProc4Injector(RunOptions options)
                 // (+0xC7).
                 mainTextRenderToTextureV137Site1ReturnAddress = address + 0x19;
                 mainTextRenderToTextureV137Site1ZeroReturnAddress = address + 0xC7;
+                mainTextRawLogFuncAddress = cast(size_t) &wideGlyphRawLog;
                 mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextRenderToTextureV137Site1_hook, 16);
@@ -2034,6 +2068,7 @@ DllError mainTextProc4Injector(RunOptions options)
                 // (+0x354).
                 mainTextRenderToTextureV137Site2ReturnAddress = address + 0x14;
                 mainTextRenderToTextureV137Site2ZeroReturnAddress = address + 0x354;
+                mainTextRawLogFuncAddress = cast(size_t) &wideGlyphRawLog;
                 mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextRenderToTextureV137Site2_hook, 14);

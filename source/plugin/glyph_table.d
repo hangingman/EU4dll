@@ -190,6 +190,50 @@ extern (C) void* wideGlyphLookup(size_t fontBase, uint codePoint)
 // Font bases that hold a given code point (item 31 diagnostic:
 // lets a lookup miss be checked against every font instance
 // that registered the same code point).
+// Raw CString dump for the RenderToTexture sites (item 32,
+// step 2): called from the site 1 / site 2 wide paths with the
+// operator[] char pointer and the loop index at the START of
+// the escape sequence (the hooks advance the index by 2 before
+// the wide path, so they pass index-2). It reconstructs the
+// string start as charPtr-index and dumps up to 48 bytes as
+// hex, so the exact buffer each pass reads can be compared:
+// site 1 measures the original string, site 2 draws whatever
+// the line buffer holds when it produces U+2026.
+string formatRawCStringLogLine(uint site, uint codePoint, uint index,
+        const(ubyte)[] bytes)
+{
+    import std.format : format;
+
+    string hex;
+    foreach (b; bytes)
+    {
+        if (hex.length)
+            hex ~= " ";
+        hex ~= format("%02x", b);
+    }
+    return format("[GLYPH-DEBUG] raw site=%d cp=0x%x index=%d bytes=%s\n",
+            site, codePoint, index, hex.length ? hex : "-");
+}
+
+extern (C) void wideGlyphRawLog(const(char)* charPtr, uint index,
+        uint codePoint, uint site)
+{
+    if (!glyphDebugEnabled() || !glyphDebugInteresting(codePoint))
+        return;
+    if (charPtr is null || index > 4096)
+        return;
+    auto start = charPtr - index;
+    ubyte[] buf;
+    foreach (i; 0 .. 48)
+    {
+        const b = cast(ubyte) start[i];
+        if (b == 0)
+            break;
+        buf ~= b;
+    }
+    glyphDebugWrite(formatRawCStringLogLine(site, codePoint, index, buf));
+}
+
 extern (C) size_t wideGlyphFontCountFor(uint codePoint)
 {
     size_t n;
@@ -308,6 +352,11 @@ unittest
     assert(glyphDebugInteresting(0x2026));
     assert(!glyphDebugInteresting(0x41));
     assert(!glyphDebugInteresting(0x100));
+    assert(formatRawCStringLogLine(2, 0x2026, 0,
+            [0x10, 0x26, 0x20]) ==
+            "[GLYPH-DEBUG] raw site=2 cp=0x2026 index=0 bytes=10 26 20\n");
+    assert(formatRawCStringLogLine(1, 0x623B, 3, []) ==
+            "[GLYPH-DEBUG] raw site=1 cp=0x623b index=3 bytes=-\n");
     const line = formatGlyphDebugLine("lookup-miss", 0x1234, 0x623B, null, 42);
     assert(line == "[GLYPH-DEBUG] lookup-miss font=0x1234 cp=0x623b glyph=0x0 total=42\n");
     const cline = formatGlyphDebugLineCaller("lookup-hit", 0x1234, 0x2026, cast(void*) 0x5000, 42, 0x7000);

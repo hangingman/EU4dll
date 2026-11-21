@@ -87,3 +87,72 @@ pointer when U+2026 is produced, to see the exact buffer
 the draw pass reads. Then fix that width/copy logic, keep
 `EU4DLL_GLYPH_DEBUG` until the fix is verified, and re-run
 this same Game Browser check.
+
+## 6. Step 2 (2026-11-21): the draw-pass buffer holds only the lead bytes
+
+Instrumentation: the RenderToTexture site 1 and site 2 wide
+paths now call `wideGlyphRawLog` (plugin.glyph_table, same
+`EU4DLL_GLYPH_DEBUG=1` opt-in) before the glyph lookup. It
+reconstructs the string start as charPtr - (loop index at the
+escape start) and dumps up to 48 bytes as hex, so the exact
+buffer each pass reads can be compared. The naked hooks save
+RAX/RCX/R10/R11 around the call (four pushes, stack alignment
+preserved) because the logger is a D function and clobbers
+caller-saved registers; the formatter is unit-tested and
+`make test` passes (10 modules).
+
+Run: throwaway test mod `testfonts_item32s2` (all 32 item 23
+font files, hardlinks, temporary `dlc_load.json`), removed
+after the run, user folder restored. `eu4_multiplayer.sh`,
+`runs/20261121-195701-multiplayer`, env
+`EU4DLL_ENABLE_DECODE=1` + `EU4DLL_GLYPH_DEBUG=1` + SetText
+probe, same Japanese Back replacement. Normal build verified
+first (`make all` run last, .so md5
+37484c609b1d90de8b75642811d25b16). SetText id=0 applied, no
+crash, process alive at the Game Browser screen (ended by
+kill, known behaviour); screenshot checked visually - button
+again shows only the three dots, English UI otherwise normal.
+
+Evidence (5 identical render groups each):
+
+| Pass | Raw bytes at the fetch | Decodes to |
+|---|---|---|
+| Site 1 (measuring), index 0 | `11 49 62 10 8b 30` | U+623B, U+308B (the full escaped string) |
+| Site 1 (measuring), index 3 | `11 49 62 10 8b 30` | U+308B |
+| Site 2 (draw), index 0 | `11 10` (then NUL) | see below |
+
+So the draw pass does NOT read the original string and does
+NOT read a ` ...` ASCII ellipsis either. Its line buffer is
+2 bytes long: `0x11 0x10` - exactly the LEAD byte of each of
+the two escape sequences (`11 49 62` and `10 8b 30`), with
+the two payload bytes of each sequence dropped. Whoever
+builds this buffer between the measuring pass and the draw
+pass copies one byte per character (per escape sequence),
+i.e. it walks the string with the decoded character step
+(3 bytes, matching the hooks' index advance) but copies only
+the single byte at each character position.
+
+Why that draws exactly one U+2026: at site 2 the first byte
+`0x11` is ESCAPE_SEQ_2, so the hook reads the word at +1,
+which is `0x10` followed by the buffer's terminating NUL,
+i.e. word `0x0010`; `0x0010 - SHIFT_2 (0x0E) = 0x0002`, which
+lies in the NO_FONT band, so the hook maps it to NOT_DEF
+(U+2026) and the wide lookup returns the real ellipsis
+glyph. The loop index then advances by 3, past the 2-byte
+buffer, so exactly one glyph - the ellipsis - is drawn. This
+fully explains the item 30/31 observations (three dots on
+screen are the single U+2026 glyph of the generated font).
+
+## 7. Next (item 32, step 3)
+
+Find the per-character 1-byte copy that builds the
+RenderToTexture line buffer between the site 1 measuring
+loop (fetch VA 0x204ef59) and the draw loop (fetch VA
+0x2051088): the disassembly region 0x204f000-0x2051000
+contains several `CString(char)` append blocks (e.g. around
+VA 0x204ea19-0x204ec99 in the function's first phase and the
+line-store blocks after the measuring loop). The fix must
+make that copy move all 3 bytes of an escape sequence (or
+make the buffer hold the decoded text), then re-run this
+same Game Browser check. `EU4DLL_GLYPH_DEBUG` (now including
+the raw dump) stays until item 32 closes.
