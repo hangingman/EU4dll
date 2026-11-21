@@ -289,3 +289,9 @@
 
 - Recorded in memory-bank/details/glyph_table_expansion_item28.md (implementation step 5). Smoke runs/20261121-180844 with all 16 generated fonts (32 files) via the throwaway test mod testfonts_item28 (removed afterwards, user folder restored) and EU4DLL_ENABLE_DECODE=1: Duplicate character ID = 0, Invalid character ID = 0, no crash, ended_by_exit_button, eu4_wait=0, menu screenshot visually normal English. The item 26 full-font segfault is gone.
 - Item 28 is complete. Next: item 27 - Japanese display re-check (Game Browser) with the generated fonts placed.
+
+## Japanese display re-check (2026/11/21, item 27) - item 27 complete, items 27/28 done
+
+- Recorded in memory-bank/details/font_display_recheck_item27.md. Smoke runs/20261121-181435-multiplayer with all 16 generated fonts via the throwaway test mod testfonts_item27 (removed afterwards, user folder restored), EU4DLL_ENABLE_DECODE=1, EU4DLL_SETTEXT_PROBE=1, Back replaced with the Japanese word for it: DLL active, SetText id=0 result=applied, Duplicate = 0, Invalid = 0, no crash, menu screenshot visually normal English.
+- Result NEGATIVE for display: the Game Browser bottom-left button shows four glyphs (I, b, boxed-X, 0), which are exactly the escaped bytes 11 49 62 10 8B 30 rendered byte by byte. Path identified: this button is drawn by a byte-width CBitmapFont path (RenderToScreen/RenderToTexture/GetWidthOfString family, item 28 step 4), not by the five hooked TextView functions, so escapes are never decoded there.
+- Items 27 and 28 are both complete. Japanese on this class of UI text needs a new item (decode escapes inside the byte-wise BitmapFont paths); do not start it without owner instruction.
