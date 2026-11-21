@@ -2,7 +2,7 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。次はヘッダ32バイト化による容量の実測へ進む。
+Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。次は可変長置換の実機確認へ進む。
 
 ## 確定事項
 
@@ -16,7 +16,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 
 ## 未確定・制約
 
-- 現在は同一UTF-8バイト長の置換だけ。`Back=戻る`など可変長置換は未対応。
+- 可変長置換は容量以下の場合に限って実装済み。容量超過は `exceeds-capacity` で見送る。`Back=戻る`などの実機表示は未確認。
 - `translationMap`のキーとSetText実引数の対応は未証明。PoCは明示的な環境変数マッピングを使う。
 - フックはLinux・EU4 v1.37.5・明示opt-inに限定。全UI経路やWindows版への展開は未実施。
 - GDB診断スクリプト末尾の`no registers`は、EU4終了後にレジスタを読む後処理エラーであり、native置換成功とは別問題。
@@ -25,5 +25,5 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 
 1. この変更をコミットする。
 2. 必要なら置換ログへmapping idを追加し、2件の対応を個別に記録する。
-3. CStringの所有権・容量・寿命を確認できるまで可変長置換を実装しない。
+3. 可変長置換を実機で確認する（Game Browser で長さの違う置換と日本語置換の表示）。
 4. EU4のバージョン更新時はAOB一意性と完全命令境界を再検証する。

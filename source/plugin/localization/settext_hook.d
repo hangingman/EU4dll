@@ -20,11 +20,15 @@ version (linux)
     private enum size_t MaxProbeBytes = 256;
     private enum size_t MaxMappings = 8;
 
+    private enum size_t CStringHeaderBytes = 32;
+    private enum size_t SsoCapacity = 15;
+
     private struct ProbeMapping
     {
         ubyte[MaxProbeBytes] source;
         ubyte[MaxProbeBytes] replacement;
-        size_t length;
+        size_t sourceLength;
+        size_t replacementLength;
     }
 
     private __gshared ProbeMapping[MaxMappings] mappings;
@@ -32,6 +36,7 @@ version (linux)
     private __gshared bool setTextActive;
     private __gshared bool[MaxMappings] replacementLogged;
     private __gshared bool[MaxMappings] contentMismatchLogged;
+    private __gshared bool[MaxMappings] capacitySkipLogged;
     private __gshared uint headerSkipLoggedMask;
 
     private void rawDiagnostic(string message)
@@ -72,12 +77,30 @@ version (linux)
             return false;
         auto source = cast(const(ubyte)[]) entry[0 .. separator];
         auto replacement = cast(const(ubyte)[]) entry[separator + 1 .. $];
-        if (source.length != replacement.length || source.length > MaxProbeBytes)
+        if (source.length > MaxProbeBytes || replacement.length > MaxProbeBytes)
             return false;
-        mapping.length = source.length;
+        mapping.sourceLength = source.length;
+        mapping.replacementLength = replacement.length;
         mapping.source[0 .. source.length] = source[];
-        mapping.replacement[0 .. source.length] = replacement[];
+        mapping.replacement[0 .. replacement.length] = replacement[];
         return true;
+    }
+
+    // Capacity of a CString from its 32-byte header (see
+    // memory-bank/details/cstring_ownership.md): the data pointer equals
+    // object+16 for SSO storage (capacity 15); otherwise +16 holds the
+    // heap capacity as a size_t. Pure so it can be unit tested.
+    size_t cstringCapacity(const(ubyte)[CStringHeaderBytes] header, size_t objectAddress)
+    {
+        auto data = *cast(const(size_t)*)(header.ptr);
+        if (data == objectAddress + 16)
+            return SsoCapacity;
+        return *cast(const(size_t)*)(header.ptr + 16);
+    }
+
+    bool replacementFitsCapacity(size_t replacementLength, size_t capacity)
+    {
+        return replacementLength <= capacity;
     }
 
     // Outcome of comparing one mapping against one observed CString value.
@@ -91,9 +114,9 @@ version (linux)
     // Pure comparison so the per-mapping decision can be unit tested.
     SetTextDecision decideSetTextMapping(const ref ProbeMapping mapping, const(ubyte)[] value)
     {
-        if (mapping.length != value.length)
+        if (mapping.sourceLength != value.length)
             return SetTextDecision.lengthMismatch;
-        if (value != mapping.source[0 .. mapping.length])
+        if (value != mapping.source[0 .. mapping.sourceLength])
             return SetTextDecision.contentMismatch;
         return SetTextDecision.matched;
     }
@@ -119,9 +142,7 @@ version (linux)
             return "empty-source";
         if (separator + 1 >= entry.length)
             return "empty-replacement";
-        if (separator != entry.length - separator - 1)
-            return "length-mismatch";
-        if (separator > MaxProbeBytes)
+        if (separator > MaxProbeBytes || entry.length - separator - 1 > MaxProbeBytes)
             return "too-long";
         return "none";
     }
@@ -154,7 +175,7 @@ version (linux)
             {
                 log(LogLevel.info, format(
                     "[DIAGNOSTIC] SetText mapping id=%d length=%d result=loaded reason=none",
-                    mappingCount, mapping.length));
+                    mappingCount, mapping.sourceLength));
                 mappings[mappingCount++] = mapping;
             }
             else
@@ -166,7 +187,7 @@ version (linux)
 
     private bool tryReplace(void* cstring)
     {
-        ubyte[16] header;
+        ubyte[CStringHeaderBytes] header;
         if (cstring is null || !readMemory(cstring, header[]))
         {
             logHeaderSkip(0, "null-or-unreadable-cstring", 1u << 0);
@@ -182,6 +203,12 @@ version (linux)
         if (length <= 0 || length > MaxProbeBytes)
         {
             logHeaderSkip(0, "invalid-length", 1u << 2);
+            return false;
+        }
+        auto capacity = cstringCapacity(header, cast(size_t) cstring);
+        if (capacity < cast(size_t) length)
+        {
+            logHeaderSkip(cast(size_t) length, "invalid-capacity", 1u << 4);
             return false;
         }
 
@@ -215,7 +242,28 @@ version (linux)
             case SetTextDecision.matched:
                 break;
             }
-            auto replaced = writeMemory(data, mapping.replacement[0 .. mapping.length]);
+            if (!replacementFitsCapacity(mapping.replacementLength, capacity))
+            {
+                if (!capacitySkipLogged[i] && !replacementLogged[i])
+                {
+                    capacitySkipLogged[i] = true;
+                    rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
+                        false, "exceeds-capacity"));
+                }
+                return false;
+            }
+            // Write replacement bytes plus the terminating NUL, then update
+            // the length field (+8) to match; data pointer and +16 stay
+            // untouched, as required by cstring_ownership.md.
+            ubyte[MaxProbeBytes + 1] replacementValue;
+            replacementValue[0 .. mapping.replacementLength] =
+                mapping.replacement[0 .. mapping.replacementLength];
+            replacementValue[mapping.replacementLength] = 0;
+            auto newLength = cast(size_t) mapping.replacementLength;
+            auto replaced = writeMemory(data,
+                    replacementValue[0 .. mapping.replacementLength + 1])
+                && writeMemory(cast(void*)(cast(ubyte*) cstring + 8),
+                    (cast(ubyte*) &newLength)[0 .. size_t.sizeof]);
             if (!replacementLogged[i])
             {
                 replacementLogged[i] = true;
@@ -340,13 +388,35 @@ version (linux)
     {
         ProbeMapping mapping;
         assert(parseSetTextProbeEntry("Back=Home", mapping));
-        assert(mapping.length == 4);
+        assert(mapping.sourceLength == 4 && mapping.replacementLength == 4);
         assert(mapping.source[0] == 'B' && mapping.source[3] == 'k');
         assert(mapping.replacement[0] == 'H' && mapping.replacement[3] == 'e');
         assert(!parseSetTextProbeEntry("Back=Home=Again", mapping));
-        assert(!parseSetTextProbeEntry("Long=Shorter", mapping));
+        assert(parseSetTextProbeEntry("Long=Shorter", mapping));
+        assert(mapping.sourceLength == 4 && mapping.replacementLength == 7);
+        assert(parseSetTextProbeEntry("Back=Homepage", mapping));
+        assert(mapping.sourceLength == 4 && mapping.replacementLength == 8);
         assert(!parseSetTextProbeEntry("=Home", mapping));
         assert(!parseSetTextProbeEntry("Back=", mapping));
+
+        // Capacity: SSO header (data == object+16) is 15; heap header
+        // carries the capacity size_t at +16.
+        ubyte[CStringHeaderBytes] ssoHeader;
+        auto ssoObject = cast(size_t) 0x1000;
+        *cast(size_t*)(ssoHeader.ptr) = ssoObject + 16;
+        *cast(size_t*)(ssoHeader.ptr + 8) = 4;
+        assert(cstringCapacity(ssoHeader, ssoObject) == 15);
+        ubyte[CStringHeaderBytes] heapHeader;
+        auto heapObject = cast(size_t) 0x2000;
+        *cast(size_t*)(heapHeader.ptr) = cast(size_t) 0x9000;
+        *cast(size_t*)(heapHeader.ptr + 8) = 20;
+        *cast(size_t*)(heapHeader.ptr + 16) = 31;
+        assert(cstringCapacity(heapHeader, heapObject) == 31);
+        assert(replacementFitsCapacity(8, 15));
+        assert(replacementFitsCapacity(15, 15));
+        assert(!replacementFitsCapacity(16, 15));
+        assert(replacementFitsCapacity(31, 31));
+        assert(!replacementFitsCapacity(32, 31));
 
         // Per-mapping decision: length first, then content.
         assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Back")
@@ -369,7 +439,8 @@ version (linux)
         assert(probeEntryRejectionReason("Back=Home=Again") == "multiple-separators");
         assert(probeEntryRejectionReason("=Home") == "empty-source");
         assert(probeEntryRejectionReason("Back=") == "empty-replacement");
-        assert(probeEntryRejectionReason("Long=Shorter") == "length-mismatch");
+        assert(probeEntryRejectionReason("Long=Shorter") == "none");
+        assert(probeEntryRejectionReason("Back=Homepage") == "none");
         assert(probeEntryRejectionReason("Back=Home") == "none");
     }
 }
