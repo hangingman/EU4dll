@@ -14,6 +14,7 @@ version (linux)
     import std.process : environment;
     import std.string : indexOf, lastIndexOf, split;
     import plugin.byte_pattern;
+    import plugin.localization.escape_codec : encodeUtf8ToEscaped;
     import plugin.patcher.patcher : patch_memory, makeAbsoluteJmp, makeAbsoluteJmpPadded;
 
     private enum size_t CopiedLength = 17;
@@ -29,6 +30,10 @@ version (linux)
         ubyte[MaxProbeBytes] replacement;
         size_t sourceLength;
         size_t replacementLength;
+        // True when replacement holds escape-encoded bytes (item 20):
+        // replacementLength is then the escaped length, which is what
+        // the CString capacity check in tryReplace must use.
+        bool replacementEscaped;
     }
 
     private __gshared ProbeMapping[MaxMappings] mappings;
@@ -80,11 +85,62 @@ version (linux)
         auto replacement = cast(const(ubyte)[]) entry[separator + 1 .. $];
         if (source.length > MaxProbeBytes || replacement.length > MaxProbeBytes)
             return false;
+        ubyte[] prepared;
+        bool escaped;
+        if (!prepareSetTextReplacement(replacement, prepared, escaped))
+            return false;
+        if (prepared.length > MaxProbeBytes)
+            return false;
         mapping.sourceLength = source.length;
-        mapping.replacementLength = replacement.length;
+        mapping.replacementLength = prepared.length;
+        mapping.replacementEscaped = escaped;
         mapping.source[0 .. source.length] = source[];
-        mapping.replacement[0 .. replacement.length] = replacement[];
+        mapping.replacement[0 .. prepared.length] = prepared[];
         return true;
+    }
+
+    // A replacement needs escape encoding when it contains any
+    // non-ASCII byte (UTF-8 multibyte text such as Japanese). Pure
+    // ASCII replacements pass through unchanged, so the existing
+    // English probe behaviour is byte-identical.
+    bool replacementNeedsEscape(const(ubyte)[] replacement)
+    {
+        foreach (b; replacement)
+            if (b >= 0x80)
+                return true;
+        return false;
+    }
+
+    // Prepare the bytes a mapping actually writes (item 20): when the
+    // configured replacement is non-ASCII, convert the whole UTF-8
+    // string with escape_codec so the decode hooks (items 17-19) can
+    // render it; otherwise copy it verbatim. Returns false when the
+    // text cannot be encoded (invalid UTF-8 or above-BMP), in which
+    // case the mapping is rejected at load time.
+    bool prepareSetTextReplacement(const(ubyte)[] raw, out ubyte[] prepared,
+            out bool escaped)
+    {
+        prepared = null;
+        escaped = false;
+        if (!replacementNeedsEscape(raw))
+        {
+            prepared = raw.dup;
+            return true;
+        }
+        ubyte[] encoded;
+        if (!encodeUtf8ToEscaped(cast(const(char)[]) raw, encoded))
+            return false;
+        prepared = encoded;
+        escaped = true;
+        return true;
+    }
+
+    // Load-time log line for a mapping whose replacement was escape
+    // encoded. Kept pure so tests pin the fields exactly.
+    string formatSetTextEscapedLog(long mappingId, size_t rawLength, size_t escapedLength)
+    {
+        return format("[DIAGNOSTIC-RAW] SetText escaped id=%d raw-length=%d escaped-length=%d\n",
+            mappingId, rawLength, escapedLength);
     }
 
     // Capacity of a CString from its 32-byte header (see
@@ -154,6 +210,11 @@ version (linux)
             return "empty-replacement";
         if (separator > MaxProbeBytes || entry.length - separator - 1 > MaxProbeBytes)
             return "too-long";
+        ubyte[] prepared;
+        bool escaped;
+        if (!prepareSetTextReplacement(
+                cast(const(ubyte)[]) entry[separator + 1 .. $], prepared, escaped))
+            return "unencodable-replacement";
         return "none";
     }
 
@@ -186,6 +247,9 @@ version (linux)
                 log(LogLevel.info, format(
                     "[DIAGNOSTIC] SetText mapping id=%d length=%d result=loaded reason=none",
                     mappingCount, mapping.sourceLength));
+                if (mapping.replacementEscaped)
+                    rawDiagnostic(formatSetTextEscapedLog(mappingCount,
+                        entry.length - entry.indexOf('=') - 1, mapping.replacementLength));
                 mappings[mappingCount++] = mapping;
             }
             else
@@ -460,6 +524,39 @@ version (linux)
         assert(probeEntryRejectionReason("Long=Shorter") == "none");
         assert(probeEntryRejectionReason("Back=Homepage") == "none");
         assert(probeEntryRejectionReason("Back=Home") == "none");
+
+        // Item 20: non-ASCII (Japanese) replacements are stored
+        // escape-encoded; ASCII replacements are byte-identical.
+        assert(!replacementNeedsEscape(cast(const(ubyte)[]) "Home"));
+        assert(replacementNeedsEscape(cast(const(ubyte)[]) "戻る"));
+        ubyte[] prepared;
+        bool escaped;
+        assert(prepareSetTextReplacement(cast(const(ubyte)[]) "Home", prepared, escaped));
+        assert(!escaped && prepared == cast(ubyte[]) "Home");
+        assert(prepareSetTextReplacement(cast(const(ubyte)[]) "戻る", prepared, escaped));
+        assert(escaped && prepared == cast(ubyte[])[0x11, 0x49, 0x62, 0x10, 0x8B, 0x30]);
+
+        assert(parseSetTextProbeEntry("Back=戻る", mapping));
+        assert(mapping.replacementEscaped && mapping.replacementLength == 6);
+        assert(mapping.replacement[0 .. 6] ==
+            cast(ubyte[])[0x11, 0x49, 0x62, 0x10, 0x8B, 0x30]);
+        // The capacity check uses the escaped length: 6 fits the SSO
+        // capacity of 15, while three repetitions (18 escaped bytes)
+        // do not, even though the source length is still 4.
+        assert(replacementFitsCapacity(mapping.replacementLength, SsoCapacity));
+        assert(parseSetTextProbeEntry("Back=戻る戻る戻る", mapping));
+        assert(mapping.replacementLength == 18);
+        assert(!replacementFitsCapacity(mapping.replacementLength, SsoCapacity));
+        assert(parseSetTextProbeEntry("Back=Home", mapping));
+        assert(!mapping.replacementEscaped && mapping.replacementLength == 4);
+
+        // Unencodable replacements (above-BMP) are rejected at load.
+        assert(!parseSetTextProbeEntry("Back=😀", mapping));
+        assert(probeEntryRejectionReason("Back=😀") == "unencodable-replacement");
+        assert(probeEntryRejectionReason("Back=戻る") == "none");
+
+        assert(formatSetTextEscapedLog(0, 6, 6) ==
+            "[DIAGNOSTIC-RAW] SetText escaped id=0 raw-length=6 escaped-length=6\n");
     }
 }
 else

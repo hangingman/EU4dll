@@ -16,8 +16,9 @@ module plugin.localization.escape_codec;
 // full derivation and the two documented deviations from upstream.
 //
 // This module is pure: it does not touch the game, the SetText hook,
-// or any file. Wiring it into the hook is a later stage (item 7
-// design, stage B), not part of item 10.
+// or any file. Wiring into the SetText hook was done in item 20
+// (settext_hook.d converts non-ASCII replacements at load time);
+// see memory-bank/details/settext_escape_wiring.md.
 
 import std.utf : decode, UTFException;
 

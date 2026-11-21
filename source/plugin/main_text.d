@@ -346,8 +346,14 @@ extern (C)
                 ja        JMP_E;
                 mov       EAX, NOT_DEF;
             JMP_E:
+                cmp       EAX, 0x100;
+                jae       JMP_G;
                 mov RCX, qword ptr [RSP + 0x68];
                 mov R15, qword ptr [RCX + RAX*8 + 0x100];
+                lea       R11, [RIP + mainTextProc1V137SiteAReturnAddress];
+                jmp       qword ptr [R11];
+            JMP_G:
+                xor R15D, R15D;
                 lea       R11, [RIP + mainTextProc1V137SiteAReturnAddress];
                 jmp       qword ptr [R11];
             }
@@ -393,7 +399,13 @@ extern (C)
                 ja        JMP_E;
                 mov       EAX, NOT_DEF;
             JMP_E:
+                cmp       EAX, 0x100;
+                jae       JMP_G;
                 mov RAX, qword ptr [R12 + RAX*8 + 0x100];
+                jmp       JMP_H;
+            JMP_G:
+                xor EAX, EAX;
+            JMP_H:
                 test RAX, RAX;
                 lea       R11, [RIP + mainTextProc1V137SiteBReturnAddress];
                 jmp       qword ptr [R11];
@@ -440,8 +452,14 @@ extern (C)
                 ja        JMP_E;
                 mov       EAX, NOT_DEF;
             JMP_E:
+                cmp       EAX, 0x100;
+                jae       JMP_G;
                 mov RCX, qword ptr [RSP + 0x28];
                 mov RBP, qword ptr [RCX + RAX*8 + 0x100];
+                lea       R11, [RIP + mainTextProc4V137GetActualReturnAddress];
+                jmp       qword ptr [R11];
+            JMP_G:
+                xor EBP, EBP;
                 lea       R11, [RIP + mainTextProc4V137GetActualReturnAddress];
                 jmp       qword ptr [R11];
             }
@@ -487,7 +505,13 @@ extern (C)
                 ja        JMP_E;
                 mov       EAX, NOT_DEF;
             JMP_E:
+                cmp       EAX, 0x100;
+                jae       JMP_G;
                 mov RBP, qword ptr [R13 + RAX*8 + 0x100];
+                jmp       JMP_H;
+            JMP_G:
+                xor EBP, EBP;
+            JMP_H:
                 test RBP, RBP;
                 lea       R11, [RIP + mainTextProc4V137GetRequiredReturnAddress];
                 jmp       qword ptr [R11];
@@ -534,7 +558,13 @@ extern (C)
                 ja        JMP_E;
                 mov       EAX, NOT_DEF;
             JMP_E:
+                cmp       EAX, 0x100;
+                jae       JMP_G;
                 mov RBP, qword ptr [R15 + RAX*8 + 0x100];
+                jmp       JMP_H;
+            JMP_G:
+                xor EBP, EBP;
+            JMP_H:
                 test RBP, RBP;
                 lea       R11, [RIP + mainTextProc4V137GetActualRealReturnAddress];
                 jmp       qword ptr [R11];
