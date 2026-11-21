@@ -2,7 +2,7 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。可変長置換の過去の試行整理と容量の実測は完了し、`memory-bank/details/variable_length_history.md` に記録した（対象2件はどちらもSSO容量15）。次は文字化けの原因の切り分けへ進む。
+Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。可変長置換の過去の試行整理と容量の実測は完了し、`memory-bank/details/variable_length_history.md` に記録した（対象2件はどちらもSSO容量15）。文字化けの原因の切り分けは完了し、`memory-bank/details/mojibake_settext.md` に記録した（SetText置換は変換を通らず、復号側のテキスト処理ループ／フォントフックがLinux版では未有効のため、UTF-8バイト列が1バイト文字として解釈されて化ける）。
 
 ## 確定事項
 
@@ -16,7 +16,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 
 ## 未確定・制約
 
-- 可変長置換は容量以下の場合に限って実装済み。容量超過は `exceeds-capacity` で見送る。`Back=戻る`などの実機表示は未確認。
+- 可変長置換は容量以下の場合に限って実装済み。容量超過は `exceeds-capacity` で見送る。`Back=戻る`は実機で `result=applied` を確認済みだが、表示は文字化けする（原因は `details/mojibake_settext.md`）。
 - `translationMap`のキーとSetText実引数の対応は未証明。PoCは明示的な環境変数マッピングを使う。
 - フックはLinux・EU4 v1.37.5・明示opt-inに限定。全UI経路やWindows版への展開は未実施。
 - GDB診断スクリプト末尾の`no registers`は、EU4終了後にレジスタを読む後処理エラーであり、native置換成功とは別問題。

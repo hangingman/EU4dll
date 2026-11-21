@@ -112,3 +112,11 @@
 - 詳細は `memory-bank/details/variable_length_history.md` に記録した。過去の試行は、f25f5a3 のGDB PoCが同一バイト長を前提に可変長を明示的にスキップし（所有権・寿命・容量が未確認のため）、その後も容量が読めないことが止まった理由だった。
 - この変更では置換の許可範囲を変えず、マッチ時に容量を1回だけログへ出す行（`SetText capacity id=.. length=.. capacity=..`、純粋関数 `formatSetTextCapacityLog`）だけを追加した。
 - 実機実測（smoke runs/20261121-122907、EU4はExitボタンで正常終了）: `Back`（長さ4）と `Connect to ID`（長さ13）はどちらもSSOで容量15。両対象とも15バイトまでの置換が容量に収まる。それ以外の文字列やヒープ確保の文字列の容量は未実測。
+
+## 文字化けの原因の切り分け（2026/11/21）
+
+- 詳細は `memory-bank/details/mojibake_settext.md` に記録した。結論: SetText置換は変換処理を通らない。フックは環境変数のバイト列をそのままCStringへ書く（`settext_hook.d` の `parseSetTextProbeEntry`／`tryReplace`）。`translationMap` も参照しない。
+- DLL本来の2バイト文字の仕組みは、テキスト処理ループ側の復号（`main_text.d` の `ESCAPE_SEQ_1..4` = 0x10〜0x13＋2バイトコードポイント）と `font.d` のパッチだが、`dllmain.d` では `Font.init`／`TextView.init` がTODOとしてコメントアウトされており、Linux版では有効になっていない。有効なのは `loadTranslationMods`、`ReloadTrace`、`SetTextHook`、`PluginVersion` のみ。
+- そのためEU4は置換後のCStringを通常の1バイト文字として読み、UTF-8の各バイトが別々の字形になる。`戻る` は E6 88 BB E3 82 8B の6バイトで、長さや容量の問題ではなく表示側の解釈で化ける。
+- 実機確認（smoke runs/20261121-123828、`Back=戻る`）: `SetText capacity id=0 length=4 capacity=15`、`result=applied` を確認し、EU4はExitボタンで正常終了した。書き込み側は日本語バイト列でも動作する。画面表示の成否は判定に入れていない。
+- 今後の見通し: SetTextでUTF-8を書く方式のままでは日本語は表示できない。先にテキスト処理ループとフォント側の復号をLinux v1.37.5で有効にし、置換文字列はエスケープ形式で渡す必要がある。このリポジトリにUTF-8からエスケープ形式への変換器はまだ無い。実装はしていない。
