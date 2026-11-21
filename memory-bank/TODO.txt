@@ -1,74 +1,38 @@
 # EU4dll 開発 TODO
 
-## 最新状態（2026/08/29）
+## 現在の状態（2026-11-21）
 
-- Linux x86-64版EU4 v1.37.5を対象とする。
-- `ReloadPdxLocalize` は辞書を再構築するが、生成済みUIを更新しなかった。表示更新フックの候補から外す。
-- `CTextSprite::SetText` の第1`CString`（`rdx`）をnative hookするPoCを実装済み。
-- `Back=Home` と `Connect to ID=Connect to JP` の同一長置換を実機で確認した。`Back → Home`のUI反映、EU4正常終了も確認済み。
-- 変更は明示的な`EU4DLL_SETTEXT_PROBE=1`が必要で、Linux・v1.37.5に限定している。
-- 旧C++版`Plugin64/injector.hpp`のfar jump実装を確認済み。近距離は5バイト`E9 rel32`、遠距離は14バイトの絶対間接JMPを使用していた。Linux版PoCも後者を採用する。
+- 対象は Linux x86-64 版 EU4 v1.37.5。
+- 翻訳Mod（eu4dll_translations、yml 145ファイル＋生成フォント32ファイル）を有効にすると、メニュー、Game Browser、国選択画面の全面に日本語が表示されることを実機で確認済み。所有者の環境でも直接起動で日本語表示を確認済み（2026-11-21）。
+- 日本語表示の仕組みは3点の組合せである。(1) 生成フォント（Noto Sans CJK JP）とグリフ表のサイドテーブル拡張、(2) 描画・計測経路の復号フック（既定で有効、EU4DLL_ENABLE_DECODE=0 で無効化）、(3) ローカライズ読み込みフック（LocalizeYmlAddKey で値をエスケープ形式のまま辞書へ格納、EU4DLL_LOCALIZE_ESCAPE=1 で有効化）。
+- DLL は非EU4プロセスでは何もしない（preload ガード）。Steam 経由・直接起動のどちらでも使える。
+- 項目1〜32と2026-11-21夜の追加作業（復号既定化、SetText辞書、読み込みフック、wide path 修正、preload ガード）は全て master へマージ・push 済み。経緯は progress.md と details/ に記録がある。
 
-## 現在の実装
+### 過去の経緯（要約）
 
-- 対象AOBは`CTextSprite::SetText`固有の命令列に限定し、複数一致時は停止する。
-- 先頭17バイトを完全な命令境界でtrampolineへ退避する。
-- 14バイト絶対JMP＋3バイトNOPでhookする。
-- probe stubは引数レジスタを保存し、SysV x86-64のスタックアラインメントを維持して元処理へ復帰する。
-- `CString`のNULL、ポインタ、負数・過大長、終端NUL、read/write結果を検証する。
-- 置換は明示マッピング・同一UTF-8バイト長に限定し、再入を防止する。
-- `make test`、`make all`、`git diff --check`は成功済み。
+- SetText 置換 PoC と CString 所有権・可変長置換の調査（2026/08/29）は完了し、後続の方式に置き換わった。詳細は details/cstring_ownership.md、details/variable_length_history.md、details/mojibake_settext.md。
+- 「保留」だった経路（PdxLocalize 一括 hook、描画層 hook 等）は採用しなかった。翻訳の本線は読み込みフック＋復号フックである。
 
-## 次の作業（優先順）
+## 残っている課題
 
-1. CStringの所有権・容量・寿命を追加観測する。確認できるまで可変長置換を実装しない。
-2. 置換ログにmapping id、対象長、成功/skip理由を追加し、各マッピングの実行結果を個別に追跡できるようにする。
-3. EU4バージョン更新時に、AOBの一意性・17バイトの命令境界・絶対JMPを再検証する。
-4. 対象外のゲーム操作で影響がないことを確認する。
-5. `translationMap`のキーとSetText実引数の対応を確認できた場合のみ、環境変数probeから翻訳辞書連携へ進む。
-
-## 可変長CString置換調査（2026/08/29）
-
-- EU4 v1.37.5の`CString`は、少なくとも`+0=data pointer`、`+8=length`の`std::string`互換レイアウトと整合する。`CString(char const*)`は`std::string`コンストラクタへ転送し、初期化時に`+0`を`this+0x10`、`+8`を0、`+0x10`を0にする。
-- `+0x10`はlibstdc++の`std::string`におけるSBO領域またはcapacity unionとみられるが、CString固有のcapacity値・アロケータ・所有権・デストラクタ契約は本調査では証明できない。SBOの有無も確定扱いしない。
-- `CTextSprite::SetText`（`0x20d9da4`）は入力第1CString（`rdx`）の`+0`を読み、`strlen`後、`std::string::_M_replace`へ渡して`this+0x220`へコピーする。入力CStringオブジェクト自体のpointer/lengthは書き換えない。
-- 分類: 元データへ直接書けるのは、既存の同一バイト長PoCのように書込可否と終端を実測でき、共有・const・寿命の問題を別途排除できる場合だけ。ただし所有権は未証明なので一般化禁止。
-- 新規バッファ差し替えは、所有権を渡さないTLS上の一時CStringビューとして実験した。正規CStringコンストラクタ/destructorは呼ばず、SetText実行期間だけ`data`と`length`を保持した。実験終了後、恒久コードからは削除した。
-- `EU4DLL_SETTEXT_VARIABLE_PROBE=1`の1ケース実験で最大16バイトreplacementを扱った。ASCII可変長は成功したが、日本語UTF-8は文字化けしたため、元の同一長PoCへ戻した。capacity推測と任意アドレス探索は行っていない。
-- `Back=戻る`の可変長置換は、この診断PoCの実機結果（DLLログ、GDBログ、UI反映、クラッシュなし）を分離確認するまで成功扱いにしない。
-- 実機結果（2026/08/29）: constructor/hook設置、`Back`一致、`VARIABLE_VIEW_READY` 9件、EU4正常終了を確認したが、UIは日本語バイト列を文字化け表示した。SetText実行期間のpointer差し替えは通過した一方、UTF-8バイト列を直接渡すだけでは表示形式を満たさない。
-- 追加実機結果（2026/08/29）: `Back=Go Back`（replacement length 7）は`VARIABLE_VIEW_READY` 9件、UI表示成功、EU4正常終了、SIGSEGV/SIGBUSなし。可変長差し替えの制御経路・寿命はASCIIで再確認できた。
-- よって次は可変長機構を変更せず、既存の日本語表示成功箇所のSetText生バイト列を限定観測し、UTF-8以外の形式または後段変換の有無を調べる。
-- 追加実機観測（2026/08/29）: `rdx`・`rcx`・`r8`を対象に、終端NULとlength 1..64を検証して非ASCII列を最大64件探索したが、該当は0件だった。今回の操作では`ロード`のUTF-8列も独自高ビット列もSetText候補3引数には現れていない。
-- Back限定再観測（2026/08/29）: `Back=戻る`で`VARIABLE_VIEW_READY source_length=4 replacement_length=6`を9件確認し、EU4は正常終了した。UIは再び文字化け。元CString一致と一時ビュー生成は確認済みだが、表示可能な日本語入力形式は未同定。
-- 旧C++版確認（git履歴 `c649f5c^`）: `Plugin64/injector.hpp`はメモリ保護・相対/絶対JMP/CALLのみで、ASCII/UTF-8切替は扱わない。一方、`Plugin64/escape_tool.cpp`は`MultiByteToWideChar(CP_UTF8)`→UCS2→Clausewitz用escaped textへ変換し、`ParadoxTextObject`（inline text[0x10]/pointer union + len + len2）を構成する。
-- 旧C++版の`Font::Init`はcode point上限、font buffer clear/拡張、font size limitをpatchし、`dll_main.cpp`は`Font::Init`と`Input::Init`を呼んでいた。従って日本語表示は単純なCStringフラグではなく、UTF-8→escaped表現変換とフォント側拡張の組合せである可能性が高い。Linuxへ未検証移植しない。
-- これは「日本語がASCII相当の内部形式である」「別の描画経路を通る」「観測した操作で日本語表示経路に到達していない」の切り分けを未完了とする結果であり、UTF-8方式の否定証明ではない。次はCreateTextSprite側または日本語表示を確実に再現する入口を同じ安全条件で観測する。
-- 再発防止: `make all`を`dub build --force`へ変更し、EU4起動wrapperで通常版constructor markerを`strings`検査する。検査失敗時はEU4を起動しない。
-- SetText本体の逆アセンブルで「入力CStringからSetText内部std::stringへの即時コピー」は確認できたが、それは入力CStringの差し替え安全性や所有権を証明しない。
-- 追加観測が必要なのは、実機で同一CStringオブジェクトの`+0/+8/+0x10`をconstructor・copy/move・destructor・SetText入口/復帰で追跡し、長短文字列のallocation/freeと呼出し間の寿命を対応付けること。現時点で実機パッチは行わない。
-
-## 保留
-
-- `Back=戻る`などの可変長置換。
-- SetText以外の全UI経路への一括hook。
-- `PdxLocalize`一括hook、`open`/`read` hook、SDL/OpenGL描画層hook。
-- FreeType/HarfBuzz専用hook。
-- Windows版アドレス・命令列の直接流用。
-- Ghidraによる「テキスト処理ループ2」の全面探索。
+1. フォントサイズ調整: 生成フォントが全体的に2〜3pt大きく見える（所有者の指摘、2026-11-21）。生成時のサイズ指定と .fnt メトリクスの調整方法を調査中。関連: details/font_generation_item23.md、details/charset_and_font_generation.md。
+2. ゲーム内マップの国名表示の実機確認: Render3d site 2 の wide path は修正済み（details/decode_widepath_fix.md）だが、ゲーム内マップで実際に踏んだ確認がまだ無い。
+3. 表示品質: チェックボックスのラベル重なり、狭い見出しの「…」省略、メニューボタンの文字切れ。日本語が英語より幅を取るためのレイアウト側の問題。
+4. EU4DLL_LOCALIZE_ESCAPE の既定ON化の判断: 現在は opt-in のみ。実績が安定したら既定化を検討する。
+5. SetText辞書の位置づけ見直し: 読み込みフックが本線になったため、EU4DLL_SETTEXT_FROM_TRANSLATIONS の辞書経路（details/translation_dict_stage_b.md）を残すか畳むか決める。
+6. バージョン更新時の再検証: EU4のバージョンが上がったら、各フックの AOB 一意性と命令境界を再検証する（恒常項目）。
 
 ## 検証方針
 
-- 正常終了だけでは成功扱いにしない。hook設置、置換結果、UI反映を分けて確認する。
-- 実機ログはGDB出力とDLL側`pattern_eu4jps.log`を混同しない。
-- 未確認の文字列対応、所有権、寿命、可変長容量を成功扱いしない。
+- 正常終了だけでは成功扱いにしない。hook設置、置換・格納結果、UI反映を分けて確認する。
+- 実機ログはGDB出力とDLL側 pattern_eu4jps.log を混同しない。
+- make test の後は必ず make all を実行する（unittest 版 .so の上書きで DLL が無効化されるため。details/dll_inactivation_item25.md）。
+- 実機確認はスクリーンショットで表示まで確認する。未確認の経路は未完了として記録する。
 - 生成ログや一時ファイルはリポジトリへ追加しない。
 
 ## 完了条件
 
-1. Linux版EU4で対象文字列の実際の経路を動的に観測できる。
-2. 置換地点の根拠をログと逆アセンブル結果で説明できる。
-3. 最小の同一長置換が動作する。
-4. EU4が継続操作可能である。
-5. `make test`と`make all`が成功する。
-6. 未検証のUI経路を未完了として記録している。
+1. 残課題1〜3が解消し、実機のスクリーンショットで確認できる。
+2. 課題4・5の判断が決まり、コードと記録に反映されている。
+3. make test と make all が成功する。
+4. 未検証のUI経路を未完了として記録している。

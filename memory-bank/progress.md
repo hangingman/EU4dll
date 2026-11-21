@@ -399,3 +399,11 @@
 
 ## 2026-11-21 - SetText file dictionary removed
 - Folded the dictionary per settext_dict_position_review.md: the load hook covers yml localisation per key, the dictionary's own verification run applied exactly one replacement, and its mod-disabled configuration is blocked by the fonts living in the same mod. Removed loadLocalisationMap / gameLocalisationDir / joinTranslationDictionary (+ join structs) from mod.d; dictMode storage, loadTranslationDictMappings, buildDictMapping, findDictMapping, tryReplaceDict and the FROM_TRANSLATIONS branch from settext_hook.d; retired EU4DLL_SETTEXT_FROM_TRANSLATIONS and EU4DLL_GAME_LOCALISATION_DIR; dropped test_mod.d cases 8-12. The SetText hook and the EU4DLL_SETTEXT_PROBE / EU4DLL_SETTEXT_REPLACEMENTS probe stay. Verify: grep shows no remaining references, make test 11 modules passed, make all run last. Details: memory-bank/details/settext_dict_removal.md.
+
+## 2026-11-21 - Owner confirms Japanese display on the real machine
+- After merging work/preload-guard (940a26e) and pushing, the owner enabled eu4dll_translations in dlc_load.json, placed steam_appid.txt (236850) in the game folder, and launched eu4 directly with EU4DLL_LOCALIZE_ESCAPE=1 and LD_PRELOAD on his own build: all injector JMP logs present, DLL active, Japanese rendering confirmed in game by the owner (reported 2026-11-21 23:30). This also serves as the in-game confirmation for the preload guard.
+- New owner feedback: the generated fonts look 2-3pt too large overall; font size adjustment is the next investigation.
+
+## 2026-11-21 - Memory-bank cleanup
+- TODO.txt rewritten: the 2026/08/29 content (SetText PoC era, all superseded) replaced by the current state, six remaining issues (font size adjustment, Render3d site 2 map labels, layout quality, LOCALIZE_ESCAPE default-on decision, SetText dictionary positioning, version-update AOB re-verification), verification policy, and completion criteria.
+- activeContext.md rewritten: focus updated to the confirmed full-screen Japanese display, confirmed facts trimmed to those still in force, the 2026/08/29 survey sections compressed to details references, and the 2026-11-21 sections replaced by an item-to-details index. History remains in progress.md and details/.
