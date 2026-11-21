@@ -6,7 +6,7 @@ This dll makes it possible to display double-byte characters on Europa Universal
 
 ### Prerequisites
 
-- A D language compiler. We recommend LDC. You can install it via the official installer:
+- A D language compiler. LDC 1.43.0 or later is required (older LDC cannot build the naked inline assembly in source/plugin/main_text.d and source/plugin/font.d). We recommend LDC. You can install it via the official installer:
   ```sh
   curl -fsSL https://dlang.org/install.sh | bash -s ldc
   ```
