@@ -387,3 +387,6 @@
 
 ## 2026-11-21 - Wide-path fix verified: Game Browser renders Japanese
 - Run runs/20261121-214814-multiplayer (branch work/decode-widepath-fix, throwaway mod: 145 yml + 32 fonts, EU4DLL_LOCALIZE_ESCAPE=1): no crash, menu and multiplayer reached, eu4_wait=0. Game Browser shows Japanese across the screen (search boxes, headers, Back button) instead of '?'. Checkbox labels partly overlap and two narrow headers truncate; layout quality is a follow-up. Render3d site 2 (map labels) fixed in the same commit but not yet exercised. Details: memory-bank/details/localize_escape_hook.md.
+
+## 2026-11-21 - Country-select screen renders Japanese; map labels still open
+- Run runs/20261121-215310-single: country-select screen fully Japanese (bookmarks, country panel, description text, buttons), no crash. The script's clicks missed France and the Start button, so the in-game map (Render3d site 2 labels) is still unverified. Details: memory-bank/details/localize_escape_hook.md.

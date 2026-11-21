@@ -182,3 +182,17 @@ afterwards, user folder restored.
 - Not yet verified: the Render3d site 2 wide path (map name labels
   in game) received the same fix in c99d6ed but has not been
   exercised on the real machine.
+
+
+## Country-select screen (2026-11-21)
+
+Run runs/20261121-215310-single (same setup; new helper script
+eu4_single.sh clicks Single Player, a map point, and a guessed Play
+position). The run reached the country-select screen and stayed
+alive (eu4_wait=0, ended by the script's kill). The whole screen is
+Japanese: bookmark names, start-date controls, the selected-country
+panel, the scenario description text, and the menu buttons.
+The map click landed on an Arabian country instead of France and
+the guessed Play position missed the Start button, so the game
+itself was not entered and map name labels (Render3d site 2) are
+still not exercised on the real machine.
