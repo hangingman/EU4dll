@@ -90,3 +90,9 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 - 詳細は `memory-bank/details/dll_inactivation_item25.md` に記録した。16:07以降「DLLが有効にならない」現象の原因は `make test` だった。dub の unittest ビルドが通常ビルドと同じ libeu4dll.so を上書きし、unittest 版では crt_constructor の hijack() が version(unittest) で NOP になるため、.so は黙って読み込まれるだけで何もしない。再現で証明済み: make test 直後の .so は md5 24a49710b4b6eeee5042b9da6958a633（項目24が失敗期間中に記録した値と一致）で /bin/true への LD_PRELOAD でも無出力、make all で通常版 md5 2e645e64952315dacad5ed762024a6dd に戻る。
 - 復旧確認済み: smoke runs/20261121-170719（復号opt-in＋SetTextプローブ Back=Home）で DIAGNOSTIC-RAW、新規 pattern_eu4jps.log（SetText id=0 applied）、DLL [OK]、ended_by_exit_button、eu4_wait=0。メニューのスクリーンショットも目視確認し、英語表示は正常で崩れなし。
 - 今後の決まり: make test の後は必ず make all を実行し、smoke の前に /bin/true への LD_PRELOAD で DIAGNOSTIC-RAW が出ることを確認する。項目24の Invalid character ID 120,880件は DLL が無効な状態での計測なので、項目17のリミッタが効くかの証拠にはならない。項目26で DLL が有効な状態で再確認する。
+
+## フォント文字集合テーブルの上限（2026/11/21追記、項目26）
+
+- 詳細は  に記録した。DLLが有効な状態では bitmapfont.cpp:436 の Invalid character ID は0件で、項目17のリミッタがパーサ側チェックまで効いている。専用パッチは不要。
+- 新しい阻害要因が判明した: CBitmapFont+0x100 に埋め込まれた CBitmapCharacterSet のグリフ表は256ポインタ分しかなく（コンストラクタの memset 0x800バイト、デストラクタは256件だけ走査し、その後ろはカーニング用 unordered_map）、ParseFontFile は範囲確認なしに id で添字アクセスする。そのため id >= 0x100 は全て Duplicate character ID（bitmapfont.cpp:431）と誤判定されるか、ゼロの場所では無関係なメモリへグリフポインタを書き込む。最小再現（id 256/1000/8199 の3件だけ追加した standard.fnt、runs/20261121-172215）でも3件とも Duplicate になり、ゲームは正常終了した。全フォント読み込み時の segfault（runs/20261121-171402）もこの上書きで説明が付く。
+- 生成フォントの日本語グリフは読み込まれていない。項目27は、サイドテーブル等の実効ある対処を新しい項目として実装するまで実施しない。
