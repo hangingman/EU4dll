@@ -127,3 +127,14 @@
 - 実機照合（smoke runs/20261121-124618、EU4はExitボタンで正常終了）: `BACK`->`Back` は id=0 で `result=applied`（容量15）、`CONNECT_TO_IP`->`Connect to ID` は id=1 で `result=applied`（容量15）。一方 `MENU_BAR_LOAD_GAME`->`Load Game` は id=2 に applied／capacity／content-mismatch のいずれも出ず、メインメニュー実行ではSetText到達を観測できなかった（理由は未証明で、不一致の証明ではない）。
 - 同じ実行で `translationMap` は0件だった。agent環境にはParadoxのmodディレクトリ自体が無く（`Mod directory not found`）、観測キー3件は全て `status=missing`。実データの日本語値を埋めるには `submodules/EU4JPModAppendixI` の初期化と、その `main.py`（要 `PARATRANZ_SECRET`）による生成が必要だが、指示によりサブモジュール初期化は行わなかった（`git submodule status` は `-19be99e` の未初期化状態）。この点は所有者の判断待ちとして記録した。
 - フックは `translationMap` を参照しない（項目5）ため、この対応は情報整理のみ。辞書連携へ進む場合はキーではなく英語値で結び、英語値の衝突と、SetTextへ到達しないキーへの扱いを決める必要がある。
+
+
+## 翻訳ファイル読み込みへの移行設計（2026/11/21）
+
+- 詳細は `memory-bank/details/translation_file_loading_design.md` に記録した。設計のみで実装は変更していない。大きな作り替えは所有者の確認待ちとする。
+- 現状: SetTextフックは環境変数 `EU4DLL_SETTEXT_REPLACEMENTS`（`MaxMappings=8`、`MaxProbeBytes=256`）から `ProbeMapping` 表を作り、`translationMap` は `loadTranslationMods()` がmodディレクトリのymlから読み込むがフックは参照しない。両者は `dllmain.d` で辞書ロード→フックの順に既に動いているため、移行は結合部の追加であり書き直しではない。
+- 項目6の制約: キーはローカライズキーでSetTextへは渡らず、英語値を介した反転（キー -> 英語値 -> 日本語値）が必要。英語値は一意でないため衝突ルールを要し、提案は同一英語・異なる訳の場合は `reason=ambiguous-source` で見送ってログに残すこと。`MENU_BAR_LOAD_GAME` のようにSetTextへ到達しないキーがあり、全件置換は約束できない。
+- 項目5の制約: 置換文字列はUTF-8ではなくエスケープ形式（0x10〜0x13＋2バイト）で渡す必要があり、UTF-8→エスケープ変換器はまだ無いため新規の純粋関数として設計した（復号側の `SHIFT_2/3/4` の逆変換、往復テストと固定ベクタで検証、容量判定はエスケープ後のバイト長で行う）。エスケープ後は1文字3バイトになるため、実測SSO容量15では日本語は最大5文字までしか収まらない点も記録した。
+- 前提条件: 変換器、Linux v1.37.5での復号側（`Font.init`／`TextView.init`、テキスト処理ループとフォントパッチ）の有効化、実データのためのサブモジュール初期化＋ `PARATRANZ_SECRET` による生成。復号側が無い間、ファイル読み込みの検証はロード／結合／変換のログとフィクスチャ、英文同士の組の表示、フックでの `result=applied` までに限る。
+- 段階案: A 変換器＋テスト、B opt-inスイッチ（提案名 `EU4DLL_SETTEXT_FROM_TRANSLATIONS=1`）の後ろで結合とファイル読み込み（現行の表の上限のまま、既知2件で検証、環境変数は設定時に優先する上書きとして残す）、C 全辞書向けの保存／検索の拡張と実測、D 復号側の有効化と日本語の画面確認。
+- 所有者の判断待ち: 英語側の入手方法（ゲームのymlをロード時に読む／生成した対応ファイルを同梱する）、衝突ルール、環境変数の優先扱い、サブモジュール初期化と秘密情報の用意、段階DをB・Cより前に置くかどうか。
