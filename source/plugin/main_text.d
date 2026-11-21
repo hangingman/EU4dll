@@ -6,6 +6,7 @@ import plugin.constant;
 import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
+import plugin.glyph_table : wideGlyphLookup;
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
  // @naked を使用するため
 
@@ -306,6 +307,20 @@ extern (C)
         }
     }
 
+    // Item 28 step 3: at all five v1.37.5 fetch hooks below, the
+    // JMP_G path (decoded code point >= 0x100) no longer returns a
+    // null glyph; it calls wideGlyphLookup(fontBase, codePoint)
+    // through mainTextGlyphLookupFuncAddress and uses the result
+    // (null on a miss, the item 19/20 safe behaviour). Register
+    // safety: the fetch sits immediately after a CString::operator[]
+    // call in every site, so no caller-saved register or XMM value
+    // is live across it; callee-saved registers are preserved by
+    // the callee. Each site keeps RSP 16-byte aligned for the call
+    // (function bodies run with RSP % 16 == 0, verified from the
+    // prologues: 6 pushes + a sub whose low nibble is 8 in all
+    // three functions) by pushing exactly two registers, and the
+    // font base register that the following game code reuses
+    // (RCX at site A / GetActual) is restored before returning.
     // mainTextProc1V137SiteA_hook (Linux v1.37.5)
     void mainTextProc1V137SiteA_hook()
     {
@@ -353,7 +368,17 @@ extern (C)
                 lea       R11, [RIP + mainTextProc1V137SiteAReturnAddress];
                 jmp       qword ptr [R11];
             JMP_G:
-                xor R15D, R15D;
+                mov RCX, qword ptr [RSP + 0x68];
+                push RAX;
+                push RCX;
+                mov RDI, RCX;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov R15, RAX;
+                pop RCX;
+                pop RAX;
                 lea       R11, [RIP + mainTextProc1V137SiteAReturnAddress];
                 jmp       qword ptr [R11];
             }
@@ -404,7 +429,15 @@ extern (C)
                 mov RAX, qword ptr [R12 + RAX*8 + 0x100];
                 jmp       JMP_H;
             JMP_G:
-                xor EAX, EAX;
+                push RCX;
+                push RDX;
+                mov RDI, R12;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                pop RDX;
+                pop RCX;
             JMP_H:
                 test RAX, RAX;
                 lea       R11, [RIP + mainTextProc1V137SiteBReturnAddress];
@@ -459,7 +492,17 @@ extern (C)
                 lea       R11, [RIP + mainTextProc4V137GetActualReturnAddress];
                 jmp       qword ptr [R11];
             JMP_G:
-                xor EBP, EBP;
+                mov RCX, qword ptr [RSP + 0x28];
+                push RAX;
+                push RCX;
+                mov RDI, RCX;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov RBP, RAX;
+                pop RCX;
+                pop RAX;
                 lea       R11, [RIP + mainTextProc4V137GetActualReturnAddress];
                 jmp       qword ptr [R11];
             }
@@ -510,7 +553,16 @@ extern (C)
                 mov RBP, qword ptr [R13 + RAX*8 + 0x100];
                 jmp       JMP_H;
             JMP_G:
-                xor EBP, EBP;
+                push RCX;
+                push RDX;
+                mov RDI, R13;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov RBP, RAX;
+                pop RDX;
+                pop RCX;
             JMP_H:
                 test RBP, RBP;
                 lea       R11, [RIP + mainTextProc4V137GetRequiredReturnAddress];
@@ -563,7 +615,16 @@ extern (C)
                 mov RBP, qword ptr [R15 + RAX*8 + 0x100];
                 jmp       JMP_H;
             JMP_G:
-                xor EBP, EBP;
+                push RCX;
+                push RDX;
+                mov RDI, R15;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov RBP, RAX;
+                pop RDX;
+                pop RCX;
             JMP_H:
                 test RBP, RBP;
                 lea       R11, [RIP + mainTextProc4V137GetActualRealReturnAddress];
@@ -578,6 +639,7 @@ private __gshared size_t mainTextProc1V137SiteBReturnAddress;
 private __gshared size_t mainTextProc4V137GetActualReturnAddress;
 private __gshared size_t mainTextProc4V137GetRequiredReturnAddress;
 private __gshared size_t mainTextProc4V137GetActualRealReturnAddress;
+private __gshared size_t mainTextGlyphLookupFuncAddress;
 private __gshared size_t mainTextProc1ReturnAddress;
 private __gshared size_t mainTextProc2ReturnAddress;
 private __gshared size_t mainTextProc2BufferAddress;
@@ -650,6 +712,7 @@ DllError mainTextProc1Injector(RunOptions options)
                 size_t address = BytePattern.tempInstance().getFirst().address;
                 // Return at the test r15,r15 after the 16-byte fetch.
                 mainTextProc1V137SiteAReturnAddress = address + 16;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextProc1V137SiteA_hook, 16);
                 writeln("JMP for mainTextProc1Injector (v1.37.5 site A) created.");
@@ -957,6 +1020,7 @@ DllError mainTextProc4Injector(RunOptions options)
                 size_t address = BytePattern.tempInstance().getFirst().address;
                 // Return at the test rbp,rbp after the 16-byte fetch.
                 mainTextProc4V137GetActualReturnAddress = address + 16;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextProc4V137GetActual_hook, 16);
                 writeln("JMP for mainTextProc4Injector (v1.37.5 GetActualRequiredSize) created.");

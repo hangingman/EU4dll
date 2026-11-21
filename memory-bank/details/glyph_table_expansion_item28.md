@@ -276,3 +276,55 @@ The vanilla game without the generated fonts is unaffected.
   eu4_wait=0, menu screenshot visually normal English.
 - make test: 10 modules passed. Next: step 3, item 19 hook
   change (>= 0x100 guard becomes a side-table lookup).
+
+## Implementation step 3 (2026-11-21, fourth run of item 28)
+
+- Item 19 fetch hooks change in source/plugin/main_text.d:
+  at all five v1.37.5 sites (FillVertexBuffer A/B,
+  GetActualRequiredSize, GetRequiredSize,
+  GetActualRealRequiredSizeActually) the JMP_G path for a
+  decoded code point >= 0x100 now calls
+  wideGlyphLookup(fontBase, codePoint) through a __gshared
+  function-address global (set by both v1.37.5 injectors)
+  instead of returning a null glyph. A miss still returns
+  null, which every call site already null-checks, so the
+  item 19/20 safe behaviour is preserved for unregistered
+  code points (including the NOT_DEF 0x2026 fallback when
+  that glyph is not in the font).
+- Font base per site: site A and GetActualRequiredSize
+  reload it from the same stack slot the vanilla fetch
+  uses ([RSP+0x68] / [RSP+0x28]) into RCX, and RCX is
+  restored after the call because the following game code
+  reads the font scale through it (0x940(%rcx) at site A);
+  site B uses R12, GetRequiredSize R13 and
+  GetActualRealRequiredSizeActually R15 (all callee-saved,
+  preserved by the callee).
+- Register/alignment argument, recorded in a comment at
+  the hooks: every fetch sits immediately after a
+  CString::operator[] call, so no caller-saved register or
+  XMM value is live across the fetch; the destination
+  registers are callee-saved except site B (RAX, which is
+  the lookup return value itself). All three functions
+  run their bodies with RSP % 16 == 0 (prologues: 6 pushes
+  plus a sub whose low nibble is 8, verified by objdump
+  for FillVertexBuffer, GetActualRequiredSize,
+  GetRequiredSize and GetActualRealRequiredSizeActually),
+  and each wide path pushes exactly two registers, so the
+  call is SysV-aligned, mirroring the step 2 trampolines.
+- Verification: make test 10 modules passed, make all OK
+  and run last (DIAGNOSTIC-RAW present on /bin/true
+  preload). Smoke runs/20261121-175544 with the item 26
+  minimal font (throwaway test mod, removed afterwards,
+  user folder restored) and EU4DLL_ENABLE_DECODE=1: all
+  five fetch-hook injector lines and both registration
+  injector lines present, Duplicate character ID = 0,
+  Invalid character ID = 0, no crash,
+  ended_by_exit_button, eu4_wait=0, menu screenshot
+  visually normal English. The wide lookup path itself is
+  exercised end-to-end in step 5 / item 27 (a menu smoke
+  has no escaped wide text to fetch).
+- Next: step 4, per-site width analysis of the eight
+  not-hooked fetch sites (RenderToTexture x2,
+  RenderToScreen x2, GetHeightOfString, GetWidthOfString,
+  Render3d x2) plus the two second fetches in
+  GetRequiredSize / GetActualRealRequiredSizeActually.

@@ -273,3 +273,9 @@
 - Recorded in memory-bank/details/glyph_table_expansion_item28.md (implementation step 1). New pure module source/plugin/glyph_table.d: WideGlyphTable keyed by (font base, code point) for ids >= 0x100, refusing non-wide, null and duplicate registrations, with extern(C) wideGlyphRegister/Lookup/ClearAll/Count wrappers for the later trampolines.
 - Verification: make test 10 modules passed (was 9; threshold, item 26 ids 256/1000/8199, duplicate, per-font isolation, 3,022-entry scale, global wrappers), make all OK and finished last (normal build, DIAGNOSTIC-RAW present). No smoke: no runtime patch yet.
 - Next: item 28 step 2 - ParseFontFile registration redirect, verified with the item 26 minimal font (Duplicate must become 0).
+
+## Wide glyph fetch redirect (2026/11/21, item 28 step 3)
+
+- Recorded in memory-bank/details/glyph_table_expansion_item28.md (implementation step 3). The five item 19 v1.37.5 fetch hooks in source/plugin/main_text.d now resolve decoded code points >= 0x100 through wideGlyphLookup(font base, code point) instead of returning null; a miss still returns null. Font-base registers per site and the RSP-alignment / live-register argument are recorded in the details file and in a comment at the hooks.
+- Verification: make test 10 modules passed, make all OK and run last (normal build). Smoke runs/20261121-175544 (item 26 minimal font, throwaway mod removed afterwards, EU4DLL_ENABLE_DECODE=1): all five fetch and both registration injector lines present, Duplicate = 0, Invalid = 0, ended_by_exit_button, eu4_wait=0, menu screenshot visually normal English.
+- Next: item 28 step 4 - width analysis of the eight not-hooked fetch sites and the two second fetches in GetRequiredSize / GetActualRealRequiredSizeActually.
