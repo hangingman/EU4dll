@@ -32,12 +32,15 @@ import FileSave = plugin.file_save.entry; // 修正
 import Options = plugin.options;
 import PluginVersion = plugin.plugin_version;
 
-// Decode opt-in (item 15): Font.init / TextView.init run only when the
-// environment variable EU4DLL_ENABLE_DECODE is exactly "1". The decision
-// is a pure helper so it can be unit tested without starting EU4.
-bool decodeOptInEnabled(string value)
+// Decode enablement: Font.init / TextView.init run by default. The
+// environment variable EU4DLL_ENABLE_DECODE=0 opts out (item 15 wired
+// this as opt-in with "=1"; the owner decided on 2026-11-21 to flip the
+// default so translation mods work without setting the variable). The
+// decision is a pure helper so it can be unit tested without starting
+// EU4.
+bool decodeEnabled(string value)
 {
-    return value == "1";
+    return value != "0";
 }
 
 // True when any injector flag in a DllError is set.
@@ -53,11 +56,11 @@ bool dllErrorHasAny(DllError error)
 
 unittest
 {
-    assert(decodeOptInEnabled("1"));
-    assert(!decodeOptInEnabled(null));
-    assert(!decodeOptInEnabled(""));
-    assert(!decodeOptInEnabled("0"));
-    assert(!decodeOptInEnabled("true"));
+    assert(decodeEnabled("1"));
+    assert(decodeEnabled(null));
+    assert(decodeEnabled(""));
+    assert(!decodeEnabled("0"));
+    assert(decodeEnabled("true"));
 
     DllError clean;
     assert(!dllErrorHasAny(clean));
@@ -113,20 +116,17 @@ void hijackProcess()
     ReloadTrace.initReloadTrace(eu4Version);
     SetTextHook.initSetTextHook(eu4Version);
 
-    // Decode enablement (item 15, opt-in only): run the font and main
-    // text initialisers only when EU4DLL_ENABLE_DECODE=1 is set
-    // explicitly. Upstream order is Font before TextView. Failures are
-    // aggregated into `success` and logged, but are NOT fatal here:
-    // on Linux v1.37.5 most injectors in font.d / main_text.d have no
-    // matching case yet (items 12/13 derived AOB patterns only; the
-    // Linux fetch-site hooks themselves are not written), so they
-    // return version/unmatched errors and apply no patch. Making that
-    // exit(-1) would break startup for an opt-in diagnostic, and the
-    // PluginVersion gate below remains the fatal one. When the
-    // variable is unset, behaviour is exactly as before this item.
-    if (decodeOptInEnabled(environment.get("EU4DLL_ENABLE_DECODE")))
+    // Decode enablement: run the font and main text initialisers by
+    // default; EU4DLL_ENABLE_DECODE=0 skips them. Upstream order is
+    // Font before TextView. Failures are aggregated into `success` and
+    // logged, but are NOT fatal here: an injector that has no matching
+    // case for the running version returns a version/unmatched error
+    // and applies no patch, and making that exit(-1) would break
+    // startup on versions the decode hooks do not cover yet. The
+    // PluginVersion gate below remains the fatal one.
+    if (decodeEnabled(environment.get("EU4DLL_ENABLE_DECODE")))
     {
-        std.logger.info("[DIAGNOSTIC] EU4DLL_ENABLE_DECODE=1; calling Font.init and TextView.init (opt-in)");
+        std.logger.info("[DIAGNOSTIC] Decode enabled (default; EU4DLL_ENABLE_DECODE=0 opts out); calling Font.init and TextView.init");
         DllError decodeResult;
         decodeResult = decodeResult | Font.init(eu4Version);
         decodeResult = decodeResult | TextView.init(eu4Version);
@@ -144,7 +144,7 @@ void hijackProcess()
     }
     else
     {
-        std.logger.info("[DIAGNOSTIC] EU4DLL_ENABLE_DECODE is not 1; skipping Font.init / TextView.init");
+        std.logger.info("[DIAGNOSTIC] EU4DLL_ENABLE_DECODE=0; skipping Font.init / TextView.init");
     }
 
     // TODO: マップ文字位置調整

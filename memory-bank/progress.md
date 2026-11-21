@@ -359,3 +359,7 @@
 - Fix: mainTextRenderToTextureV137LineBuf_hook patches the loop head (60 bytes, AOB 1 hit) and appends all 3 bytes of an escape sequence with the same construct/append/cleanup sequence; returns at VA 0x204ea4a.
 - Verify: make test 10 modules passed, make all run last (.so md5 2e79fa621626cbfbec2c1109278c4a98). Smoke runs/20261121-200810-multiplayer (throwaway mod removed, user folder restored): draw pass now reads the full escaped string and fetches both Japanese code points; screenshot shows the Game Browser button rendering the Japanese word correctly, English UI otherwise normal, Duplicate=0, no crash.
 - Item 32 is COMPLETE. Details: memory-bank/details/ellipsis_fix_item32.md section 8.
+
+## 2026-11-21 - Decode default-on (post item 32)
+- Owner decision: decode runs by default; EU4DLL_ENABLE_DECODE=0 opts out. dllmain.d helper flipped from opt-in ("1") to opt-out ("0"), unit tests updated, log lines reworded. Details: memory-bank/details/decode_default_enablement.md.
+- Verify: make test 10 modules passed, make all run last. Smoke runs/20261121-210753 (no env: decode-enabled log line, menu, Exit, eu4_wait=0) and runs/20261121-211038 (=0: skip log line, menu, Exit, eu4_wait=0). The aggregate decode-error line also appears in the verified item 32 runs, so it is the known state.
