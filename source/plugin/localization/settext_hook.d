@@ -37,6 +37,7 @@ version (linux)
     private __gshared bool[MaxMappings] replacementLogged;
     private __gshared bool[MaxMappings] contentMismatchLogged;
     private __gshared bool[MaxMappings] capacitySkipLogged;
+    private __gshared bool[MaxMappings] capacityLogged;
     private __gshared uint headerSkipLoggedMask;
 
     private void rawDiagnostic(string message)
@@ -128,6 +129,15 @@ version (linux)
     {
         return format("[DIAGNOSTIC-RAW] SetText mapping id=%d length=%d result=%s reason=%s\n",
             mappingId, targetLength, applied ? "applied" : "skipped", reason);
+    }
+
+    // Capacity measurement line: emitted once per mapping when its source
+    // value is first matched, so real CString capacities can be collected
+    // from the DLL log without changing any replacement decision.
+    string formatSetTextCapacityLog(long mappingId, size_t targetLength, size_t capacity)
+    {
+        return format("[DIAGNOSTIC-RAW] SetText capacity id=%d length=%d capacity=%d\n",
+            mappingId, targetLength, capacity);
     }
 
     // Why parseSetTextProbeEntry rejected an entry, for the load-time log.
@@ -241,6 +251,11 @@ version (linux)
                 continue;
             case SetTextDecision.matched:
                 break;
+            }
+            if (!capacityLogged[i])
+            {
+                capacityLogged[i] = true;
+                rawDiagnostic(formatSetTextCapacityLog(i, cast(size_t) length, capacity));
             }
             if (!replacementFitsCapacity(mapping.replacementLength, capacity))
             {
@@ -433,6 +448,11 @@ version (linux)
             "[DIAGNOSTIC-RAW] SetText mapping id=0 length=4 result=skipped reason=content-mismatch\n");
         assert(formatSetTextReplacementLog(-1, 0, false, "invalid-length") ==
             "[DIAGNOSTIC-RAW] SetText mapping id=-1 length=0 result=skipped reason=invalid-length\n");
+
+        assert(formatSetTextCapacityLog(0, 4, 15) ==
+            "[DIAGNOSTIC-RAW] SetText capacity id=0 length=4 capacity=15\n");
+        assert(formatSetTextCapacityLog(1, 13, 31) ==
+            "[DIAGNOSTIC-RAW] SetText capacity id=1 length=13 capacity=31\n");
 
         // Load-time rejection reasons match parseSetTextProbeEntry.
         assert(probeEntryRejectionReason("BackHome") == "missing-separator");

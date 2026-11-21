@@ -106,3 +106,9 @@
 - 容量を超える場合は置換を見送り、`result=skipped reason=exceeds-capacity` をマッピングごとに1回ログへ出す。容量が元の長さ未満の場合は `reason=invalid-capacity` で見送る。
 - 環境変数の entry は長さが違う組も読み込むようになった（`length-mismatch` の却下は廃止）。単体テストで可変長の parse、SSO／ヒープ容量、容量境界を確認した。
 - 検証: `make test`（6モジュール通過）、`make all` 成功。実機 smoke（runs/20261121-122234、同一長2件）では両マッピングとも `result=applied`、`invalid-capacity` なし、EU4はExitボタンで正常終了した。可変長そのものの実機確認は次の項目で行う。
+
+## 可変長置換の過去の試行整理と容量の実測（2026/11/21）
+
+- 詳細は `memory-bank/details/variable_length_history.md` に記録した。過去の試行は、f25f5a3 のGDB PoCが同一バイト長を前提に可変長を明示的にスキップし（所有権・寿命・容量が未確認のため）、その後も容量が読めないことが止まった理由だった。
+- この変更では置換の許可範囲を変えず、マッチ時に容量を1回だけログへ出す行（`SetText capacity id=.. length=.. capacity=..`、純粋関数 `formatSetTextCapacityLog`）だけを追加した。
+- 実機実測（smoke runs/20261121-122907、EU4はExitボタンで正常終了）: `Back`（長さ4）と `Connect to ID`（長さ13）はどちらもSSOで容量15。両対象とも15バイトまでの置換が容量に収まる。それ以外の文字列やヒープ確保の文字列の容量は未実測。

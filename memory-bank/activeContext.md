@@ -2,7 +2,7 @@
 
 ## 現在の焦点
 
-Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。次は可変長置換の実機確認へ進む。
+Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定した文字列置換PoCを検証済み。CString所有権・容量・寿命の調査は完了し、`memory-bank/details/cstring_ownership.md` に記録した。容量（+16）の読み取りと可変長置換を実装した。可変長置換の過去の試行整理と容量の実測は完了し、`memory-bank/details/variable_length_history.md` に記録した（対象2件はどちらもSSO容量15）。次は文字化けの原因の切り分けへ進む。
 
 ## 確定事項
 
