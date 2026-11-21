@@ -36,3 +36,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## UTF-8→エスケープ変換器の実装（2026/11/21追記）
 
 - 詳細は `memory-bank/details/escape_codec.md` に記録した。`source/plugin/localization/escape_codec.d` に純粋な変換器を実装し、復号テストダブルとの往復テストと4帯域の固定ベクタで検証した（`make test` 7モジュール通過）。変換表は上流 matanki-saito/EU4dll の `Plugin64/escape_tool.cpp` の移植で、回避バイト集合とCP1252特殊ケースを含む。フックへの配線は未実施（項目7設計の段階B、所有者の判断待ち事項が残る）。項目11の画面確認は復号側の有効化が済んでいないため実施しない。
+
+## Font側のLinux用パターン導出（2026/11/21追記）
+
+- 詳細は `memory-bank/details/font_linux_patterns.md` に記録した（導出のみ、注入は無効のまま）。Font側6注入のうち、リミッタ（`ParseFontFile` VA 0x204e366、`41 81 FD FF 00 00 00 0F 87 25 01 00 00`、全体で1件）だけが一意パターンまで確定した。HeapZeroClear はLinuxに対応箇所なし、BufferClear／Expansion の 0x3D88 は存在せず候補は `GfxCreateVertexBuffer` の即値 0x4B0 の2箇所（役割の同一性は未証明）、FontSizeLimit は未発見。
