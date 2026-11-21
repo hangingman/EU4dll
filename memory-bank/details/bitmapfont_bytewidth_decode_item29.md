@@ -204,3 +204,169 @@ Decision on pText: site 1 keeps the full escape sequence in pText; site 2 decode
   and hooks for RenderToTexture x2, GetHeightOfString and
   Render3d x2, or a recorded reason any of them cannot carry
   a wide glyph.
+# Step 3 (2026-11-21, item 29 step 3): per-site analysis of the
+# remaining five fetch sites - analysis only, no runtime code
+
+Scope: RenderToTexture x2, GetHeightOfString, Render3d x2.
+Method: objdump disassembly of each fetch with its loop head,
+kerning block and loop tail, plus a full-binary AOB scan for
+every site (58 MiB binary, VA = file offset + 0x400000).
+Item 29 is NOT complete; no hook is installed in this step.
+
+## 7. Common finding: all five sites are hookable the same way
+
+- Every site obtains its byte through CString::operator[]
+  (const version at 0x254c110, mutable at 0x254c10a). Both
+  operator[] bodies are three instructions:
+  `mov %esi,%eax; add (%rdi),%rax; ret` - i.e. a CString is a
+  std::string whose data pointer sits at offset 0, and
+  operator[](i) is exactly `*(char*)*str + i`. A hook can
+  therefore read the two payload bytes of an escape sequence
+  directly as `word ptr [[string] + index + 1]` without
+  calling operator[] and without disturbing the call state,
+  exactly like the raw `const char*` hooks of steps 1-2.
+- At every site the colour/format parsing (0xA3/0xA4/0xA6/
+  0xA7/0x40/0x7B family, plus the `|`/`_`/letter checks in
+  the copy loops of GetHeightOfString / Render3d) diverts
+  before the fetch; escape bytes 0x10-0x13 are in none of
+  those sets, so they reach the fetch unmodified, as in the
+  already-hooked paths.
+- At every site the loop index is a single register (or, for
+  RenderToTexture site 2, a register that the common tail
+  increments), and the common loop tail adds exactly 1, so a
+  hook advances the index by 2 on an escape, the same
+  contract as steps 1-2. Kerning after each fetch stays
+  byte-keyed (recorded approximation, as before).
+
+## 8. Per-site register / patch map
+
+### RenderToTexture site 1 - fetch VA 0x204ef59
+- Loop head VA 0x204ef41: RDI = CString on the stack at
+  0xc0(%rsp) (const operator[]), ESI = R14D = index.
+  Byte: `movzbl (%rax),%eax` at 0x204ef51.
+- Fetch: `mov 0x38(%rsp),%rcx` (font), then
+  `mov 0x100(%rcx,%rax,8),%rbp`; `test %rbp,%rbp`;
+  `je 0x204f018` (null target, +0xBF from the fetch).
+  After a non-null glyph the code does
+  `movswl 0xc(%rbp),%eax` at 0x204ef6a, so a patch starting
+  at the movzbl (0x204ef51) must reproduce byte load, font
+  load, fetch, test and that movswl head, returning at
+  0x204ef6a (+0x19) or at the null target.
+- Common tail: `inc %r14d` at VA 0x204f576, then compare
+  against the length at 0x78(%rsp); hook adds 2 to R14D.
+- AOB (from the movzbl):
+  `0F B6 00 48 8B 4C 24 38 48 8B AC C1 00 01 00 00 48 85 ED
+   0F 84 AE 00 00 00` = exactly 1 hit (VA 0x204ef51).
+
+### RenderToTexture site 2 - fetch VA 0x2051088
+- Loop head VA 0x205107a: RDI = R12 (CString, mutable
+  operator[]), ESI = R14D = index.
+  Byte: `movzbl (%rax),%eax` at 0x2051085.
+- Fetch: `mov 0x100(%r13,%rax,8),%r11` (R13 = font / this);
+  `test %r11,%r11`; `je 0x20513d9` (null target, +0x351
+  from the fetch). The non-null path first reloads the
+  scale `movss 0x940(%r13),%xmm8` at 0x2051099, so a patch
+  at the movzbl returns at 0x2051099 (+0x14) or at the
+  null target. XMM8 is live in this loop, so the wide path
+  must spill it (it is not spilled by the step 1-2 hooks,
+  which only cover XMM0-XMM5).
+- Common tail: `inc %r14d` at VA 0x2051489, compare against
+  0x8(%rsp); hook adds 2 to R14D. Note the null target
+  0x20513d9 re-reads the byte at the same index for the
+  newline checks (0x0A/0x0D) before falling into the same
+  tail, which is consistent with a null wide glyph being
+  skipped.
+- AOB: `0F B6 00 4D 8B 9C C5 00 01 00 00 4D 85 DB
+  0F 84 40 03 00 00` = exactly 1 hit (VA 0x2051085).
+
+### GetHeightOfString - fetch VA 0x2053d56
+- Loop head VA 0x2053d49: RDI = R14 (CString, const
+  operator[]), ESI = EBP = index.
+  Byte: `movzbl (%rax),%eax` at 0x2053d53.
+- Fetch: `mov 0x100(%rbx,%rax,8),%rax` (RBX = font / this);
+  `test %rax,%rax`; `je 0x2053dfc` (null target, +0xA6
+  from the fetch). Non-null path continues with
+  `movswl 0xc(%rax),%ecx` at 0x2053d67; a patch at the
+  movzbl returns at 0x2053d67 (+0x14) or at the null
+  target. The glyph pointer register is RAX itself, so
+  the hook must keep the decoded id in a different
+  register until the fetch is done.
+- Common tail: `inc %ebp` at VA 0x2053eb2, then a GetSize
+  compare; hook adds 2 to EBP.
+- Caveat recorded: this function first runs a separate
+  byte-copy loop (head around VA 0x2053ceb) that copies
+  bytes into a stack buffer at 0x30(%rsp) indexed by R15D,
+  diverting only on the `|`/`_`/letter checks. That copy
+  is not the string the fetch loop reads (the fetch reads
+  the original CString in R14), so decoding at the fetch
+  does not need the copy loop changed for measuring; any
+  later use of the copied buffer is a separate question if
+  this function is ever hooked for drawing (it is not a
+  drawing function).
+- AOB: `0F B6 00 48 8B 84 C3 00 01 00 00 48 85 C0
+  0F 84 95 00 00 00` = exactly 1 hit (VA 0x2053d53).
+
+### Render3d site 1 (measuring pass) - fetch VA 0x20546d7
+- Loop head VA 0x20546c9: RDI = RBP (CString, const
+  operator[]), ESI = R15D = index.
+  Byte: `movzbl (%rax),%eax` at 0x20546d4.
+- Fetch: `mov 0x100(%r12,%rax,8),%rbx` (R12 = font / this);
+  `test %rbx,%rbx`; `je 0x20547ef` (null target, +0x118
+  from the fetch). Non-null path: `movswl 0xc(%rbx),%eax`
+  at 0x20546e8; a patch at the movzbl returns at
+  0x20546e8 (+0x14) or at the null target.
+- This pass has the same preceding byte-copy loop shape as
+  GetHeightOfString (stack buffer at 0x110(%rsp) indexed
+  by R14D); the fetch reads the original CString in RBP,
+  so the same caveat and the same conclusion apply.
+- AOB: `0F B6 00 49 8B 9C C4 00 01 00 00 48 85 DB
+  0F 84 07 01 00 00` = exactly 1 hit (VA 0x20546d4).
+
+### Render3d site 2 (draw pass) - fetch VA 0x2054cd0
+- Loop head VA 0x2054cc2: RDI = R13 (CString, mutable
+  operator[]), ESI = R15D = index.
+  Byte: `movzbl (%rax),%eax` at 0x2054ccd.
+- Fetch: `mov 0x100(%r12,%rax,8),%rax` (R12 = font / this);
+  `test %rax,%rax`; `je 0x205519d` (null target, +0x4CD
+  from the fetch). Non-null path reloads the scale into
+  XMM10 (`movss 0x940(%r12),%xmm10` at 0x2054ce1), so a
+  patch at the movzbl returns at 0x2054ce1 (+0x14) or at
+  the null target, and the wide path must spill XMM10.
+  The glyph pointer register is RAX itself (same note as
+  GetHeightOfString).
+- The short AOB `0F B6 00 49 8B 84 C4 00 01 00 00 48 85 C0`
+  has 4 hits in the whole binary (it also matches a
+  FillVertexBuffer site and two unrelated sites), so the
+  long form including the je target and the XMM10 reload
+  is required: `0F B6 00 49 8B 84 C4 00 01 00 00 48 85 C0
+  0F 84 BC 04 00 00 F3 45 0F 10 94 24 40 09 00 00`
+  = exactly 1 hit (VA 0x2054ccd).
+- Remaining verification before hooking this site: the
+  exact common loop tail that increments R15D on the draw
+  path (several `inc %r15d` exist in Render3d, e.g. at
+  0x205496a in the measuring pass); the draw-pass tail
+  must be pinned down first, because the hook's +2 has to
+  land on the same register the draw tail increments.
+
+## 9. Decision and split for the rest of item 29
+
+- No site is unhookable: all five can carry a wide glyph
+  with the decode-at-fetch design, using the CString data
+  pointer at offset 0 for the payload word. There is no
+  recorded reason to exempt any of them.
+- They are nevertheless NOT implemented in this step: each
+  site differs in patch start, return / null-return
+  offsets, index register, glyph register and live XMM set
+  (XMM8 at RenderToTexture site 2, XMM10 at Render3d
+  site 2), and a wrong spill or return offset crashes the
+  game (item 14 lesson). Implementing all five at once
+  would make a smoke failure unbisectable.
+- Split: step 4 = RenderToTexture site 1 + site 2 hooks
+  (the prime suspects for the Game Browser button, which
+  still showed byte glyphs after step 2; GUI buttons
+  commonly render to a texture once). Step 5 =
+  GetHeightOfString + Render3d site 1 + site 2 hooks,
+  after pinning the Render3d draw-pass loop tail.
+- Verification of this step: record-only change, no runtime
+  code changed; `make test` / `make all` are run as usual
+  and the tree is committed on the work branch.
