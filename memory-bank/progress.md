@@ -379,3 +379,8 @@
 
 ## 2026-11-21 - Localize escape hook verification: stores work, crash in GetHeightOfString
 - Run runs/20261121-213554-multiplayer (throwaway mod: 145 yml + 32 fonts, EU4DLL_LOCALIZE_ESCAPE=1): hook installed at the surveyed addresses, first escaped store logged, then SIGSEGV before the menu. Crash stack: CBitmapFont::GetHeightOfString <- CInstantTextBox::UpdateScrollbarSize <- CTutorial::Init. GetHeightOfString is a measure path the decode hooks do not cover yet; escaped dictionary values reach it via tutorial text. Details: memory-bank/details/localize_escape_hook.md. Next: survey and extend decode coverage to that path.
+
+## 2026-11-21 - Wide-path glyph result fix (GetHeight + Render3d site 2)
+- Implemented the patch plan of getheightofstring_decode_survey.md unchanged: in mainTextGetHeightV137_hook and mainTextRender3dV137Site2_hook the wide path no longer pushes/pops RAX around wideGlyphLookup (the pop overwrote the glyph pointer with the code point id - the GetHeight SIGSEGV at VA 0x2053d67, and a latent twin in Render3d site 2). Stack adjustment sub/add RSP 48 -> 40 keeps the total a multiple of 16. No AOB, patch length, return address, or constant changes.
+- Grep re-check of every push/pop RAX site in main_text.d and font.d: all other sites copy the result out of RAX (or, for glyphStore, ignore it by design); no other instance of the pattern. Details: memory-bank/details/decode_widepath_fix.md.
+- Verify: make test 11 modules passed, make all run last (.so md5 e2bfd99fe75344c6fe2bf5ab81042705). No smoke run yet; the survey's real-machine verification (localisation-escape rerun, then Render3d map labels) is next.

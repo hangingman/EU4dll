@@ -1325,8 +1325,10 @@ extern (C)
     // the embedded table, ids >= 0x100 via wideGlyphLookup.
     // Glyph register is RAX itself, so the char pointer is kept
     // in R11. Prologue is 6 pushes + sub 0xB8, so RSP % 16 == 0
-    // at the fetch; the wide path pushes 4 registers + sub 48
-    // and spills XMM0-XMM5 low halves as insurance. Kerning
+    // at the fetch; the wide path pushes 3 registers + sub 40
+    // and spills XMM0-XMM5 low halves as insurance. RAX is
+    // never pushed around the lookup call: it must keep the
+    // wideGlyphLookup result (decode_widepath_fix.md). Kerning
     // stays byte-keyed (recorded approximation).
     void mainTextGetHeightV137_hook()
     {
@@ -1372,11 +1374,10 @@ extern (C)
                 mov RAX, qword ptr [RBX + RAX*8 + 0x100];
                 jmp JMP_H;
             JMP_G:
-                push RAX;
                 push RCX;
                 push RDX;
                 push RDI;
-                sub RSP, 48;
+                sub RSP, 40;
                 movss dword ptr [RSP + 0], XMM0;
                 movss dword ptr [RSP + 4], XMM1;
                 movss dword ptr [RSP + 8], XMM2;
@@ -1394,11 +1395,10 @@ extern (C)
                 movss XMM3, dword ptr [RSP + 12];
                 movss XMM4, dword ptr [RSP + 16];
                 movss XMM5, dword ptr [RSP + 20];
-                add RSP, 48;
+                add RSP, 40;
                 pop RDI;
                 pop RDX;
                 pop RCX;
-                pop RAX;
             JMP_H:
                 test RAX, RAX;
                 jz JMP_Z;
@@ -1519,7 +1519,9 @@ extern (C)
     // hook adds 2 to R15D and the tail adds the third byte.
     // Glyph register is RAX itself, so the char pointer is
     // kept in R10. Wide path spills XMM0-XMM5 plus XMM10 (the
-    // scale register of this loop) low halves.
+    // scale register of this loop) low halves. RAX is never
+    // pushed around the lookup call: it must keep the result
+    // (decode_widepath_fix.md).
     void mainTextRender3dV137Site2_hook()
     {
         version (X86_64)
@@ -1564,11 +1566,10 @@ extern (C)
                 mov RAX, qword ptr [R12 + RAX*8 + 0x100];
                 jmp JMP_H;
             JMP_G:
-                push RAX;
                 push RCX;
                 push RDX;
                 push RDI;
-                sub RSP, 48;
+                sub RSP, 40;
                 movss dword ptr [RSP + 0], XMM0;
                 movss dword ptr [RSP + 4], XMM1;
                 movss dword ptr [RSP + 8], XMM2;
@@ -1588,11 +1589,10 @@ extern (C)
                 movss XMM4, dword ptr [RSP + 16];
                 movss XMM5, dword ptr [RSP + 20];
                 movss XMM10, dword ptr [RSP + 24];
-                add RSP, 48;
+                add RSP, 40;
                 pop RDI;
                 pop RDX;
                 pop RCX;
-                pop RAX;
             JMP_H:
                 test RAX, RAX;
                 jz JMP_Z;
