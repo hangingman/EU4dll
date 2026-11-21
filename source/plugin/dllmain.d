@@ -70,6 +70,51 @@ unittest
     assert(dllErrorHasAny(failed));
 }
 
+// Preload guard: Steam starts the game through a chain of helper
+// processes (the Paradox launcher, Steam runtime tools, ...), and
+// LD_PRELOAD puts this DLL into every one of them. hijackProcess()
+// ends in exit(-1) when the EU4 version check fails, which is always
+// the case outside the game itself, so each helper died instantly and
+// the game never started (measured: LD_PRELOAD=<this .so> /bin/true
+// exited with 255). The constructor therefore first checks whether
+// the current process is the EU4 executable and stays completely
+// inert otherwise: no patches, no log setup, no translation loading,
+// no exit. Behaviour inside the game is unchanged.
+bool isEu4ExecutablePath(string exePath)
+{
+    import std.path : baseName;
+
+    return exePath.length > 0 && baseName(exePath) == "eu4";
+}
+
+// True only when the running process is the EU4 executable
+// (std.file.thisExePath reads /proc/self/exe). If the path cannot
+// be determined, the process is treated as "not EU4" so the DLL stays
+// inert instead of risking an exit(-1) in an unknown host process.
+bool currentProcessIsEu4()
+{
+    import std.file : thisExePath;
+
+    try
+    {
+        return isEu4ExecutablePath(thisExePath());
+    }
+    catch (Exception)
+    {
+        return false;
+    }
+}
+
+unittest
+{
+    assert(isEu4ExecutablePath("/home/user/Europa Universalis IV/eu4"));
+    assert(isEu4ExecutablePath("eu4"));
+    assert(!isEu4ExecutablePath("/usr/bin/true"));
+    assert(!isEu4ExecutablePath("/opt/steam/steam"));
+    assert(!isEu4ExecutablePath("/games/eu4.sh"));
+    assert(!isEu4ExecutablePath(""));
+}
+
 extern (C):
 
 pragma(crt_constructor)
@@ -82,6 +127,13 @@ void hijack()
     }
     else
     {
+        // Stay inert in every process that is not the game itself.
+        // hijackProcess() has no other caller, so guarding this entry
+        // covers every path into it.
+        if (!currentProcessIsEu4())
+        {
+            return;
+        }
         enum msg = "[DIAGNOSTIC-RAW] crt_constructor entered\n";
         write(2, msg.ptr, msg.length);
         hijackProcess();

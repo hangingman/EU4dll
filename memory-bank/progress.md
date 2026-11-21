@@ -390,3 +390,6 @@
 
 ## 2026-11-21 - Country-select screen renders Japanese; map labels still open
 - Run runs/20261121-215310-single: country-select screen fully Japanese (bookmarks, country panel, description text, buttons), no crash. The script's clicks missed France and the Start button, so the in-game map (Render3d site 2 labels) is still unverified. Details: memory-bank/details/localize_escape_hook.md.
+
+## 2026-11-21 - Preload guard: DLL stays inert outside the EU4 process
+- Steam launches died silently because LD_PRELOAD put the DLL into every launcher/runtime helper and hijackProcess exit(-1) killed each one (measured: preloaded /bin/true exited 255). The crt_constructor in dllmain.d now checks the /proc/self/exe basename via pure isEu4ExecutablePath and returns immediately in non-EU4 processes; EU4-side behaviour unchanged. make test: 11 modules pass. Preloaded /bin/true now exits 0 silently, /bin/echo works, /bin/false keeps exit 1, no pattern log created. In-game behaviour not re-run on the machine (CPU); owner's next Steam launch is the confirmation. Details: memory-bank/details/preload_guard.md.
