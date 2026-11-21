@@ -31,6 +31,8 @@ version (linux)
     private __gshared size_t mappingCount;
     private __gshared bool setTextActive;
     private __gshared bool[MaxMappings] replacementLogged;
+    private __gshared bool[MaxMappings] contentMismatchLogged;
+    private __gshared uint headerSkipLoggedMask;
 
     private void rawDiagnostic(string message)
     {
@@ -78,21 +80,87 @@ version (linux)
         return true;
     }
 
+    // Outcome of comparing one mapping against one observed CString value.
+    enum SetTextDecision
+    {
+        lengthMismatch,
+        contentMismatch,
+        matched,
+    }
+
+    // Pure comparison so the per-mapping decision can be unit tested.
+    SetTextDecision decideSetTextMapping(const ref ProbeMapping mapping, const(ubyte)[] value)
+    {
+        if (mapping.length != value.length)
+            return SetTextDecision.lengthMismatch;
+        if (value != mapping.source[0 .. mapping.length])
+            return SetTextDecision.contentMismatch;
+        return SetTextDecision.matched;
+    }
+
+    // Single log format for every per-mapping outcome. Kept pure so tests
+    // pin the fields (mapping id, target length, result, reason) exactly.
+    string formatSetTextReplacementLog(long mappingId, size_t targetLength,
+            bool applied, string reason)
+    {
+        return format("[DIAGNOSTIC-RAW] SetText mapping id=%d length=%d result=%s reason=%s\n",
+            mappingId, targetLength, applied ? "applied" : "skipped", reason);
+    }
+
+    // Why parseSetTextProbeEntry rejected an entry, for the load-time log.
+    string probeEntryRejectionReason(string entry)
+    {
+        auto separator = entry.indexOf('=');
+        if (separator < 0)
+            return "missing-separator";
+        if (separator != entry.lastIndexOf('='))
+            return "multiple-separators";
+        if (separator == 0)
+            return "empty-source";
+        if (separator + 1 >= entry.length)
+            return "empty-replacement";
+        if (separator != entry.length - separator - 1)
+            return "length-mismatch";
+        if (separator > MaxProbeBytes)
+            return "too-long";
+        return "none";
+    }
+
+    private void logHeaderSkip(size_t targetLength, string reason, uint bit)
+    {
+        if (headerSkipLoggedMask & bit)
+            return;
+        headerSkipLoggedMask |= bit;
+        rawDiagnostic(formatSetTextReplacementLog(-1, targetLength, false, reason));
+    }
+
     private void loadProbeMappings()
     {
         mappingCount = 0;
         auto configured = environment.get("EU4DLL_SETTEXT_REPLACEMENTS");
         if (configured.length == 0)
             return;
-        foreach (entry; configured.split(';'))
+        foreach (entryId, entry; configured.split(';'))
         {
             if (mappingCount == MaxMappings)
+            {
+                log(LogLevel.error, format(
+                    "[DIAGNOSTIC] SetText mapping id=%d length=%d result=skipped reason=too-many-mappings",
+                    entryId, entry.length));
                 break;
+            }
             ProbeMapping mapping;
             if (parseSetTextProbeEntry(entry, mapping))
+            {
+                log(LogLevel.info, format(
+                    "[DIAGNOSTIC] SetText mapping id=%d length=%d result=loaded reason=none",
+                    mappingCount, mapping.length));
                 mappings[mappingCount++] = mapping;
+            }
             else
-                log(LogLevel.error, "[DIAGNOSTIC] SetText probe mapping rejected");
+                log(LogLevel.error, format(
+                    "[DIAGNOSTIC] SetText mapping id=%d length=%d result=skipped reason=%s",
+                    entryId, entry.length, probeEntryRejectionReason(entry)));
         }
     }
 
@@ -100,27 +168,62 @@ version (linux)
     {
         ubyte[16] header;
         if (cstring is null || !readMemory(cstring, header[]))
+        {
+            logHeaderSkip(0, "null-or-unreadable-cstring", 1u << 0);
             return false;
+        }
         auto data = *cast(void**)(header.ptr);
         auto length = *cast(long*)(header.ptr + 8);
-        if (data is null || length <= 0 || length > MaxProbeBytes)
+        if (data is null)
+        {
+            logHeaderSkip(0, "null-data-pointer", 1u << 1);
             return false;
+        }
+        if (length <= 0 || length > MaxProbeBytes)
+        {
+            logHeaderSkip(0, "invalid-length", 1u << 2);
+            return false;
+        }
 
         ubyte[MaxProbeBytes + 1] value;
         if (!readMemory(data, value[0 .. cast(size_t) length + 1]) ||
                 value[cast(size_t) length] != 0)
+        {
+            logHeaderSkip(cast(size_t) length, "value-unreadable-or-missing-nul", 1u << 3);
             return false;
+        }
         foreach (i; 0 .. mappingCount)
         {
             auto mapping = &mappings[i];
-            if (mapping.length != cast(size_t) length ||
-                    value[0 .. mapping.length] != mapping.source[0 .. mapping.length])
+            // Only same-length values are candidates for this mapping; other
+            // lengths are not this mapping's outcome and stay unlogged, so
+            // the probe does not flood the log on every SetText call.
+            final switch (decideSetTextMapping(*mapping, value[0 .. cast(size_t) length]))
+            {
+            case SetTextDecision.lengthMismatch:
                 continue;
+            case SetTextDecision.contentMismatch:
+                // Once this mapping has an outcome, a later same-length
+                // string is not a new outcome for it.
+                if (!contentMismatchLogged[i] && !replacementLogged[i])
+                {
+                    contentMismatchLogged[i] = true;
+                    rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
+                        false, "content-mismatch"));
+                }
+                continue;
+            case SetTextDecision.matched:
+                break;
+            }
             auto replaced = writeMemory(data, mapping.replacement[0 .. mapping.length]);
-            if (replaced && !replacementLogged[i])
+            if (!replacementLogged[i])
             {
                 replacementLogged[i] = true;
-                rawDiagnostic("[DIAGNOSTIC-RAW] SetText replacement applied\n");
+                // Keep the plain marker as well: eu4_smoke.sh greps for it.
+                if (replaced)
+                    rawDiagnostic("[DIAGNOSTIC-RAW] SetText replacement applied\n");
+                rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
+                    replaced, replaced ? "none" : "write-failed"));
             }
             return replaced;
         }
@@ -244,6 +347,30 @@ version (linux)
         assert(!parseSetTextProbeEntry("Long=Shorter", mapping));
         assert(!parseSetTextProbeEntry("=Home", mapping));
         assert(!parseSetTextProbeEntry("Back=", mapping));
+
+        // Per-mapping decision: length first, then content.
+        assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Back")
+            == SetTextDecision.matched);
+        assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Backx")
+            == SetTextDecision.lengthMismatch);
+        assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Bock")
+            == SetTextDecision.contentMismatch);
+
+        // Log line carries mapping id, target length, result and reason.
+        assert(formatSetTextReplacementLog(1, 13, true, "none") ==
+            "[DIAGNOSTIC-RAW] SetText mapping id=1 length=13 result=applied reason=none\n");
+        assert(formatSetTextReplacementLog(0, 4, false, "content-mismatch") ==
+            "[DIAGNOSTIC-RAW] SetText mapping id=0 length=4 result=skipped reason=content-mismatch\n");
+        assert(formatSetTextReplacementLog(-1, 0, false, "invalid-length") ==
+            "[DIAGNOSTIC-RAW] SetText mapping id=-1 length=0 result=skipped reason=invalid-length\n");
+
+        // Load-time rejection reasons match parseSetTextProbeEntry.
+        assert(probeEntryRejectionReason("BackHome") == "missing-separator");
+        assert(probeEntryRejectionReason("Back=Home=Again") == "multiple-separators");
+        assert(probeEntryRejectionReason("=Home") == "empty-source");
+        assert(probeEntryRejectionReason("Back=") == "empty-replacement");
+        assert(probeEntryRejectionReason("Long=Shorter") == "length-mismatch");
+        assert(probeEntryRejectionReason("Back=Home") == "none");
     }
 }
 else
