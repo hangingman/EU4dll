@@ -1209,6 +1209,108 @@ extern (C)
             }
         }
     }
+    // mainTextRenderToTextureV137LineBuf_hook (Linux v1.37.5,
+    // item 32 step 3)
+    // CBitmapFont::RenderToTexture per-character word-buffer
+    // append site (loop head, VA 0x204ea0e). The measuring loop
+    // appends exactly ONE byte per iteration to the word buffer
+    // CString at 0x58(%rsp): it constructs a 1-char CString from
+    // input[R14D] and move-appends it. The site 1 decode hook
+    // advances R14D by 3 for an escape sequence, so the payload
+    // bytes are never appended and the line buffer stored for
+    // the draw pass holds only the lead bytes (11 10 for the
+    // item 30 string), which site 2 then mis-decodes as a
+    // single U+2026 (items 32 steps 1-2). This hook reproduces
+    // the vanilla append for the first byte and, when that byte
+    // is an escape lead (0x10-0x13), appends the two payload
+    // bytes with the same construct / move-append / cleanup
+    // sequence, so the stored line buffer carries the full
+    // 3-byte sequence and the draw pass decodes it normally.
+    // Entry state (verified by disassembly): R14D = loop
+    // index, R13 = temp CString storage at 0x2f0(%rsp), input
+    // CString at 0xc0(%rsp), word buffer at 0x58(%rsp), temp
+    // SSO sentinel pointer at 0x10(%rsp). The patch covers
+    // 0x3C bytes (loop head through the temp cleanup) and the
+    // hook returns at VA 0x204ea4a (the formatting-flag test).
+    // The EU4 helpers called here (CString::operator[] VA
+    // 0x254c110, CString(char) VA 0x254bf68, CString::operator+=
+    // (move) VA 0x254c184, operator delete PLT VA 0xd43da0) are
+    // ordinary functions in the non-PIE binary: they preserve
+    // callee-saved registers, so R13 / R14D / RBP survive, the
+    // char pointer is kept in RBX (pushed/popped), and one
+    // extra push + sub 8 keeps RSP % 16 == 0 at the internal
+    // call sites, matching the vanilla frame (6 pushes + sub
+    // 0x2888 from an entry RSP % 16 == 8). Vanilla itself calls
+    // these same helpers at this point, so no caller-saved
+    // register or XMM register is live across the append.
+    void mainTextRenderToTextureV137LineBuf_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                push RBX;
+                sub RSP, 8;
+                lea RDI, [RSP + 0xD0];
+                mov ESI, R14D;
+                mov R11, 0x254C110;
+                call R11;
+                mov RBX, RAX;
+                movsx ESI, byte ptr [RBX];
+                mov RDI, R13;
+                mov R11, 0x254BF68;
+                call R11;
+                lea RDI, [RSP + 0x68];
+                mov RSI, R13;
+                mov R11, 0x254C184;
+                call R11;
+                mov RDI, qword ptr [RSP + 0x300];
+                cmp RDI, qword ptr [RSP + 0x20];
+                je APP_1;
+                mov R11, 0xD43DA0;
+                call R11;
+            APP_1:
+                movzx EAX, byte ptr [RBX];
+                cmp EAX, ESCAPE_SEQ_1;
+                jb APP_DONE;
+                cmp EAX, ESCAPE_SEQ_4;
+                ja APP_DONE;
+                movsx ESI, byte ptr [RBX + 1];
+                mov RDI, R13;
+                mov R11, 0x254BF68;
+                call R11;
+                lea RDI, [RSP + 0x68];
+                mov RSI, R13;
+                mov R11, 0x254C184;
+                call R11;
+                mov RDI, qword ptr [RSP + 0x300];
+                cmp RDI, qword ptr [RSP + 0x20];
+                je APP_2;
+                mov R11, 0xD43DA0;
+                call R11;
+            APP_2:
+                movsx ESI, byte ptr [RBX + 2];
+                mov RDI, R13;
+                mov R11, 0x254BF68;
+                call R11;
+                lea RDI, [RSP + 0x68];
+                mov RSI, R13;
+                mov R11, 0x254C184;
+                call R11;
+                mov RDI, qword ptr [RSP + 0x300];
+                cmp RDI, qword ptr [RSP + 0x20];
+                je APP_DONE;
+                mov R11, 0xD43DA0;
+                call R11;
+            APP_DONE:
+                add RSP, 8;
+                pop RBX;
+                lea R11, [RIP + mainTextRenderToTextureV137LineBufReturnAddress];
+                jmp qword ptr [R11];
+            }
+        }
+    }
     // mainTextGetHeightV137_hook (Linux v1.37.5, item 29 step 5)
     // CBitmapFont::GetHeightOfString fetch site (VA 0x2053d56,
     // patch at the preceding movzbl, VA 0x2053d53).
@@ -1520,6 +1622,7 @@ private __gshared size_t mainTextRenderToTextureV137Site1ReturnAddress;
 private __gshared size_t mainTextRenderToTextureV137Site1ZeroReturnAddress;
 private __gshared size_t mainTextRenderToTextureV137Site2ReturnAddress;
 private __gshared size_t mainTextRenderToTextureV137Site2ZeroReturnAddress;
+private __gshared size_t mainTextRenderToTextureV137LineBufReturnAddress;
 private __gshared size_t mainTextGetHeightV137ReturnAddress;
 private __gshared size_t mainTextGetHeightV137ZeroReturnAddress;
 private __gshared size_t mainTextRender3dV137Site1ReturnAddress;
@@ -2073,6 +2176,31 @@ DllError mainTextProc4Injector(RunOptions options)
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextRenderToTextureV137Site2_hook, 14);
                 writeln("JMP for mainTextProc4Injector (v1.37.5 RenderToTexture site 2, item 29) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
+            // Item 32 step 3: the RenderToTexture measuring
+            // loop builds its word/line buffers with a
+            // per-character 1-byte append at the loop head (VA
+            // 0x204ea0e), dropping escape payload bytes (see the
+            // hook comment). The pattern is the loop-head lea /
+            // operator[] call / CString(char) construction head;
+            // exactly 1 hit in the whole binary (verified by a
+            // full byte scan in the item 32 step 3 run).
+            BytePattern.tempInstance()
+                .findPattern("48 8D BC 24 C0 00 00 00 44 89 F6 E8 F2 D6 4F 00 0F BE 30 4C 89 EF");
+            if (BytePattern.tempInstance().hasSize(1, "MainText RenderToTexture v1.37.5 line buffer"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                // Return at the formatting-flag test after the
+                // reproduced append + cleanup (+0x3C).
+                mainTextRenderToTextureV137LineBufReturnAddress = address + 0x3C;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextRenderToTextureV137LineBuf_hook, 60);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 RenderToTexture line buffer, item 32) created.");
             }
             else
             {
