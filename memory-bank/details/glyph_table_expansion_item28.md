@@ -216,3 +216,26 @@ The vanilla game without the generated fonts is unaffected.
   above; function attribution by nm symbol ranges.
 - No code change in this part; make test / make all are
   run as usual and recorded in PROGRESS.md.
+
+## Implementation step 1 (2026-11-21, second run of item 28)
+
+- New module source/plugin/glyph_table.d (plugin.glyph_table):
+  WideGlyphTable keyed by (font base, code point), with
+  registerGlyph / lookupGlyph / hasGlyph / clearFont /
+  clearAll, plus the >= 0x100 gate (isWideCodePoint).
+  Registration refuses non-wide code points, null glyphs and
+  duplicates (first entry wins); the duplicate refusal is the
+  predicate the step 2 duplicate-check trampoline needs.
+- extern(C) wrappers for the later naked-asm trampolines:
+  wideGlyphRegister / wideGlyphLookup / wideGlyphClearAll /
+  wideGlyphCount, plain (size_t, uint, void*) signatures.
+  Process-wide instance is __gshared.
+- Unittests (3 blocks): threshold and item 26 ids
+  256/1000/8199, duplicate and null handling, per-font
+  isolation, clearFont/clearAll, a 3,022-entry scale check at
+  generated-font size, and the global wrappers.
+  make test: 10 modules passed (was 9).
+- No patch or hook yet, so no smoke in this step; the runtime
+  behaviour is unchanged. Next: step 2, ParseFontFile
+  registration redirect (duplicate check 0x204e385 and store
+  0x204e563), verified with the item 26 minimal font.
