@@ -155,3 +155,13 @@
 - その他の障害: この移植の `BytePattern.hasSize()` は常時trueのスタブで、ヒット0件でも `getFirst()` を参照しかねない。`font.d`／`main_text.d` は5バイトrel32 `makeJmp` を使うが、Linuxでは遠距離で使えなかった実績があり、実証済みのSetText方式（14バイト絶対JMP＋命令境界検証）への置き換えが要る。HeapZeroClear（WindowsのHeapAlloc前提）と0x3D88前提のバッファパッチはLinuxに同形の箇所が無い（0x3D88の出現7件は全てトークンID等の無関係箇所だった）。
 - Linux側の候補箇所はシンボルから特定した: テキスト処理ループの実体は `CBitmapFont::GetRequiredSize`（0x20565aa）、`GetActualRequiredSize`（0x2055f92）、`FillVertexBuffer`（0x2055448）、`RenderToTexture`（0x204e886）等で、フォントバッファ側は `CreateBuffers`（0x204d524）／`ParseFontFile`（0x204de66）。有効化の作業手順（箇所特定→Linux用AOBとアセンブリ→v1_37_5ケース追加→opt-in配線→段階確認）を詳細ファイルに残した。
 - この調査が済むまで項目11（日本語の画面確認）は実施できない。項目10の変換器は単体テスト（復号規則との往復）までの検証になる。
+
+
+## UTF-8→エスケープ変換器の実装（2026/11/21）
+
+- 詳細は `memory-bank/details/escape_codec.md` に記録した。新規モジュール `source/plugin/localization/escape_codec.d` に純粋関数 `encodeUtf8ToEscaped`／`encodeCodePoint` と、単体テスト専用の復号テストダブル `decodeEscaped` を実装した。SetTextフックへの配線はまだ行っていない（項目7設計の段階B）。
+- 変換表の出どころ: 上流 matanki-saito/EU4dll の `develop` ブランチ `Plugin64/escape_tool.cpp`（同ファイルの最終変更は a0fedb2、2024-08-24）の `convertWideTextToEscapedText` 等を移植した。項目7の設計時点では復号側のシフト量（SHIFT_2=0x0E、SHIFT_3=0x900、SHIFT_4=0x8F2）しか分かっていなかったが、実際の変換には回避バイト集合（29値。高位バイトが集合内なら+2、下位バイトが集合内なら+1でエスケープバイト 0x10〜0x13 を決め、保存ワードをずらして集合内のバイトが現れない形にする）と、CP1252特殊ケース（27件、例 U+20AC→0x80）が要ることが上流コードで判明した。
+- 検証: 固定ベクタで4つのエスケープ帯全てを確認した（戻=`11 49 62`、る=`10 8B 30`、続=`12 9A 74`、尻=`13 49 53`）。往復テストはASCII・かな・漢字・混在文と、項目8の実訳値（戻る、ID接続、ロード）で通過した。`make test` は7モジュール通過（従来6）、`make all` 成功。
+- 上流からの意図的な相違を1件記録した: CP1252特殊ケースで上流は `(BYTE)cp`（元のコードポイントの下位バイト）を書くが、それでは上流自身の復号（CP1252ToUCS2）で戻らないため、この移植では変換表の値（U+20ACなら0x80）を書く。
+- 制限も記録した: 0x100より大きく0xA00未満の帯域は上流仕様で +0xE000 ずらされ往復しない（日本語は0xA00以上で無関係）。BMPを超えるコードポイントは表現が無いため変換失敗として返す。復号テストダブルのNOT_DEF境界は上流 `convertEscapedTextToWideText` に従い、`main_text.d` フック側（16ビット切捨て、0x98F以下で代替）とは細部が異なる点も記録した。
+- 項目11（日本語の画面確認）は、復号側が有効になっていないため実施しない（項目9の結論どおり、有効化にはLinux用パターンとフックの新規作成が要る）。

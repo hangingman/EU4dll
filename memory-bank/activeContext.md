@@ -31,3 +31,8 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## 復号の有効化方法の調査（2026/11/21追記）
 
 - 詳細は `memory-bank/details/decode_enablement_investigation.md` に記録した（調査のみ）。`Font.init`／`TextView.init` は、インジェクタにv1.37.5のケースが無く、ローカル／上流v1.37（Windows）の全パターンがLinuxバイナリで0件のため、コメントアウトを外すだけでは有効にならない。有効化にはLinux版 `CBitmapFont` 系関数からのフック箇所特定とLinux用パターン／アセンブリの新規作成が要る。
+
+
+## UTF-8→エスケープ変換器の実装（2026/11/21追記）
+
+- 詳細は `memory-bank/details/escape_codec.md` に記録した。`source/plugin/localization/escape_codec.d` に純粋な変換器を実装し、復号テストダブルとの往復テストと4帯域の固定ベクタで検証した（`make test` 7モジュール通過）。変換表は上流 matanki-saito/EU4dll の `Plugin64/escape_tool.cpp` の移植で、回避バイト集合とCP1252特殊ケースを含む。フックへの配線は未実施（項目7設計の段階B、所有者の判断待ち事項が残る）。項目11の画面確認は復号側の有効化が済んでいないため実施しない。
