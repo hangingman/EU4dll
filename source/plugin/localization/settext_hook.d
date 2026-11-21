@@ -13,11 +13,8 @@ version (linux)
     import std.logger;
     import std.process : environment;
     import std.string : indexOf, lastIndexOf, split;
-    import std.algorithm : sort;
     import plugin.byte_pattern;
     import plugin.localization.escape_codec : encodeUtf8ToEscaped;
-    import plugin.mod : gameLocalisationDir, joinTranslationDictionary,
-        loadLocalisationMap, translationMap;
     import plugin.patcher.patcher : patch_memory, makeAbsoluteJmp, makeAbsoluteJmpPadded;
 
     private enum size_t CopiedLength = 17;
@@ -47,19 +44,6 @@ version (linux)
     private __gshared bool[MaxMappings] capacitySkipLogged;
     private __gshared bool[MaxMappings] capacityLogged;
     private __gshared uint headerSkipLoggedMask;
-
-    // Dictionary mode (Stage B+C): mappings built from the translation
-    // files instead of the env-var probe. Storage is a dynamic array
-    // plus an associative array from the exact English source bytes to
-    // the mapping index, so a full dictionary does not rescan the probe
-    // table on every SetText call. The per-mapping once-log flags are
-    // dynamic arrays parallel to dictMappings.
-    private __gshared ProbeMapping[] dictMappings;
-    private __gshared size_t[string] dictIndexBySource;
-    private __gshared bool dictMode;
-    private __gshared bool[] dictReplacementLogged;
-    private __gshared bool[] dictCapacitySkipLogged;
-    private __gshared bool[] dictCapacityLogged;
 
     private void rawDiagnostic(string message)
     {
@@ -275,118 +259,15 @@ version (linux)
         }
     }
 
-    // Prepare one dictionary-mode mapping from an English source string
-    // and its Japanese (UTF-8) target, applying the same limits and
-    // escape preparation as the probe path. Returns "none" on success,
-    // else the load-time skip reason: "source-length" (empty or over
-    // MaxProbeBytes), "empty-replacement" (the target is empty, which
-    // the probe path also rejects: applying it would blank the text),
-    // "unencodable" (the target cannot be escape encoded), or
-    // "replacement-length" (the prepared bytes exceed MaxProbeBytes).
-    string buildDictMapping(string source, string target, ref ProbeMapping mapping)
-    {
-        if (source.length == 0 || source.length > MaxProbeBytes)
-            return "source-length";
-        if (target.length == 0)
-            return "empty-replacement";
-        ubyte[] prepared;
-        bool escaped;
-        if (!prepareSetTextReplacement(cast(const(ubyte)[]) target, prepared, escaped))
-            return "unencodable";
-        if (prepared.length > MaxProbeBytes)
-            return "replacement-length";
-        mapping.sourceLength = source.length;
-        mapping.replacementLength = prepared.length;
-        mapping.replacementEscaped = escaped;
-        mapping.source[0 .. source.length] = cast(const(ubyte)[]) source[];
-        mapping.replacement[0 .. prepared.length] = prepared[];
-        return "none";
-    }
-
-    // Exact-match lookup used by dictionary mode: the mapping index for
-    // these exact source bytes, or -1. Kept separate from
-    // tryReplaceDict so it can be unit tested without game memory.
-    long findDictMapping(const(ubyte)[] value)
-    {
-        auto index = (cast(string) value) in dictIndexBySource;
-        return index is null ? -1 : cast(long) *index;
-    }
-
-    // Build the dictionary from the translation files: read the game's
-    // English localisation, join it with translationMap (both are
-    // key -> text), and prepare every joined entry. Skips are counted
-    // per reason and reported in the single source=translations line.
-    private void loadTranslationDictMappings()
-    {
-        auto dir = gameLocalisationDir();
-        auto englishByKey = loadLocalisationMap(dir);
-        string[string] japaneseByKey;
-        foreach (key, data; translationMap)
-            japaneseByKey[key] = data.value;
-        auto joined = joinTranslationDictionary(japaneseByKey, englishByKey);
-
-        size_t skippedSourceLength;
-        size_t skippedEmptyReplacement;
-        size_t skippedReplacementLength;
-        size_t skippedUnencodable;
-        auto sources = joined.byEnglish.keys;
-        sources.sort;
-        foreach (source; sources)
-        {
-            ProbeMapping mapping;
-            auto reason = buildDictMapping(source, joined.byEnglish[source], mapping);
-            if (reason == "source-length")
-            {
-                skippedSourceLength++;
-                continue;
-            }
-            if (reason == "empty-replacement")
-            {
-                skippedEmptyReplacement++;
-                continue;
-            }
-            if (reason == "replacement-length")
-            {
-                skippedReplacementLength++;
-                continue;
-            }
-            if (reason == "unencodable")
-            {
-                skippedUnencodable++;
-                continue;
-            }
-            dictIndexBySource[source] = dictMappings.length;
-            dictMappings ~= mapping;
-        }
-        dictReplacementLogged = new bool[dictMappings.length];
-        dictCapacitySkipLogged = new bool[dictMappings.length];
-        dictCapacityLogged = new bool[dictMappings.length];
-        log(LogLevel.info, format(
-            "[DIAGNOSTIC] SetText mapping source=translations dir=%s loaded=%d joined=%d deduplicated=%d ambiguous=%d skipped-source-length=%d skipped-empty-replacement=%d skipped-replacement-length=%d skipped-unencodable=%d english-keys=%d japanese-keys=%d",
-            dir, dictMappings.length, joined.byEnglish.length,
-            joined.stats.deduplicated, joined.stats.ambiguous,
-            skippedSourceLength, skippedEmptyReplacement,
-            skippedReplacementLength, skippedUnencodable,
-            englishByKey.length, japaneseByKey.length));
-    }
-
-    // Choose where the SetText mappings come from. The env-var probe
-    // wins when it is set (the file dictionary is not read at all);
-    // otherwise EU4DLL_SETTEXT_FROM_TRANSLATIONS=1 selects the
-    // translation files. With neither set, behaviour is exactly the
-    // historical probe with no mappings.
+    // The SetText mappings come from the env-var probe
+    // (EU4DLL_SETTEXT_REPLACEMENTS). With it unset, behaviour is
+    // exactly the historical probe with no mappings.
     private void loadSetTextMappings()
     {
         if (environment.get("EU4DLL_SETTEXT_REPLACEMENTS").length != 0)
         {
             loadProbeMappings();
             log(LogLevel.info, "[DIAGNOSTIC] SetText mapping source=env");
-            return;
-        }
-        if (environment.get("EU4DLL_SETTEXT_FROM_TRANSLATIONS") == "1")
-        {
-            dictMode = true;
-            loadTranslationDictMappings();
             return;
         }
         loadProbeMappings();
@@ -490,89 +371,6 @@ version (linux)
         return false;
     }
 
-    // Dictionary-mode replacement: same CString reading, capacity
-    // check, write procedure and log formats as the probe path, but the
-    // mapping is found by exact match in the associative array instead
-    // of a table scan. A miss is not an outcome for any mapping, so it
-    // stays unlogged.
-    private bool tryReplaceDict(void* cstring)
-    {
-        ubyte[CStringHeaderBytes] header;
-        if (cstring is null || !readMemory(cstring, header[]))
-        {
-            logHeaderSkip(0, "null-or-unreadable-cstring", 1u << 0);
-            return false;
-        }
-        auto data = *cast(void**)(header.ptr);
-        auto length = *cast(long*)(header.ptr + 8);
-        if (data is null)
-        {
-            logHeaderSkip(0, "null-data-pointer", 1u << 1);
-            return false;
-        }
-        if (length <= 0 || length > MaxProbeBytes)
-        {
-            logHeaderSkip(0, "invalid-length", 1u << 2);
-            return false;
-        }
-        auto capacity = cstringCapacity(header, cast(size_t) cstring);
-        if (capacity < cast(size_t) length)
-        {
-            logHeaderSkip(cast(size_t) length, "invalid-capacity", 1u << 4);
-            return false;
-        }
-
-        ubyte[MaxProbeBytes + 1] value;
-        if (!readMemory(data, value[0 .. cast(size_t) length + 1]) ||
-                value[cast(size_t) length] != 0)
-        {
-            logHeaderSkip(cast(size_t) length, "value-unreadable-or-missing-nul", 1u << 3);
-            return false;
-        }
-        auto found = findDictMapping(value[0 .. cast(size_t) length]);
-        if (found < 0)
-            return false;
-        auto i = cast(size_t) found;
-        auto mapping = &dictMappings[i];
-        if (!dictCapacityLogged[i])
-        {
-            dictCapacityLogged[i] = true;
-            rawDiagnostic(formatSetTextCapacityLog(i, cast(size_t) length, capacity));
-        }
-        if (!replacementFitsCapacity(mapping.replacementLength, capacity))
-        {
-            if (!dictCapacitySkipLogged[i] && !dictReplacementLogged[i])
-            {
-                dictCapacitySkipLogged[i] = true;
-                rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
-                    false, "exceeds-capacity"));
-            }
-            return false;
-        }
-        // Write replacement bytes plus the terminating NUL, then update
-        // the length field (+8) to match; data pointer and +16 stay
-        // untouched, as required by cstring_ownership.md.
-        ubyte[MaxProbeBytes + 1] replacementValue;
-        replacementValue[0 .. mapping.replacementLength] =
-            mapping.replacement[0 .. mapping.replacementLength];
-        replacementValue[mapping.replacementLength] = 0;
-        auto newLength = cast(size_t) mapping.replacementLength;
-        auto replaced = writeMemory(data,
-                replacementValue[0 .. mapping.replacementLength + 1])
-            && writeMemory(cast(void*)(cast(ubyte*) cstring + 8),
-                (cast(ubyte*) &newLength)[0 .. size_t.sizeof]);
-        if (!dictReplacementLogged[i])
-        {
-            dictReplacementLogged[i] = true;
-            // Keep the plain marker as well: eu4_smoke.sh greps for it.
-            if (replaced)
-                rawDiagnostic("[DIAGNOSTIC-RAW] SetText replacement applied\n");
-            rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
-                replaced, replaced ? "none" : "write-failed"));
-        }
-        return replaced;
-    }
-
     // Only rdx (the first CString observed in the GDB trace) is interpreted.
     // The entry shim preserves every argument register and the caller's stack,
     // so the unverified trailing ABI is passed to the original unchanged.
@@ -582,12 +380,7 @@ version (linux)
             return;
         setTextActive = true;
         scope (exit) setTextActive = false;
-        if (dictMode)
-        {
-            if (dictMappings.length != 0)
-                tryReplaceDict(first);
-        }
-        else if (mappingCount != 0)
+        if (mappingCount != 0)
             tryReplace(first);
     }
 
@@ -647,7 +440,7 @@ version (linux)
         if (eu4Version != EU4Ver.v1_37_5 || environment.get("EU4DLL_SETTEXT_PROBE") != "1")
             return;
         loadSetTextMappings();
-        if (mappingCount == 0 && dictMappings.length == 0)
+        if (mappingCount == 0)
         {
             log(LogLevel.info, "[DIAGNOSTIC] SetText probe disabled: no valid mappings");
             return;
@@ -779,41 +572,6 @@ version (linux)
         assert(formatSetTextEscapedLog(0, 6, 6) ==
             "[DIAGNOSTIC-RAW] SetText escaped id=0 raw-length=6 escaped-length=6\n");
 
-        // Dictionary mode: buildDictMapping applies the same limits and
-        // escape preparation as the probe path, with per-reason skips.
-        ProbeMapping dictMapping;
-        assert(buildDictMapping("Back", "戻る", dictMapping) == "none");
-        assert(dictMapping.sourceLength == 4 && dictMapping.replacementLength == 6);
-        assert(dictMapping.replacementEscaped);
-        assert(buildDictMapping("Back", "Home", dictMapping) == "none");
-        assert(!dictMapping.replacementEscaped && dictMapping.replacementLength == 4);
-        string longSource;
-        foreach (_; 0 .. MaxProbeBytes + 1)
-            longSource ~= "x";
-        assert(buildDictMapping(longSource, "Home", dictMapping) == "source-length");
-        assert(buildDictMapping("", "Home", dictMapping) == "source-length");
-        string longTarget;
-        foreach (_; 0 .. 100)
-            longTarget ~= "あ"; // 100 chars -> 300 escaped bytes
-        assert(buildDictMapping("Back", longTarget, dictMapping) == "replacement-length");
-        assert(buildDictMapping("Back", "😀", dictMapping) == "unencodable");
-        assert(buildDictMapping("Back", "", dictMapping) == "empty-replacement");
-
-        // Dictionary lookup is an exact byte match on the source.
-        dictMappings = null;
-        dictIndexBySource = null;
-        assert(buildDictMapping("Back", "戻る", dictMapping) == "none");
-        dictIndexBySource["Back"] = dictMappings.length;
-        dictMappings ~= dictMapping;
-        assert(buildDictMapping("Connect to ID", "接続", dictMapping) == "none");
-        dictIndexBySource["Connect to ID"] = dictMappings.length;
-        dictMappings ~= dictMapping;
-        assert(findDictMapping(cast(const(ubyte)[]) "Back") == 0);
-        assert(findDictMapping(cast(const(ubyte)[]) "Connect to ID") == 1);
-        assert(findDictMapping(cast(const(ubyte)[]) "back") == -1);
-        assert(findDictMapping(cast(const(ubyte)[]) "Backx") == -1);
-        dictMappings = null;
-        dictIndexBySource = null;
     }
 }
 else
