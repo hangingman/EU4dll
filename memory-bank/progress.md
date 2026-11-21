@@ -413,3 +413,6 @@
 
 ## 2026-11-22 - Debian package
 - Added debian/ packaging (branch work/debian-package): one .deb bundles libeu4dll.so (usr/lib/eu4dll/), the eu4dll_translations mod data (localisation 145 yml + generated fonts 32 files, usr/share/eu4dll/mod/), and the eu4dll-launch / eu4dll-install-mod helper scripts. Mod data is copied at build time from EU4DLL_MOD_SRC because it is not stored in this repository. Build succeeds on the build machine (12.7 MB package); contents, the packaged library's preload-guard behaviour, and eu4dll-install-mod against a scratch data home were verified. Installing on a second machine and an in-game run from the package alone are not verified yet. Details: memory-bank/details/debian_packaging.md.
+
+## 2026-11-22 - Debian package: LDC 1.43 follow-up
+- After PR #9 the source needs LDC >= 1.43, which Debian's ldc (1.40) cannot build (link error on the naked asm references). Package 0.2 follows up (branch work/debian-ldc143): debian/rules checks the ldc2 version and stops early with a readable message, and the build bundles the compiler's shared D runtime (libphobos/libdruntime) into /usr/lib/eu4dll with the library rpath set to $ORIGIN, so the installed package is self-contained and does not depend on a system D runtime. Details: memory-bank/details/debian_packaging.md.

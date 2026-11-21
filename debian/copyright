@@ -25,6 +25,16 @@ License: MIT
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
 
+Files: usr/lib/eu4dll/libphobos2-ldc-shared.so.*
+       usr/lib/eu4dll/libdruntime-ldc-shared.so.*
+Copyright: The LDC project contributors
+License: BSL-1.0
+ The bundled D runtime libraries (Phobos and druntime, as shipped
+ with LDC) are distributed under the Boost Software License,
+ Version 1.0. The full license text is available at
+ https://www.boost.org/LICENSE_1_0.txt and in the libphobos2-ldc
+ source package on Debian systems.
+
 Files: usr/share/eu4dll/mod/eu4dll_translations/gfx/fonts/*
 Copyright: The Noto Project Authors
 License: OFL-1.1

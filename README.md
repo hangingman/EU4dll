@@ -46,8 +46,16 @@ The library, the eu4dll_translations mod data (localisation files and
 generated fonts) and two helper scripts can be bundled into a .deb:
 
 ```sh
-EU4DLL_MOD_SRC=/path/to/mod/eu4dll_translations dpkg-buildpackage -us -uc -b
+sudo apt install debhelper dub patchelf
+PATH=$HOME/ldc2-1.43.0-linux-x86_64/bin:$PATH EU4DLL_MOD_SRC=/path/to/mod/eu4dll_translations dpkg-buildpackage -us -uc -b -d
 ```
+
+Building needs LDC >= 1.43. Debian's ldc package is older, so use
+the official LDC release and put its bin directory first on PATH.
+The `-d` flag skips the build-dependency check, which cannot see a
+tarball install. The shared D runtime of the compiler in use is
+bundled into the package, so the installed .deb does not depend on
+a system D runtime.
 
 The mod data is not stored in this repository. `EU4DLL_MOD_SRC` must
 point at a eu4dll_translations mod directory; without it, the current
@@ -56,7 +64,7 @@ user's Paradox mod directory is used.
 Install the package and set up the mod for your user:
 
 ```sh
-sudo apt install ../eu4dll_0.1_amd64.deb
+sudo apt install ../eu4dll_0.2_amd64.deb
 eu4dll-install-mod
 eu4dll-launch
 ```
