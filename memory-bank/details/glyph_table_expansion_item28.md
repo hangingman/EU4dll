@@ -328,3 +328,49 @@ The vanilla game without the generated fonts is unaffected.
   RenderToScreen x2, GetHeightOfString, GetWidthOfString,
   Render3d x2) plus the two second fetches in
   GetRequiredSize / GetActualRealRequiredSizeActually.
+
+## Implementation step 4 (2026-11-21, fifth run of item 28)
+
+Per-site width analysis of the eight not-hooked fetch sites
+plus the two second fetches. Method: objdump disassembly of
+each site with about 0x90 bytes of preceding code (and, for
+RenderToScreen site 2, the branch predecessors), tracing the
+index register back to its load. Result: every index is a
+single byte, so no wide code point (>= 0x100) can ever reach
+any of these sites, and no redirect is needed for any of
+them. No runtime code is changed in this step.
+
+| VA | Function | Index source | Verdict |
+|---|---|---|---|
+| 0x204ef59 | RenderToTexture | `movzbl (%rax),%eax` after CString::operator[] (0x204ef4c) | byte, safe |
+| 0x2051088 | RenderToTexture | `movzbl (%rax),%eax` after CString::operator[] (0x2051085) | byte, safe |
+| 0x2052189 | RenderToScreen | `movzbl (%r14,%rbp,1),%ecx` (0x2052126), direct string byte | byte, safe |
+| 0x2053084 | RenderToScreen | `movzbl 0x333d450(%rbx),%eax` (0x2052ed5) from the stack string copy; all three entries to 0x205307f (je 0x2052ee4, jne 0x2052f00, jne 0x2052f55 / fallthrough) carry that byte in EAX, unmodified by the intervening cmps | byte, safe |
+| 0x2053d56 | GetHeightOfString | `movzbl (%rax),%eax` after CString::operator[] (0x2053d53) | byte, safe |
+| 0x2054027 | GetWidthOfString | `movzbl (%rbx,%r15,1),%esi` (0x2053fd9) from the raw `const char*` argument; the escape branches (0xA3/0xA4/0xA6/0xA7/0x40/0x7B) divert before the fetch and never widen RSI | byte, safe |
+| 0x20546d7 | Render3d | `movzbl (%rax),%eax` after CString::operator[] (0x20546d4) | byte, safe |
+| 0x2054cd0 | Render3d | `movzbl (%rax),%eax` after CString::operator[] (0x2054ccd); the separate `movsbl` nearby (0x2054c64) feeds FindColor, not this fetch | byte, safe |
+| 0x205664f | GetRequiredSize (2nd fetch) | `movsbq` of one byte of the internal string copy (0x2056646); sign-extended byte, range -128..127 | never >= 0x100, safe |
+| 0x2056df7 | GetActualRealRequiredSizeActually (2nd fetch) | `movsbq` of one byte of the internal string copy (0x2056def); sign-extended byte, range -128..127 | never >= 0x100, safe |
+
+Notes:
+
+- The escaped UI text path is decoded only inside the five
+  item 19 hooked functions (FillVertexBuffer,
+  GetActualRequiredSize, the first fetches of GetRequiredSize
+  and GetActualRealRequiredSizeActually), which step 3
+  already redirected. The functions analysed here iterate
+  raw bytes of their input string; multi-byte escape
+  sequences pass through them byte by byte exactly as in
+  vanilla, which is the pre-existing behaviour for these
+  measurement/render helpers and is unchanged by item 28.
+- The two second fetches use a sign-extended byte, so bytes
+  >= 0x80 index slightly before the embedded table. That is
+  vanilla behaviour on byte strings, unrelated to wide code
+  points (which are >= 0x100 and positive), and is left
+  as-is.
+- With this step, the fetch-side inventory from part 1 is
+  fully resolved: 5 hooked sites redirected (step 3),
+  10 byte-width sites needing no patch. Remaining for
+  item 28: step 5, the full check with all 16 generated
+  fonts placed via the throwaway test mod.
