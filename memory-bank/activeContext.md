@@ -93,6 +93,6 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 
 ## フォント文字集合テーブルの上限（2026/11/21追記、項目26）
 
-- 詳細は  に記録した。DLLが有効な状態では bitmapfont.cpp:436 の Invalid character ID は0件で、項目17のリミッタがパーサ側チェックまで効いている。専用パッチは不要。
+- 詳細は `memory-bank/details/font_charset_table_limit_item26.md` に記録した。DLLが有効な状態では bitmapfont.cpp:436 の Invalid character ID は0件で、項目17のリミッタがパーサ側チェックまで効いている。専用パッチは不要。
 - 新しい阻害要因が判明した: CBitmapFont+0x100 に埋め込まれた CBitmapCharacterSet のグリフ表は256ポインタ分しかなく（コンストラクタの memset 0x800バイト、デストラクタは256件だけ走査し、その後ろはカーニング用 unordered_map）、ParseFontFile は範囲確認なしに id で添字アクセスする。そのため id >= 0x100 は全て Duplicate character ID（bitmapfont.cpp:431）と誤判定されるか、ゼロの場所では無関係なメモリへグリフポインタを書き込む。最小再現（id 256/1000/8199 の3件だけ追加した standard.fnt、runs/20261121-172215）でも3件とも Duplicate になり、ゲームは正常終了した。全フォント読み込み時の segfault（runs/20261121-171402）もこの上書きで説明が付く。
 - 生成フォントの日本語グリフは読み込まれていない。項目27は、サイドテーブル等の実効ある対処を新しい項目として実装するまで実施しない。
