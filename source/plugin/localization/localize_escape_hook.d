@@ -4,9 +4,11 @@ module plugin.localization.localize_escape_hook;
 // LocalizeYmlAddKey (Linux v1.37.5) that escape-encodes non-ASCII
 // yml values at load time instead of letting the game's
 // ConvertUTF8ToLatin1 turn every Japanese character into '?'.
-// Opt-in via EU4DLL_LOCALIZE_ESCAPE=1. The survey that identified
-// the conversion point and the disassembly this file is built on
-// are recorded in memory-bank/details/
+// Enabled by default; EU4DLL_LOCALIZE_ESCAPE=0 opts out (the hook
+// shipped as opt-in and the owner flipped the default on
+// 2026-11-21, mirroring the decode enablement in dllmain.d). The
+// survey that identified the conversion point and the disassembly
+// this file is built on are recorded in memory-bank/details/
 // localisation_load_conversion_survey.md and
 // memory-bank/details/localize_escape_hook.md.
 //
@@ -32,6 +34,25 @@ bool isPureAscii(const(ubyte)[] bytes)
         if (b >= 0x80)
             return false;
     return true;
+}
+
+/// Localisation escape enablement: the hook is installed by
+/// default. The environment variable EU4DLL_LOCALIZE_ESCAPE=0 opts
+/// out; unset, empty, "1", or any other value enables it. Pure so
+/// the decision can be unit tested without starting EU4 (same shape
+/// as decodeEnabled in dllmain.d).
+bool localizeEscapeEnabled(string value)
+{
+    return value != "0";
+}
+
+unittest
+{
+    assert(localizeEscapeEnabled(null));
+    assert(localizeEscapeEnabled(""));
+    assert(localizeEscapeEnabled("1"));
+    assert(!localizeEscapeEnabled("0"));
+    assert(localizeEscapeEnabled("true"));
 }
 
 enum LocalizePlanAction
@@ -481,8 +502,12 @@ version (linux)
     {
         if (eu4Version != EU4Ver.v1_37_5)
             return;
-        if (environment.get("EU4DLL_LOCALIZE_ESCAPE") != "1")
+        if (!localizeEscapeEnabled(environment.get("EU4DLL_LOCALIZE_ESCAPE")))
+        {
+            log(LogLevel.info,
+                "[DIAGNOSTIC] EU4DLL_LOCALIZE_ESCAPE=0; localisation escape hook not installed");
             return;
+        }
 
         auto pattern = BytePattern.tempInstance();
         pattern.findPattern("55 41 57 41 56 53 48 83 EC 28 4C 89 C3 41 89 D6");
