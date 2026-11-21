@@ -158,3 +158,27 @@ removed afterwards, user folder restored.
   for the same fetch-loop shape as the already-hooked sites and
   extend decode coverage there. Until then EU4DLL_LOCALIZE_ESCAPE
   stays opt-in and must not be enabled for real play.
+
+
+## Verification of the wide-path fix (2026-11-21)
+
+Run runs/20261121-214814-multiplayer on branch
+work/decode-widepath-fix (commit c99d6ed): same setup as the crashed
+run (throwaway mod with all 145 localisation files + 32 fonts,
+EU4DLL_LOCALIZE_ESCAPE=1, decode default). Throwaway mod removed
+afterwards, user folder restored.
+
+- No crash: menu and multiplayer screens reached, eu4_wait=0. The
+  tutorial initialisation that segfaulted in GetHeightOfString now
+  passes, so the wide-path fix works on the path that crashed.
+- The Game Browser now renders Japanese across the screen instead of
+  '?': search boxes, the Search button, the server-name / tag /
+  status column headers, and the Back button all show the translated
+  text (screenshot shot_multiplayer2.png in the run directory).
+- Known imperfections, not blockers: some checkbox labels overlap
+  the following label (Japanese text is wider than the English
+  layout), and two narrow column headers truncate to an ellipsis.
+  Width/layout quality is a separate follow-up.
+- Not yet verified: the Render3d site 2 wide path (map name labels
+  in game) received the same fix in c99d6ed but has not been
+  exercised on the real machine.
