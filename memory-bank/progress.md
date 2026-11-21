@@ -120,3 +120,10 @@
 - そのためEU4は置換後のCStringを通常の1バイト文字として読み、UTF-8の各バイトが別々の字形になる。`戻る` は E6 88 BB E3 82 8B の6バイトで、長さや容量の問題ではなく表示側の解釈で化ける。
 - 実機確認（smoke runs/20261121-123828、`Back=戻る`）: `SetText capacity id=0 length=4 capacity=15`、`result=applied` を確認し、EU4はExitボタンで正常終了した。書き込み側は日本語バイト列でも動作する。画面表示の成否は判定に入れていない。
 - 今後の見通し: SetTextでUTF-8を書く方式のままでは日本語は表示できない。先にテキスト処理ループとフォント側の復号をLinux v1.37.5で有効にし、置換文字列はエスケープ形式で渡す必要がある。このリポジトリにUTF-8からエスケープ形式への変換器はまだ無い。実装はしていない。
+
+## translationMapとSetText実引数の対応確認（2026/11/21）
+
+- 詳細は `memory-bank/details/translationmap_settext_correspondence.md` に記録した。結論: 直接の対応はない。`translationMap` のキーはローカライズキー（例 `MENU_BAR_LOAD_GAME`）で、SetTextへ渡るのはキーではなく解決済みの表示文字列であり、`l_english` セッションではゲーム自身の英語値である。値側（日本語訳）もSetTextへは渡らない。橋渡しは「キー -> 英語値 -> SetText引数」の間接対応のみ。
+- 実機照合（smoke runs/20261121-124618、EU4はExitボタンで正常終了）: `BACK`->`Back` は id=0 で `result=applied`（容量15）、`CONNECT_TO_IP`->`Connect to ID` は id=1 で `result=applied`（容量15）。一方 `MENU_BAR_LOAD_GAME`->`Load Game` は id=2 に applied／capacity／content-mismatch のいずれも出ず、メインメニュー実行ではSetText到達を観測できなかった（理由は未証明で、不一致の証明ではない）。
+- 同じ実行で `translationMap` は0件だった。agent環境にはParadoxのmodディレクトリ自体が無く（`Mod directory not found`）、観測キー3件は全て `status=missing`。実データの日本語値を埋めるには `submodules/EU4JPModAppendixI` の初期化と、その `main.py`（要 `PARATRANZ_SECRET`）による生成が必要だが、指示によりサブモジュール初期化は行わなかった（`git submodule status` は `-19be99e` の未初期化状態）。この点は所有者の判断待ちとして記録した。
+- フックは `translationMap` を参照しない（項目5）ため、この対応は情報整理のみ。辞書連携へ進む場合はキーではなく英語値で結び、英語値の衝突と、SetTextへ到達しないキーへの扱いを決める必要がある。

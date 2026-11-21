@@ -17,7 +17,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## 未確定・制約
 
 - 可変長置換は容量以下の場合に限って実装済み。容量超過は `exceeds-capacity` で見送る。`Back=戻る`は実機で `result=applied` を確認済みだが、表示は文字化けする（原因は `details/mojibake_settext.md`）。
-- `translationMap`のキーとSetText実引数の対応は未証明。PoCは明示的な環境変数マッピングを使う。
+- `translationMap`のキーとSetText実引数の直接対応はないことを確認した（詳細は `details/translationmap_settext_correspondence.md`）。キーはローカライズキーで、SetTextへ渡るのは英語値側。`MENU_BAR_LOAD_GAME` の英語値 `Load Game` はメインメニュー実行ではSetText到達を観測できなかった。実データの日本語値はサブモジュール未初期化のため未取得。PoCは明示的な環境変数マッピングを使う。
 - フックはLinux・EU4 v1.37.5・明示opt-inに限定。全UI経路やWindows版への展開は未実施。
 - GDB診断スクリプト末尾の`no registers`は、EU4終了後にレジスタを読む後処理エラーであり、native置換成功とは別問題。
 
