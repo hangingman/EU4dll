@@ -26,6 +26,7 @@ import ListFieldAdj = plugin.list_field_adjustment;
 import NameOrder = plugin.localization.entry; // 修正
 import ReloadTrace = plugin.localization.reload_trace;
 import SetTextHook = plugin.localization.settext_hook;
+import LocalizeEscape = plugin.localization.localize_escape_hook;
 import ButtonAndToolTip = plugin.tooltip_and_button;
 import EventDialog = plugin.event_dialog;
 import FileSave = plugin.file_save.entry; // 修正
@@ -115,6 +116,7 @@ void hijackProcess()
 
     ReloadTrace.initReloadTrace(eu4Version);
     SetTextHook.initSetTextHook(eu4Version);
+    LocalizeEscape.initLocalizeEscapeHook(eu4Version);
 
     // Decode enablement: run the font and main text initialisers by
     // default; EU4DLL_ENABLE_DECODE=0 skips them. Upstream order is
