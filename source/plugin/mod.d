@@ -136,6 +136,188 @@ void logTranslationObservations()
 }
 
 /**
+ * Parse one EU4 localisation YAML file into a key -> value map.
+ *
+ * This is the per-file procedure loadTranslationMods has always used
+ * (normalizeLocalizationYaml normalisation, dyaml parse, every language
+ * section's scalar pairs), factored out so other loaders read files in
+ * exactly the same way. All of the historical per-file log lines are
+ * kept. A file that cannot be parsed yields an empty map.
+ */
+private string[string] parseLocalisationFile(string filePath)
+{
+    string[string] entries;
+    try
+    {
+        string yamlContent = readText(filePath);
+
+        auto headerContent = yamlContent;
+        if (headerContent.startsWith("\xEF\xBB\xBF"))
+            headerContent = headerContent[3 .. $];
+        auto hadLanguageHeader = headerContent.strip().startsWith("l_english:");
+        yamlContent = normalizeLocalizationYaml(yamlContent);
+        if (!hadLanguageHeader)
+            std.logger.info(format("  Warning: 'l_english:' prefix missing in %s. Attempting to add it.", filePath));
+
+        // YAMLをパース (Loader structを使用)
+        auto loader = dyaml.loader.Loader.fromString(yamlContent, filePath); // ファイル名を渡す
+        if (loader.empty) // ロードするドキュメントがない場合
+        {
+            std.logger.info(format("  Warning: %s contains no YAML documents.", filePath));
+            return entries;
+        }
+        auto rootNode = loader.load(); // 最初のドキュメントのルートノードを取得
+
+        if (rootNode.empty) // ロードされたノードが空の場合
+        {
+            std.logger.info(format("  Warning: %s is empty or invalid YAML.", filePath));
+            return entries;
+        }
+
+        // EU4のlocalisationファイルの構造を想定 (例: l_english: KEY: "Value")
+        if (rootNode.nodeID == NodeID.mapping)
+        {
+            foreach (langPair; rootNode.mapping()) // rootNode.mappingはNode.mappingを返す
+            {
+                auto langValue = langPair.value;
+                if (langValue.nodeID == NodeID.mapping)
+                {
+                    foreach (pair; langValue.mapping())
+                    {
+                        if (pair.value.nodeID == NodeID.scalar)
+                        {
+                            string valueStr = pair.value.as!string;
+                            string keyStr = pair.key.as!string;
+                            entries[keyStr] = valueStr;
+                        }
+                    }
+                }
+            }
+        }
+        std.logger.info(format("  Successfully loaded and parsed YAML from %s", filePath));
+    }
+    catch (YAMLException e)
+    {
+        std.logger.error(format("  Error parsing YAML from %s: %s", filePath, e.msg));
+    }
+    catch (Exception e)
+    {
+        std.logger.error(format("  An unexpected error occurred while processing %s: %s", filePath, e.msg));
+    }
+    return entries;
+}
+
+/**
+ * Parse every *.yml file under a directory (recursively) into one
+ * key -> value map, using the same per-file procedure as
+ * loadTranslationMods. Later files overwrite earlier keys, matching
+ * the translationMap merge behaviour. A missing directory yields an
+ * empty map.
+ */
+string[string] loadLocalisationMap(string dirPath)
+{
+    string[string] entries;
+    if (!dirPath.exists || !dirPath.isDir)
+    {
+        std.logger.info(format("Localisation directory not found: %s", dirPath));
+        return entries;
+    }
+    foreach (DirEntry entry; dirEntries(dirPath, SpanMode.depth))
+    {
+        if (entry.isFile && entry.name.endsWith(".yml"))
+        {
+            foreach (key, value; parseLocalisationFile(entry.name))
+                entries[key] = value;
+        }
+    }
+    std.logger.info(format("Loaded %d localisation entries from %s", entries.length, dirPath));
+    return entries;
+}
+
+/**
+ * Directory holding the game's own localisation files. The default is
+ * the "localisation" folder next to the running executable
+ * (/proc/self/exe), which is the EU4 install directory when the DLL is
+ * preloaded into the game. EU4DLL_GAME_LOCALISATION_DIR overrides it.
+ */
+string gameLocalisationDir()
+{
+    auto configured = environment.get("EU4DLL_GAME_LOCALISATION_DIR");
+    if (!configured.empty)
+        return configured;
+    return buildPath(dirName(thisExePath()), "localisation");
+}
+
+/// Outcome counts of joinTranslationDictionary.
+struct TranslationJoinStats
+{
+    size_t commonKeys; /// keys present in both maps
+    size_t deduplicated; /// extra (English, Japanese) pairs collapsed into an existing entry
+    size_t ambiguous; /// distinct English strings dropped over conflicting Japanese values
+    size_t japaneseOnlyKeys; /// keys only in the Japanese map
+    size_t englishOnlyKeys; /// keys only in the English map
+}
+
+/// Result of joinTranslationDictionary: the inverted dictionary plus statistics.
+struct TranslationJoinResult
+{
+    string[string] byEnglish; /// English display text -> Japanese text (UTF-8)
+    TranslationJoinStats stats;
+}
+
+/**
+ * Join a key -> Japanese map with a key -> English map into an
+ * English -> Japanese dictionary (design doc: SetText receives the
+ * resolved English display text, never the localisation key, so the
+ * dictionary has to be inverted through the English value).
+ *
+ * Only keys present in both maps take part. When several keys share
+ * one English string with the same Japanese value, they collapse into
+ * one entry. When one English string would map to different Japanese
+ * values, the whole entry for that English string is dropped and
+ * counted once as ambiguous; no value wins by iteration order.
+ */
+TranslationJoinResult joinTranslationDictionary(string[string] japaneseByKey,
+        string[string] englishByKey)
+{
+    TranslationJoinResult result;
+    bool[string] ambiguousEnglish;
+    foreach (key, japanese; japaneseByKey)
+    {
+        auto english = key in englishByKey;
+        if (english is null)
+        {
+            result.stats.japaneseOnlyKeys++;
+            continue;
+        }
+        result.stats.commonKeys++;
+        if (*english in ambiguousEnglish)
+            continue;
+        auto existing = *english in result.byEnglish;
+        if (existing is null)
+        {
+            result.byEnglish[*english] = japanese;
+        }
+        else if (*existing == japanese)
+        {
+            result.stats.deduplicated++;
+        }
+        else
+        {
+            result.byEnglish.remove(*english);
+            ambiguousEnglish[*english] = true;
+            result.stats.ambiguous++;
+        }
+    }
+    foreach (key; englishByKey.byKey)
+    {
+        if (key !in japaneseByKey)
+            result.stats.englishOnlyKeys++;
+    }
+    return result;
+}
+
+/**
  * 翻訳MODを読み込む関数。
  * 検出されたMODファイルの中からYAML形式の翻訳ファイルを特定し、その内容を読み込んでパースします。
  */
@@ -173,68 +355,8 @@ void loadTranslationMods(string customModDirPath = "")
                 if (entry.name.endsWith(".yml"))
                 {
                     yamlFileCount++; // YAMLファイル数としてカウント
-                    string filePath = entry.name; // DirEntry.name を直接使用
-                    try
-                    {
-                        string yamlContent = readText(filePath);
-
-                        auto headerContent = yamlContent;
-                        if (headerContent.startsWith("\xEF\xBB\xBF"))
-                            headerContent = headerContent[3 .. $];
-                        auto hadLanguageHeader = headerContent.strip().startsWith("l_english:");
-                        yamlContent = normalizeLocalizationYaml(yamlContent);
-                        if (!hadLanguageHeader)
-                            std.logger.info(format("  Warning: 'l_english:' prefix missing in %s. Attempting to add it.", entry.name));
-
-                        // YAMLをパース (Loader structを使用)
-                        auto loader = dyaml.loader.Loader.fromString(yamlContent, filePath); // ファイル名を渡す
-                        if (loader.empty) // ロードするドキュメントがない場合
-                        {
-                            std.logger.info(format("  Warning: %s contains no YAML documents.", entry.name));
-                            continue;
-                        }
-                        auto rootNode = loader.load(); // 最初のドキュメントのルートノードを取得
-
-                        if (rootNode.empty) // ロードされたノードが空の場合
-                        {
-                            std.logger.info(format("  Warning: %s is empty or invalid YAML.", entry.name));
-                            continue;
-                        }
-
-                        // EU4のlocalisationファイルの構造を想定 (例: l_english: KEY: "Value")
-                        if (rootNode.nodeID == NodeID.mapping)
-                        {
-                            foreach (langPair; rootNode.mapping()) // rootNode.mappingはNode.mappingを返す
-                            {
-                                auto langKey = langPair.key;
-                                auto langValue = langPair.value;
-                                if (langValue.nodeID == NodeID.mapping)
-                                {
-                                    foreach (pair; langValue.mapping())
-                                    {
-                                        if (pair.value.nodeID == NodeID.scalar)
-                                        {
-                                            string valueStr = pair.value.as!string;
-                                            string keyStr = pair.key.as!string;
-                                            translationMap[keyStr] = TranslationData(keyStr, valueStr);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        std.logger.info(format("  Successfully loaded and parsed YAML from %s", entry.name));
-                    }
-                    catch (YAMLException e)
-                    {
-                        // YAMLExceptionから行番号を取得する方法を修正
-                        // dyaml 0.10.0のYAMLExceptionにはstartMarkプロパティがない可能性があるため、
-                        // e.msgから情報を抽出するか、よりジェネリックなエラーメッセージにする
-                        std.logger.error(format("  Error parsing YAML from %s: %s", entry.name, e.msg));
-                    }
-                    catch (Exception e)
-                    {
-                        std.logger.error(format("  An unexpected error occurred while processing %s: %s", entry.name, e.msg));
-                    }
+                    foreach (key, value; parseLocalisationFile(entry.name))
+                        translationMap[key] = TranslationData(key, value);
                 }
             }
         }

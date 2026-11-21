@@ -363,3 +363,8 @@
 ## 2026-11-21 - Decode default-on (post item 32)
 - Owner decision: decode runs by default; EU4DLL_ENABLE_DECODE=0 opts out. dllmain.d helper flipped from opt-in ("1") to opt-out ("0"), unit tests updated, log lines reworded. Details: memory-bank/details/decode_default_enablement.md.
 - Verify: make test 10 modules passed, make all run last. Smoke runs/20261121-210753 (no env: decode-enabled log line, menu, Exit, eu4_wait=0) and runs/20261121-211038 (=0: skip log line, menu, Exit, eu4_wait=0). The aggregate decode-error line also appears in the verified item 32 runs, so it is the known state.
+
+## 2026-11-21 - SetText dictionary from translation files (Stage B + C)
+- settext_hook can now be fed from the translation files instead of the env-var probe: EU4DLL_SETTEXT_FROM_TRANSLATIONS=1 joins translationMap with the game English localisation (new mod.d loadLocalisationMap / gameLocalisationDir / joinTranslationDictionary) and feeds tryReplaceDict through a dynamic ProbeMapping[] + exact-match AA (Stage C storage). EU4DLL_SETTEXT_REPLACEMENTS still wins when set (source=env logged); probe logs and the init gate are unchanged.
+- Join rules pinned by tests: both-sides keys only, same-English/same-Japanese deduplicated, same-English/different-Japanese dropped as ambiguous. Load line reports source=translations with loaded and per-reason skip counts.
+- Verify: make test 10 modules passed (new cases in test_mod.d and settext_hook unittest), make all run last. No smoke run this time. Rough count over the real files: ~106k joined English strings, ~92.5k would load after the 256-byte limits. Details: memory-bank/details/translation_dict_stage_b.md.

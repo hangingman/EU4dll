@@ -130,4 +130,86 @@ unittest {
         rmdir(variantTestModDir);
         clearTranslationMap();
     }
+
+    // テストケース8: loadLocalisationMapは配下のymlを再帰的に全部読み、1つのマップにまとめる
+    {
+        auto mapDir = buildPath(environment.get("CWD"), "tests", "localisation_map_fixture");
+        auto subDir = buildPath(mapDir, "sub");
+        mkdirRecurse(subDir);
+        auto fileA = buildPath(mapDir, "a_l_english.yml");
+        auto fileB = buildPath(mapDir, "b.yml");
+        auto fileC = buildPath(subDir, "c_l_english.yml");
+        write(fileA, "l_english:\n KEY_A:0 \"Alpha\"\n KEY_B:0 \"Beta\"\n");
+        write(fileB, "KEY_C:0 \"Gamma\"\n");
+        write(fileC, "l_english:\n KEY_D:0 \"Delta\"\n");
+
+        auto entries = loadLocalisationMap(mapDir);
+        entries.length.should.equal(4);
+        entries["KEY_A"].should.equal("Alpha");
+        entries["KEY_B"].should.equal("Beta");
+        entries["KEY_C"].should.equal("Gamma");
+        entries["KEY_D"].should.equal("Delta");
+
+        remove(fileA);
+        remove(fileB);
+        remove(fileC);
+        rmdir(subDir);
+        rmdir(mapDir);
+
+        // 存在しないディレクトリは空のマップを返す
+        auto missing = loadLocalisationMap(buildPath(mapDir, "no_such_dir"));
+        missing.length.should.equal(0);
+    }
+
+    // テストケース9: 結合は両方にあるキーだけを対象に、英語→日本語へ反転する
+    {
+        string[string] japaneseByKey = ["BACK": "戻る", "LOAD": "ロード", "JP_ONLY": "のみ"];
+        string[string] englishByKey = ["BACK": "Back", "LOAD": "Load Game", "EN_ONLY": "Quit"];
+        auto joined = joinTranslationDictionary(japaneseByKey, englishByKey);
+        joined.byEnglish.should.equal(["Back": "戻る", "Load Game": "ロード"]);
+        joined.stats.commonKeys.should.equal(2);
+        joined.stats.deduplicated.should.equal(0);
+        joined.stats.ambiguous.should.equal(0);
+        joined.stats.japaneseOnlyKeys.should.equal(1);
+        joined.stats.englishOnlyKeys.should.equal(1);
+    }
+
+    // テストケース10: 同じ英語に同じ日本語が重なったら1件にまとめる
+    {
+        string[string] japaneseByKey = ["K1": "同じ", "K2": "同じ"];
+        string[string] englishByKey = ["K1": "Same", "K2": "Same"];
+        auto joined = joinTranslationDictionary(japaneseByKey, englishByKey);
+        joined.byEnglish.should.equal(["Same": "同じ"]);
+        joined.stats.commonKeys.should.equal(2);
+        joined.stats.deduplicated.should.equal(1);
+        joined.stats.ambiguous.should.equal(0);
+    }
+
+    // テストケース11: 同じ英語に違う日本語が来たら、その英語の項目は丸ごと外す
+    {
+        string[string] japaneseByKey = ["K1": "甲", "K2": "乙", "K3": "甲"];
+        string[string] englishByKey = ["K1": "Same", "K2": "Same", "K3": "Same"];
+        auto joined = joinTranslationDictionary(japaneseByKey, englishByKey);
+        joined.byEnglish.length.should.equal(0);
+        assert("Same" !in joined.byEnglish);
+        joined.stats.commonKeys.should.equal(3);
+        joined.stats.ambiguous.should.equal(1);
+    }
+
+    // テストケース11b: 重複がまとまった後に違う日本語が来たら、やはり丸ごと外す
+    {
+        string[string] japaneseByKey = ["K1": "同じ", "K2": "同じ", "K3": "別"];
+        string[string] englishByKey = ["K1": "Same", "K2": "Same", "K3": "Same"];
+        auto joined = joinTranslationDictionary(japaneseByKey, englishByKey);
+        joined.byEnglish.length.should.equal(0);
+        joined.stats.deduplicated.should.equal(1);
+        joined.stats.ambiguous.should.equal(1);
+    }
+
+    // テストケース12: EU4DLL_GAME_LOCALISATION_DIRがあればそちらを優先する
+    {
+        environment["EU4DLL_GAME_LOCALISATION_DIR"] = "/tmp/eu4dll-test-localisation";
+        gameLocalisationDir().should.equal("/tmp/eu4dll-test-localisation");
+        environment["EU4DLL_GAME_LOCALISATION_DIR"] = "";
+    }
 }
