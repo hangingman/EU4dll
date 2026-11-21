@@ -1177,6 +1177,300 @@ extern (C)
             }
         }
     }
+    // mainTextGetHeightV137_hook (Linux v1.37.5, item 29 step 5)
+    // CBitmapFont::GetHeightOfString fetch site (VA 0x2053d56,
+    // patch at the preceding movzbl, VA 0x2053d53).
+    // Entry: RAX = operator[] char pointer (loop head VA
+    // 0x2053d49, CString in R14), EBP = loop index, RBX = font.
+    // The 14-byte patch covers movzbl (3) + fetch (8) + test
+    // (3); the hook reproduces them plus the je: null -> VA
+    // 0x2053dfc (patch +0xA9), otherwise return at VA
+    // 0x2053d67 (+0x14, the original movswl). On escape it adds
+    // 2 to EBP (common tail inc EBP at VA 0x2053eb2 adds the
+    // third byte), maps NO_FONT to NOT_DEF, ids < 0x100 from
+    // the embedded table, ids >= 0x100 via wideGlyphLookup.
+    // Glyph register is RAX itself, so the char pointer is kept
+    // in R11. Prologue is 6 pushes + sub 0xB8, so RSP % 16 == 0
+    // at the fetch; the wide path pushes 4 registers + sub 48
+    // and spills XMM0-XMM5 low halves as insurance. Kerning
+    // stays byte-keyed (recorded approximation).
+    void mainTextGetHeightV137_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov R11, RAX;
+                movzx EAX, byte ptr [R11];
+                cmp EAX, ESCAPE_SEQ_1;
+                jz JMP_A;
+                cmp EAX, ESCAPE_SEQ_2;
+                jz JMP_B;
+                cmp EAX, ESCAPE_SEQ_3;
+                jz JMP_C;
+                cmp EAX, ESCAPE_SEQ_4;
+                jz JMP_D;
+                jmp JMP_E;
+            JMP_A:
+                movzx EAX, word ptr [R11 + 1];
+                jmp JMP_F;
+            JMP_B:
+                movzx EAX, word ptr [R11 + 1];
+                sub EAX, SHIFT_2;
+                jmp JMP_F;
+            JMP_C:
+                movzx EAX, word ptr [R11 + 1];
+                add EAX, SHIFT_3;
+                jmp JMP_F;
+            JMP_D:
+                movzx EAX, word ptr [R11 + 1];
+                add EAX, SHIFT_4;
+            JMP_F:
+                movzx EAX, AX;
+                add EBP, 2;
+                cmp EAX, NO_FONT;
+                ja JMP_E;
+                mov EAX, NOT_DEF;
+            JMP_E:
+                cmp EAX, 0x100;
+                jae JMP_G;
+                mov RAX, qword ptr [RBX + RAX*8 + 0x100];
+                jmp JMP_H;
+            JMP_G:
+                push RAX;
+                push RCX;
+                push RDX;
+                push RDI;
+                sub RSP, 48;
+                movss dword ptr [RSP + 0], XMM0;
+                movss dword ptr [RSP + 4], XMM1;
+                movss dword ptr [RSP + 8], XMM2;
+                movss dword ptr [RSP + 12], XMM3;
+                movss dword ptr [RSP + 16], XMM4;
+                movss dword ptr [RSP + 20], XMM5;
+                mov RDI, RBX;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                movss XMM0, dword ptr [RSP + 0];
+                movss XMM1, dword ptr [RSP + 4];
+                movss XMM2, dword ptr [RSP + 8];
+                movss XMM3, dword ptr [RSP + 12];
+                movss XMM4, dword ptr [RSP + 16];
+                movss XMM5, dword ptr [RSP + 20];
+                add RSP, 48;
+                pop RDI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H:
+                test RAX, RAX;
+                jz JMP_Z;
+                lea R11, [RIP + mainTextGetHeightV137ReturnAddress];
+                jmp qword ptr [R11];
+            JMP_Z:
+                lea R11, [RIP + mainTextGetHeightV137ZeroReturnAddress];
+                jmp qword ptr [R11];
+            }
+        }
+    }
+    // mainTextRender3dV137Site1_hook (Linux v1.37.5, item 29 step 5)
+    // CBitmapFont::Render3d measuring pass fetch site (VA
+    // 0x20546d7, patch at the preceding movzbl, VA 0x20546d4).
+    // Entry: RAX = operator[] char pointer (loop head VA
+    // 0x20546c9, CString in RBP), R15D = loop index, R12 =
+    // font. The 14-byte patch covers movzbl (3) + fetch (8) +
+    // test (3); null -> VA 0x20547ef (patch +0x11B), otherwise
+    // return at VA 0x20546e8 (+0x14, the original movswl). On
+    // escape it adds 2 to R15D (common tail inc R15D at VA
+    // 0x205496a adds the third byte). Prologue is 6 pushes +
+    // sub 0x1E8, so RSP % 16 == 0 at the fetch; wide path as
+    // in the GetHeightOfString hook. The preceding byte-copy
+    // loop is not the fetched string (step 3 caveat).
+    void mainTextRender3dV137Site1_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov R11, RAX;
+                movzx EAX, byte ptr [R11];
+                cmp EAX, ESCAPE_SEQ_1;
+                jz JMP_A;
+                cmp EAX, ESCAPE_SEQ_2;
+                jz JMP_B;
+                cmp EAX, ESCAPE_SEQ_3;
+                jz JMP_C;
+                cmp EAX, ESCAPE_SEQ_4;
+                jz JMP_D;
+                jmp JMP_E;
+            JMP_A:
+                movzx EAX, word ptr [R11 + 1];
+                jmp JMP_F;
+            JMP_B:
+                movzx EAX, word ptr [R11 + 1];
+                sub EAX, SHIFT_2;
+                jmp JMP_F;
+            JMP_C:
+                movzx EAX, word ptr [R11 + 1];
+                add EAX, SHIFT_3;
+                jmp JMP_F;
+            JMP_D:
+                movzx EAX, word ptr [R11 + 1];
+                add EAX, SHIFT_4;
+            JMP_F:
+                movzx EAX, AX;
+                add R15D, 2;
+                cmp EAX, NO_FONT;
+                ja JMP_E;
+                mov EAX, NOT_DEF;
+            JMP_E:
+                cmp EAX, 0x100;
+                jae JMP_G;
+                mov RBX, qword ptr [R12 + RAX*8 + 0x100];
+                jmp JMP_H;
+            JMP_G:
+                push RAX;
+                push RCX;
+                push RDX;
+                push RDI;
+                sub RSP, 48;
+                movss dword ptr [RSP + 0], XMM0;
+                movss dword ptr [RSP + 4], XMM1;
+                movss dword ptr [RSP + 8], XMM2;
+                movss dword ptr [RSP + 12], XMM3;
+                movss dword ptr [RSP + 16], XMM4;
+                movss dword ptr [RSP + 20], XMM5;
+                mov RDI, R12;
+                mov ESI, EAX;
+                lea R11, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                mov RBX, RAX;
+                movss XMM0, dword ptr [RSP + 0];
+                movss XMM1, dword ptr [RSP + 4];
+                movss XMM2, dword ptr [RSP + 8];
+                movss XMM3, dword ptr [RSP + 12];
+                movss XMM4, dword ptr [RSP + 16];
+                movss XMM5, dword ptr [RSP + 20];
+                add RSP, 48;
+                pop RDI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H:
+                test RBX, RBX;
+                jz JMP_Z;
+                lea R11, [RIP + mainTextRender3dV137Site1ReturnAddress];
+                jmp qword ptr [R11];
+            JMP_Z:
+                lea R11, [RIP + mainTextRender3dV137Site1ZeroReturnAddress];
+                jmp qword ptr [R11];
+            }
+        }
+    }
+    // mainTextRender3dV137Site2_hook (Linux v1.37.5, item 29 step 5)
+    // CBitmapFont::Render3d draw pass fetch site (VA
+    // 0x2054cd0, patch at the preceding movzbl, VA 0x2054ccd).
+    // Entry: RAX = operator[] char pointer (loop head VA
+    // 0x2054cc2, CString in R13), R15D = loop index, R12 =
+    // font. The 14-byte patch covers movzbl (3) + fetch (8) +
+    // test (3); null -> VA 0x205519d (patch +0x4D0), otherwise
+    // return at VA 0x2054ce1 (+0x14, the XMM10 scale reload).
+    // Draw-pass loop tail pinned in this step: every path
+    // converges on inc R15D at VA 0x2055218, so on escape the
+    // hook adds 2 to R15D and the tail adds the third byte.
+    // Glyph register is RAX itself, so the char pointer is
+    // kept in R10. Wide path spills XMM0-XMM5 plus XMM10 (the
+    // scale register of this loop) low halves.
+    void mainTextRender3dV137Site2_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov R10, RAX;
+                movzx EAX, byte ptr [R10];
+                cmp EAX, ESCAPE_SEQ_1;
+                jz JMP_A;
+                cmp EAX, ESCAPE_SEQ_2;
+                jz JMP_B;
+                cmp EAX, ESCAPE_SEQ_3;
+                jz JMP_C;
+                cmp EAX, ESCAPE_SEQ_4;
+                jz JMP_D;
+                jmp JMP_E;
+            JMP_A:
+                movzx EAX, word ptr [R10 + 1];
+                jmp JMP_F;
+            JMP_B:
+                movzx EAX, word ptr [R10 + 1];
+                sub EAX, SHIFT_2;
+                jmp JMP_F;
+            JMP_C:
+                movzx EAX, word ptr [R10 + 1];
+                add EAX, SHIFT_3;
+                jmp JMP_F;
+            JMP_D:
+                movzx EAX, word ptr [R10 + 1];
+                add EAX, SHIFT_4;
+            JMP_F:
+                movzx EAX, AX;
+                add R15D, 2;
+                cmp EAX, NO_FONT;
+                ja JMP_E;
+                mov EAX, NOT_DEF;
+            JMP_E:
+                cmp EAX, 0x100;
+                jae JMP_G;
+                mov RAX, qword ptr [R12 + RAX*8 + 0x100];
+                jmp JMP_H;
+            JMP_G:
+                push RAX;
+                push RCX;
+                push RDX;
+                push RDI;
+                sub RSP, 48;
+                movss dword ptr [RSP + 0], XMM0;
+                movss dword ptr [RSP + 4], XMM1;
+                movss dword ptr [RSP + 8], XMM2;
+                movss dword ptr [RSP + 12], XMM3;
+                movss dword ptr [RSP + 16], XMM4;
+                movss dword ptr [RSP + 20], XMM5;
+                movss dword ptr [RSP + 24], XMM10;
+                mov RDI, R12;
+                mov ESI, EAX;
+                lea R10, [RIP + mainTextGlyphLookupFuncAddress];
+                mov R10, qword ptr [R10];
+                call R10;
+                movss XMM0, dword ptr [RSP + 0];
+                movss XMM1, dword ptr [RSP + 4];
+                movss XMM2, dword ptr [RSP + 8];
+                movss XMM3, dword ptr [RSP + 12];
+                movss XMM4, dword ptr [RSP + 16];
+                movss XMM5, dword ptr [RSP + 20];
+                movss XMM10, dword ptr [RSP + 24];
+                add RSP, 48;
+                pop RDI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H:
+                test RAX, RAX;
+                jz JMP_Z;
+                lea R10, [RIP + mainTextRender3dV137Site2ReturnAddress];
+                jmp qword ptr [R10];
+            JMP_Z:
+                lea R10, [RIP + mainTextRender3dV137Site2ZeroReturnAddress];
+                jmp qword ptr [R10];
+            }
+        }
+    }
+
 }
 
 private __gshared size_t mainTextProc1V137SiteAReturnAddress;
@@ -1194,6 +1488,12 @@ private __gshared size_t mainTextRenderToTextureV137Site1ReturnAddress;
 private __gshared size_t mainTextRenderToTextureV137Site1ZeroReturnAddress;
 private __gshared size_t mainTextRenderToTextureV137Site2ReturnAddress;
 private __gshared size_t mainTextRenderToTextureV137Site2ZeroReturnAddress;
+private __gshared size_t mainTextGetHeightV137ReturnAddress;
+private __gshared size_t mainTextGetHeightV137ZeroReturnAddress;
+private __gshared size_t mainTextRender3dV137Site1ReturnAddress;
+private __gshared size_t mainTextRender3dV137Site1ZeroReturnAddress;
+private __gshared size_t mainTextRender3dV137Site2ReturnAddress;
+private __gshared size_t mainTextRender3dV137Site2ZeroReturnAddress;
 private __gshared size_t mainTextGlyphLookupFuncAddress;
 private __gshared size_t mainTextProc1ReturnAddress;
 private __gshared size_t mainTextProc2ReturnAddress;
@@ -1738,6 +2038,64 @@ DllError mainTextProc4Injector(RunOptions options)
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextRenderToTextureV137Site2_hook, 14);
                 writeln("JMP for mainTextProc4Injector (v1.37.5 RenderToTexture site 2, item 29) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
+            // Item 29 step 5: GetHeightOfString (fetch VA
+            // 0x2053d56, patch at 0x2053d53) and Render3d site 1
+            // (fetch VA 0x20546d7, patch at 0x20546d4) and site 2
+            // (fetch VA 0x2054cd0, patch at 0x2054ccd, long AOB
+            // required: the short form has 4 hits). All patterns
+            // verified exactly 1 hit in a full binary scan
+            // (item 29 steps 3 and 5).
+            BytePattern.tempInstance()
+                .findPattern("0F B6 00 48 8B 84 C3 00 01 00 00 48 85 C0 0F 84 95 00 00 00");
+            if (BytePattern.tempInstance().hasSize(1, "MainText GetHeightOfString v1.37.5"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                mainTextGetHeightV137ReturnAddress = address + 0x14;
+                mainTextGetHeightV137ZeroReturnAddress = address + 0xA9;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextGetHeightV137_hook, 14);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 GetHeightOfString, item 29) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
+            BytePattern.tempInstance()
+                .findPattern("0F B6 00 49 8B 9C C4 00 01 00 00 48 85 DB 0F 84 07 01 00 00");
+            if (BytePattern.tempInstance().hasSize(1, "MainText Render3d v1.37.5 site 1"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                mainTextRender3dV137Site1ReturnAddress = address + 0x14;
+                mainTextRender3dV137Site1ZeroReturnAddress = address + 0x11B;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextRender3dV137Site1_hook, 14);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 Render3d site 1, item 29) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc4Injector = true;
+            }
+
+            BytePattern.tempInstance()
+                .findPattern("0F B6 00 49 8B 84 C4 00 01 00 00 48 85 C0 0F 84 BC 04 00 00 F3 45 0F 10 94 24 40 09 00 00");
+            if (BytePattern.tempInstance().hasSize(1, "MainText Render3d v1.37.5 site 2"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                mainTextRender3dV137Site2ReturnAddress = address + 0x14;
+                mainTextRender3dV137Site2ZeroReturnAddress = address + 0x4D0;
+                mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                PatchManager.instance().addJmpPatch(cast(void*) address,
+                    cast(void*)&mainTextRender3dV137Site2_hook, 14);
+                writeln("JMP for mainTextProc4Injector (v1.37.5 Render3d site 2, item 29) created.");
             }
             else
             {

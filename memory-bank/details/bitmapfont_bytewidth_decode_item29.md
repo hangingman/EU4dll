@@ -440,3 +440,63 @@ sub 0x2888, so RSP % 16 == 0 at both fetches).
 - Item 29 is NOT complete. Next: step 5 - GetHeightOfString +
   Render3d site 1 + site 2 hooks, after pinning the Render3d
   draw-pass loop tail (still open from step 3).
+
+# Step 5 (2026-11-21, item 29 step 5): GetHeightOfString + Render3d site 1 + site 2 hooks - item 29 COMPLETE
+
+Implemented: the last three byte-width fetch sites now decode
+escapes and resolve wide glyphs via the side table, in
+source/plugin/main_text.d (mainTextGetHeightV137_hook /
+mainTextRender3dV137Site1_hook / mainTextRender3dV137Site2_hook,
+installed from the Proc4 injector v1.37.5 case, opt-in only).
+With this step every byte-width fetch site from the item 28
+inventory is hooked: GetWidthOfString, RenderToScreen x2,
+RenderToTexture x2, GetHeightOfString, Render3d x2.
+
+- Render3d draw-pass loop tail pinned (open from step 3): the
+  non-null path, the kerning path and the null target at VA
+  0x205519d all converge on inc R15D at VA 0x2055218, followed
+  by a GetSize compare against R15D. The measuring-pass tail
+  is inc R15D at VA 0x205496a. Both hooks therefore add 2 to
+  R15D on an escape and the tails add the third byte.
+- GetHeightOfString (fetch VA 0x2053d56, patch at the movzbl
+  VA 0x2053d53, 14-byte patch): index EBP, font RBX, glyph
+  register is RAX itself so the char pointer is kept in R11.
+  Normal return VA 0x2053d67 (+0x14), null return VA
+  0x2053dfc (+0xA9). Prologue 6 pushes + sub 0xB8 gives
+  RSP % 16 == 0 at the fetch.
+- Render3d site 1 (fetch VA 0x20546d7, patch at VA 0x20546d4,
+  14-byte patch): index R15D, font R12, out RBX, char pointer
+  in R11. Normal return VA 0x20546e8 (+0x14), null return VA
+  0x20547ef (+0x11B). Prologue 6 pushes + sub 0x1E8 gives
+  RSP % 16 == 0 at the fetch.
+- Render3d site 2 (fetch VA 0x2054cd0, patch at VA 0x2054ccd,
+  14-byte patch, long AOB): index R15D, font R12, glyph
+  register is RAX itself so the char pointer is kept in R10.
+  Normal return VA 0x2054ce1 (+0x14), null return VA
+  0x205519d (+0x4D0). Wide path spills XMM0-XMM5 plus XMM10.
+- All three AOBs re-verified in this run by a full byte scan
+  of the 58 MiB binary: exactly 1 hit each at the expected VAs.
+- Recorded approximation (all three, same as steps 1-4):
+  kerning after the fetch stays byte-keyed, and the null
+  targets re-read the byte at the already-advanced index for
+  their newline checks; a payload byte is not a newline in
+  practice, so a null wide glyph is simply skipped.
+
+## Verification (step 5)
+
+- make test: 10 modules passed. make all run last; final .so
+  md5 e3d3b28224ce4b712a8d8a5a03c94196, DIAGNOSTIC-RAW lines
+  present on the /bin/true preload check (normal build,
+  item 25 rule).
+- Smoke runs/20261121-191301-multiplayer (eu4_multiplayer.sh,
+  EU4DLL_ENABLE_DECODE=1, EU4DLL_SETTEXT_PROBE=1, Back
+  replaced with the Japanese word, vanilla fonts): all three
+  new JMP lines present alongside all earlier JMP lines, DLL
+  [OK], SetText id=0 result=applied, no crash, process alive
+  at the Game Browser screen (script ended by kill, the known
+  behaviour there).
+- Screenshots checked visually: main menu and Game Browser
+  render normally in English, no corruption; the Game
+  Browser bottom-left button stays empty, as after step 4.
+- Item 29 is COMPLETE. Next: item 30 - final check with the
+  generated fonts placed.
