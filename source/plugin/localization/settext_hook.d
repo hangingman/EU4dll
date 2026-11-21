@@ -14,23 +14,36 @@ version (linux)
     import std.process : environment;
     import std.string : indexOf, lastIndexOf, split;
     import plugin.byte_pattern;
-    import plugin.patcher.patcher : patch_memory;
+    import plugin.localization.escape_codec : encodeUtf8ToEscaped;
+    import plugin.patcher.patcher : patch_memory, makeAbsoluteJmp, makeAbsoluteJmpPadded;
 
     private enum size_t CopiedLength = 17;
     private enum size_t MaxProbeBytes = 256;
     private enum size_t MaxMappings = 8;
 
+    private enum size_t CStringHeaderBytes = 32;
+    private enum size_t SsoCapacity = 15;
+
     private struct ProbeMapping
     {
         ubyte[MaxProbeBytes] source;
         ubyte[MaxProbeBytes] replacement;
-        size_t length;
+        size_t sourceLength;
+        size_t replacementLength;
+        // True when replacement holds escape-encoded bytes (item 20):
+        // replacementLength is then the escaped length, which is what
+        // the CString capacity check in tryReplace must use.
+        bool replacementEscaped;
     }
 
     private __gshared ProbeMapping[MaxMappings] mappings;
     private __gshared size_t mappingCount;
     private __gshared bool setTextActive;
     private __gshared bool[MaxMappings] replacementLogged;
+    private __gshared bool[MaxMappings] contentMismatchLogged;
+    private __gshared bool[MaxMappings] capacitySkipLogged;
+    private __gshared bool[MaxMappings] capacityLogged;
+    private __gshared uint headerSkipLoggedMask;
 
     private void rawDiagnostic(string message)
     {
@@ -70,12 +83,147 @@ version (linux)
             return false;
         auto source = cast(const(ubyte)[]) entry[0 .. separator];
         auto replacement = cast(const(ubyte)[]) entry[separator + 1 .. $];
-        if (source.length != replacement.length || source.length > MaxProbeBytes)
+        if (source.length > MaxProbeBytes || replacement.length > MaxProbeBytes)
             return false;
-        mapping.length = source.length;
+        ubyte[] prepared;
+        bool escaped;
+        if (!prepareSetTextReplacement(replacement, prepared, escaped))
+            return false;
+        if (prepared.length > MaxProbeBytes)
+            return false;
+        mapping.sourceLength = source.length;
+        mapping.replacementLength = prepared.length;
+        mapping.replacementEscaped = escaped;
         mapping.source[0 .. source.length] = source[];
-        mapping.replacement[0 .. source.length] = replacement[];
+        mapping.replacement[0 .. prepared.length] = prepared[];
         return true;
+    }
+
+    // A replacement needs escape encoding when it contains any
+    // non-ASCII byte (UTF-8 multibyte text such as Japanese). Pure
+    // ASCII replacements pass through unchanged, so the existing
+    // English probe behaviour is byte-identical.
+    bool replacementNeedsEscape(const(ubyte)[] replacement)
+    {
+        foreach (b; replacement)
+            if (b >= 0x80)
+                return true;
+        return false;
+    }
+
+    // Prepare the bytes a mapping actually writes (item 20): when the
+    // configured replacement is non-ASCII, convert the whole UTF-8
+    // string with escape_codec so the decode hooks (items 17-19) can
+    // render it; otherwise copy it verbatim. Returns false when the
+    // text cannot be encoded (invalid UTF-8 or above-BMP), in which
+    // case the mapping is rejected at load time.
+    bool prepareSetTextReplacement(const(ubyte)[] raw, out ubyte[] prepared,
+            out bool escaped)
+    {
+        prepared = null;
+        escaped = false;
+        if (!replacementNeedsEscape(raw))
+        {
+            prepared = raw.dup;
+            return true;
+        }
+        ubyte[] encoded;
+        if (!encodeUtf8ToEscaped(cast(const(char)[]) raw, encoded))
+            return false;
+        prepared = encoded;
+        escaped = true;
+        return true;
+    }
+
+    // Load-time log line for a mapping whose replacement was escape
+    // encoded. Kept pure so tests pin the fields exactly.
+    string formatSetTextEscapedLog(long mappingId, size_t rawLength, size_t escapedLength)
+    {
+        return format("[DIAGNOSTIC-RAW] SetText escaped id=%d raw-length=%d escaped-length=%d\n",
+            mappingId, rawLength, escapedLength);
+    }
+
+    // Capacity of a CString from its 32-byte header (see
+    // memory-bank/details/cstring_ownership.md): the data pointer equals
+    // object+16 for SSO storage (capacity 15); otherwise +16 holds the
+    // heap capacity as a size_t. Pure so it can be unit tested.
+    size_t cstringCapacity(const(ubyte)[CStringHeaderBytes] header, size_t objectAddress)
+    {
+        auto data = *cast(const(size_t)*)(header.ptr);
+        if (data == objectAddress + 16)
+            return SsoCapacity;
+        return *cast(const(size_t)*)(header.ptr + 16);
+    }
+
+    bool replacementFitsCapacity(size_t replacementLength, size_t capacity)
+    {
+        return replacementLength <= capacity;
+    }
+
+    // Outcome of comparing one mapping against one observed CString value.
+    enum SetTextDecision
+    {
+        lengthMismatch,
+        contentMismatch,
+        matched,
+    }
+
+    // Pure comparison so the per-mapping decision can be unit tested.
+    SetTextDecision decideSetTextMapping(const ref ProbeMapping mapping, const(ubyte)[] value)
+    {
+        if (mapping.sourceLength != value.length)
+            return SetTextDecision.lengthMismatch;
+        if (value != mapping.source[0 .. mapping.sourceLength])
+            return SetTextDecision.contentMismatch;
+        return SetTextDecision.matched;
+    }
+
+    // Single log format for every per-mapping outcome. Kept pure so tests
+    // pin the fields (mapping id, target length, result, reason) exactly.
+    string formatSetTextReplacementLog(long mappingId, size_t targetLength,
+            bool applied, string reason)
+    {
+        return format("[DIAGNOSTIC-RAW] SetText mapping id=%d length=%d result=%s reason=%s\n",
+            mappingId, targetLength, applied ? "applied" : "skipped", reason);
+    }
+
+    // Capacity measurement line: emitted once per mapping when its source
+    // value is first matched, so real CString capacities can be collected
+    // from the DLL log without changing any replacement decision.
+    string formatSetTextCapacityLog(long mappingId, size_t targetLength, size_t capacity)
+    {
+        return format("[DIAGNOSTIC-RAW] SetText capacity id=%d length=%d capacity=%d\n",
+            mappingId, targetLength, capacity);
+    }
+
+    // Why parseSetTextProbeEntry rejected an entry, for the load-time log.
+    string probeEntryRejectionReason(string entry)
+    {
+        auto separator = entry.indexOf('=');
+        if (separator < 0)
+            return "missing-separator";
+        if (separator != entry.lastIndexOf('='))
+            return "multiple-separators";
+        if (separator == 0)
+            return "empty-source";
+        if (separator + 1 >= entry.length)
+            return "empty-replacement";
+        if (separator > MaxProbeBytes || entry.length - separator - 1 > MaxProbeBytes)
+            return "too-long";
+        ubyte[] prepared;
+        bool escaped;
+        if (!prepareSetTextReplacement(
+                cast(const(ubyte)[]) entry[separator + 1 .. $], prepared, escaped))
+            return "unencodable-replacement";
+        return "none";
+    }
+
+    private void logHeaderSkip(size_t targetLength, string reason, uint bit)
+    {
+        if (headerSkipLoggedMask & bit)
+            return;
+        headerSkipLoggedMask |= bit;
+        rawDiagnostic(formatSetTextReplacementLog(-1, targetLength, false, reason));
     }
 
     private void loadProbeMappings()
@@ -84,43 +232,125 @@ version (linux)
         auto configured = environment.get("EU4DLL_SETTEXT_REPLACEMENTS");
         if (configured.length == 0)
             return;
-        foreach (entry; configured.split(';'))
+        foreach (entryId, entry; configured.split(';'))
         {
             if (mappingCount == MaxMappings)
+            {
+                log(LogLevel.error, format(
+                    "[DIAGNOSTIC] SetText mapping id=%d length=%d result=skipped reason=too-many-mappings",
+                    entryId, entry.length));
                 break;
+            }
             ProbeMapping mapping;
             if (parseSetTextProbeEntry(entry, mapping))
+            {
+                log(LogLevel.info, format(
+                    "[DIAGNOSTIC] SetText mapping id=%d length=%d result=loaded reason=none",
+                    mappingCount, mapping.sourceLength));
+                if (mapping.replacementEscaped)
+                    rawDiagnostic(formatSetTextEscapedLog(mappingCount,
+                        entry.length - entry.indexOf('=') - 1, mapping.replacementLength));
                 mappings[mappingCount++] = mapping;
+            }
             else
-                log(LogLevel.error, "[DIAGNOSTIC] SetText probe mapping rejected");
+                log(LogLevel.error, format(
+                    "[DIAGNOSTIC] SetText mapping id=%d length=%d result=skipped reason=%s",
+                    entryId, entry.length, probeEntryRejectionReason(entry)));
         }
     }
 
     private bool tryReplace(void* cstring)
     {
-        ubyte[16] header;
+        ubyte[CStringHeaderBytes] header;
         if (cstring is null || !readMemory(cstring, header[]))
+        {
+            logHeaderSkip(0, "null-or-unreadable-cstring", 1u << 0);
             return false;
+        }
         auto data = *cast(void**)(header.ptr);
         auto length = *cast(long*)(header.ptr + 8);
-        if (data is null || length <= 0 || length > MaxProbeBytes)
+        if (data is null)
+        {
+            logHeaderSkip(0, "null-data-pointer", 1u << 1);
             return false;
+        }
+        if (length <= 0 || length > MaxProbeBytes)
+        {
+            logHeaderSkip(0, "invalid-length", 1u << 2);
+            return false;
+        }
+        auto capacity = cstringCapacity(header, cast(size_t) cstring);
+        if (capacity < cast(size_t) length)
+        {
+            logHeaderSkip(cast(size_t) length, "invalid-capacity", 1u << 4);
+            return false;
+        }
 
         ubyte[MaxProbeBytes + 1] value;
         if (!readMemory(data, value[0 .. cast(size_t) length + 1]) ||
                 value[cast(size_t) length] != 0)
+        {
+            logHeaderSkip(cast(size_t) length, "value-unreadable-or-missing-nul", 1u << 3);
             return false;
+        }
         foreach (i; 0 .. mappingCount)
         {
             auto mapping = &mappings[i];
-            if (mapping.length != cast(size_t) length ||
-                    value[0 .. mapping.length] != mapping.source[0 .. mapping.length])
+            // Only same-length values are candidates for this mapping; other
+            // lengths are not this mapping's outcome and stay unlogged, so
+            // the probe does not flood the log on every SetText call.
+            final switch (decideSetTextMapping(*mapping, value[0 .. cast(size_t) length]))
+            {
+            case SetTextDecision.lengthMismatch:
                 continue;
-            auto replaced = writeMemory(data, mapping.replacement[0 .. mapping.length]);
-            if (replaced && !replacementLogged[i])
+            case SetTextDecision.contentMismatch:
+                // Once this mapping has an outcome, a later same-length
+                // string is not a new outcome for it.
+                if (!contentMismatchLogged[i] && !replacementLogged[i])
+                {
+                    contentMismatchLogged[i] = true;
+                    rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
+                        false, "content-mismatch"));
+                }
+                continue;
+            case SetTextDecision.matched:
+                break;
+            }
+            if (!capacityLogged[i])
+            {
+                capacityLogged[i] = true;
+                rawDiagnostic(formatSetTextCapacityLog(i, cast(size_t) length, capacity));
+            }
+            if (!replacementFitsCapacity(mapping.replacementLength, capacity))
+            {
+                if (!capacitySkipLogged[i] && !replacementLogged[i])
+                {
+                    capacitySkipLogged[i] = true;
+                    rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
+                        false, "exceeds-capacity"));
+                }
+                return false;
+            }
+            // Write replacement bytes plus the terminating NUL, then update
+            // the length field (+8) to match; data pointer and +16 stay
+            // untouched, as required by cstring_ownership.md.
+            ubyte[MaxProbeBytes + 1] replacementValue;
+            replacementValue[0 .. mapping.replacementLength] =
+                mapping.replacement[0 .. mapping.replacementLength];
+            replacementValue[mapping.replacementLength] = 0;
+            auto newLength = cast(size_t) mapping.replacementLength;
+            auto replaced = writeMemory(data,
+                    replacementValue[0 .. mapping.replacementLength + 1])
+                && writeMemory(cast(void*)(cast(ubyte*) cstring + 8),
+                    (cast(ubyte*) &newLength)[0 .. size_t.sizeof]);
+            if (!replacementLogged[i])
             {
                 replacementLogged[i] = true;
-                rawDiagnostic("[DIAGNOSTIC-RAW] SetText replacement applied\n");
+                // Keep the plain marker as well: eu4_smoke.sh greps for it.
+                if (replaced)
+                    rawDiagnostic("[DIAGNOSTIC-RAW] SetText replacement applied\n");
+                rawDiagnostic(formatSetTextReplacementLog(i, cast(size_t) length,
+                    replaced, replaced ? "none" : "write-failed"));
             }
             return replaced;
         }
@@ -138,16 +368,6 @@ version (linux)
         scope (exit) setTextActive = false;
         if (mappingCount != 0)
             tryReplace(first);
-    }
-
-    private ubyte[] makeAbsoluteJmp(void* destination)
-    {
-        auto address = cast(size_t) destination;
-        return [0xff, 0x25, 0, 0, 0, 0,
-            cast(ubyte)(address >> 0), cast(ubyte)(address >> 8),
-            cast(ubyte)(address >> 16), cast(ubyte)(address >> 24),
-            cast(ubyte)(address >> 32), cast(ubyte)(address >> 40),
-            cast(ubyte)(address >> 48), cast(ubyte)(address >> 56)];
     }
 
     private void* makeTrampoline(void* target)
@@ -214,7 +434,14 @@ version (linux)
         auto pattern = BytePattern.tempInstance();
         // This is the observed v1.37.5 CTextSprite::SetText prologue. The
         // copied prefix consists only of complete push instructions.
-        pattern.findPattern("55 41 57 41 56 41 55 41 54 53 48 81 EC A8 00 00 00 44 89 4C 24 3C");
+        // The 22-byte prologue alone occurs twice in the Linux binary
+        // (a second function at VA 0x2140660 shares it and diverges at
+        // byte 22 with 4D 89 C5); the pattern is extended with the next
+        // instructions of this function (4C 89 44 24 20 48 89 4C 24 30)
+        // so the full-count uniqueness check below passes with exactly
+        // one hit at VA 0x20d9da4, the site every earlier smoke run
+        // hooked as the first hit.
+        pattern.findPattern("55 41 57 41 56 41 55 41 54 53 48 81 EC A8 00 00 00 44 89 4C 24 3C 4C 89 44 24 20 48 89 4C 24 30");
         if (pattern.count() != 1)
         {
             rawDiagnostic("[DIAGNOSTIC-RAW] SetText target pattern is not unique\n");
@@ -227,8 +454,9 @@ version (linux)
         rawDiagnostic(format("[DIAGNOSTIC-RAW] SetText target=0x%x stub=0x%x\n",
             cast(size_t) target, cast(size_t) callback));
         // The AOB covers the six pushes and the complete stack allocation.
-        // The 14-byte absolute jump is followed by three NOPs.
-        patch_memory(target, makeAbsoluteJmp(callback) ~ cast(ubyte[])[0x90, 0x90, 0x90]);
+        // The shared 14-byte absolute jump is NOP-padded to the 17 bytes
+        // of complete instructions being overwritten.
+        patch_memory(target, makeAbsoluteJmpPadded(callback, CopiedLength));
         rawDiagnostic("[DIAGNOSTIC-RAW] SetText probe installed\n");
         log(LogLevel.info, "[DIAGNOSTIC] SetText probe installed; only observed rdx CString is inspected; trailing ABI remains unverified");
     }
@@ -237,13 +465,98 @@ version (linux)
     {
         ProbeMapping mapping;
         assert(parseSetTextProbeEntry("Back=Home", mapping));
-        assert(mapping.length == 4);
+        assert(mapping.sourceLength == 4 && mapping.replacementLength == 4);
         assert(mapping.source[0] == 'B' && mapping.source[3] == 'k');
         assert(mapping.replacement[0] == 'H' && mapping.replacement[3] == 'e');
         assert(!parseSetTextProbeEntry("Back=Home=Again", mapping));
-        assert(!parseSetTextProbeEntry("Long=Shorter", mapping));
+        assert(parseSetTextProbeEntry("Long=Shorter", mapping));
+        assert(mapping.sourceLength == 4 && mapping.replacementLength == 7);
+        assert(parseSetTextProbeEntry("Back=Homepage", mapping));
+        assert(mapping.sourceLength == 4 && mapping.replacementLength == 8);
         assert(!parseSetTextProbeEntry("=Home", mapping));
         assert(!parseSetTextProbeEntry("Back=", mapping));
+
+        // Capacity: SSO header (data == object+16) is 15; heap header
+        // carries the capacity size_t at +16.
+        ubyte[CStringHeaderBytes] ssoHeader;
+        auto ssoObject = cast(size_t) 0x1000;
+        *cast(size_t*)(ssoHeader.ptr) = ssoObject + 16;
+        *cast(size_t*)(ssoHeader.ptr + 8) = 4;
+        assert(cstringCapacity(ssoHeader, ssoObject) == 15);
+        ubyte[CStringHeaderBytes] heapHeader;
+        auto heapObject = cast(size_t) 0x2000;
+        *cast(size_t*)(heapHeader.ptr) = cast(size_t) 0x9000;
+        *cast(size_t*)(heapHeader.ptr + 8) = 20;
+        *cast(size_t*)(heapHeader.ptr + 16) = 31;
+        assert(cstringCapacity(heapHeader, heapObject) == 31);
+        assert(replacementFitsCapacity(8, 15));
+        assert(replacementFitsCapacity(15, 15));
+        assert(!replacementFitsCapacity(16, 15));
+        assert(replacementFitsCapacity(31, 31));
+        assert(!replacementFitsCapacity(32, 31));
+
+        // Per-mapping decision: length first, then content.
+        assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Back")
+            == SetTextDecision.matched);
+        assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Backx")
+            == SetTextDecision.lengthMismatch);
+        assert(decideSetTextMapping(mapping, cast(const(ubyte)[]) "Bock")
+            == SetTextDecision.contentMismatch);
+
+        // Log line carries mapping id, target length, result and reason.
+        assert(formatSetTextReplacementLog(1, 13, true, "none") ==
+            "[DIAGNOSTIC-RAW] SetText mapping id=1 length=13 result=applied reason=none\n");
+        assert(formatSetTextReplacementLog(0, 4, false, "content-mismatch") ==
+            "[DIAGNOSTIC-RAW] SetText mapping id=0 length=4 result=skipped reason=content-mismatch\n");
+        assert(formatSetTextReplacementLog(-1, 0, false, "invalid-length") ==
+            "[DIAGNOSTIC-RAW] SetText mapping id=-1 length=0 result=skipped reason=invalid-length\n");
+
+        assert(formatSetTextCapacityLog(0, 4, 15) ==
+            "[DIAGNOSTIC-RAW] SetText capacity id=0 length=4 capacity=15\n");
+        assert(formatSetTextCapacityLog(1, 13, 31) ==
+            "[DIAGNOSTIC-RAW] SetText capacity id=1 length=13 capacity=31\n");
+
+        // Load-time rejection reasons match parseSetTextProbeEntry.
+        assert(probeEntryRejectionReason("BackHome") == "missing-separator");
+        assert(probeEntryRejectionReason("Back=Home=Again") == "multiple-separators");
+        assert(probeEntryRejectionReason("=Home") == "empty-source");
+        assert(probeEntryRejectionReason("Back=") == "empty-replacement");
+        assert(probeEntryRejectionReason("Long=Shorter") == "none");
+        assert(probeEntryRejectionReason("Back=Homepage") == "none");
+        assert(probeEntryRejectionReason("Back=Home") == "none");
+
+        // Item 20: non-ASCII (Japanese) replacements are stored
+        // escape-encoded; ASCII replacements are byte-identical.
+        assert(!replacementNeedsEscape(cast(const(ubyte)[]) "Home"));
+        assert(replacementNeedsEscape(cast(const(ubyte)[]) "戻る"));
+        ubyte[] prepared;
+        bool escaped;
+        assert(prepareSetTextReplacement(cast(const(ubyte)[]) "Home", prepared, escaped));
+        assert(!escaped && prepared == cast(ubyte[]) "Home");
+        assert(prepareSetTextReplacement(cast(const(ubyte)[]) "戻る", prepared, escaped));
+        assert(escaped && prepared == cast(ubyte[])[0x11, 0x49, 0x62, 0x10, 0x8B, 0x30]);
+
+        assert(parseSetTextProbeEntry("Back=戻る", mapping));
+        assert(mapping.replacementEscaped && mapping.replacementLength == 6);
+        assert(mapping.replacement[0 .. 6] ==
+            cast(ubyte[])[0x11, 0x49, 0x62, 0x10, 0x8B, 0x30]);
+        // The capacity check uses the escaped length: 6 fits the SSO
+        // capacity of 15, while three repetitions (18 escaped bytes)
+        // do not, even though the source length is still 4.
+        assert(replacementFitsCapacity(mapping.replacementLength, SsoCapacity));
+        assert(parseSetTextProbeEntry("Back=戻る戻る戻る", mapping));
+        assert(mapping.replacementLength == 18);
+        assert(!replacementFitsCapacity(mapping.replacementLength, SsoCapacity));
+        assert(parseSetTextProbeEntry("Back=Home", mapping));
+        assert(!mapping.replacementEscaped && mapping.replacementLength == 4);
+
+        // Unencodable replacements (above-BMP) are rejected at load.
+        assert(!parseSetTextProbeEntry("Back=😀", mapping));
+        assert(probeEntryRejectionReason("Back=😀") == "unencodable-replacement");
+        assert(probeEntryRejectionReason("Back=戻る") == "none");
+
+        assert(formatSetTextEscapedLog(0, 6, 6) ==
+            "[DIAGNOSTIC-RAW] SetText escaped id=0 raw-length=6 escaped-length=6\n");
     }
 }
 else

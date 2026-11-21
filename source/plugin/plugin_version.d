@@ -58,7 +58,12 @@ bool detectEu4Version(RunOptions options)
     case EU4Ver.v1_37_5: // v1.37.5を追加
         // EU4のバージョン文字列を検索するパターン
         BytePattern.tempInstance().findPattern("45 55 34 20 76 31 2E ? ? 2E ?");
-        if (BytePattern.tempInstance().hasSize(1, "EU4 Version String Pattern"))
+        // The version string legitimately occurs 4 times in the Linux
+        // v1.37.5 binary (all read "EU4 v1.37.5.0 Inca..."); detection
+        // only reads the first hit and applies no patch, so the checked
+        // expectation is at-least-one, not unique. BytePattern now counts
+        // every hit (item 14), so hasSize(1) would wrongly fail here.
+        if (BytePattern.tempInstance().hasAtLeast(1, "EU4 Version String Pattern"))
         {
             size_t address = BytePattern.tempInstance().getFirst().address;
             log(LogLevel.info, "PluginVersion.init: Before logging EU4 Version String address.");

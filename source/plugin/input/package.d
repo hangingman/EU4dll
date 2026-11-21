@@ -56,6 +56,10 @@ public struct DllError
     bool versionFontBufferExpansionInjector;
     bool unmatchdFontSizeLimitInjector;
     bool versionFontSizeLimitInjector;
+    bool unmatchdGlyphDuplicateCheckInjector;
+    bool versionGlyphDuplicateCheckInjector;
+    bool unmatchdGlyphStoreInjector;
+    bool versionGlyphStoreInjector;
 
     // ime.d
     bool unmatchdImeProc1Injector;
@@ -187,7 +191,30 @@ public struct DllError
     DllError opBinary(string op)(DllError rhs)
     {
         static assert(op == "|");
-        return this | rhs;
+        // Field-wise OR. The previous body (`return this | rhs;`)
+        // called itself recursively and overflowed the stack the
+        // first time any init actually aggregated a DllError
+        // (found in item 15: EU4 died with SIGSEGV right after the
+        // EU4DLL_ENABLE_DECODE=1 log line, before Font.init could
+        // apply anything).
+        DllError result;
+        foreach (i, ref field; result.tupleof)
+            field = this.tupleof[i] || rhs.tupleof[i];
+        return result;
+    }
+
+    unittest
+    {
+        DllError a;
+        DllError b;
+        foreach (field; (a | b).tupleof)
+            assert(!field);
+        a.versionFontBufferClear1Injector = true;
+        b.unmatchdMainTextProc2Injector = true;
+        auto combined = a | b;
+        assert(combined.versionFontBufferClear1Injector);
+        assert(combined.unmatchdMainTextProc2Injector);
+        assert(!combined.versionMainTextProc1Injector);
     }
 
     DllError opBinary(string op, D)(inout D rhs)
