@@ -84,3 +84,9 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 - 結果は negative: 左下ボタンは英語の "Back" のままで、日本語は表示されなかった。メニューと Game Browser の英語表示は生成フォントで正常で、崩れは無い。
 - 理由は2点とも再確認済み: (1) この実行でもDLLが有効にならなかった（DIAGNOSTIC-RAW皆無、pattern_eu4jps.log新規なし。16:07以降の未解明の現象が、変数を明示した実行でも再現。同 .so・同バイナリ、原因未確認）。置換自体が走らなかった。(2) フォントを読み込んだ状態でも bitmapfont.cpp:436 の Invalid character ID がちょうど120,880件出て、id >= 0x100 のグリフは読み込み時点で全て落ちる。
 - 項目1〜24は全て消化済み。残るのは (a) DLL有効化の復旧・原因特定、(b) .fntパーサ側チェックの調査と対処、および項目22で記録した2件（0x100以上のnullグリフ・ガード、Game Browserの未特定経路）で、新規項目は始めていない。
+
+## DLL無効化の原因特定（2026/11/21追記、項目25）
+
+- 詳細は `memory-bank/details/dll_inactivation_item25.md` に記録した。16:07以降「DLLが有効にならない」現象の原因は `make test` だった。dub の unittest ビルドが通常ビルドと同じ libeu4dll.so を上書きし、unittest 版では crt_constructor の hijack() が version(unittest) で NOP になるため、.so は黙って読み込まれるだけで何もしない。再現で証明済み: make test 直後の .so は md5 24a49710b4b6eeee5042b9da6958a633（項目24が失敗期間中に記録した値と一致）で /bin/true への LD_PRELOAD でも無出力、make all で通常版 md5 2e645e64952315dacad5ed762024a6dd に戻る。
+- 復旧確認済み: smoke runs/20261121-170719（復号opt-in＋SetTextプローブ Back=Home）で DIAGNOSTIC-RAW、新規 pattern_eu4jps.log（SetText id=0 applied）、DLL [OK]、ended_by_exit_button、eu4_wait=0。メニューのスクリーンショットも目視確認し、英語表示は正常で崩れなし。
+- 今後の決まり: make test の後は必ず make all を実行し、smoke の前に /bin/true への LD_PRELOAD で DIAGNOSTIC-RAW が出ることを確認する。項目24の Invalid character ID 120,880件は DLL が無効な状態での計測なので、項目17のリミッタが効くかの証拠にはならない。項目26で DLL が有効な状態で再確認する。

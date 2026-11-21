@@ -246,3 +246,10 @@
 - Blocker 1 re-confirmed: the DLL did not activate in this run (no DIAGNOSTIC-RAW lines, no fresh pattern_eu4jps.log), the same unexplained absence since 16:07 today, reproduced with the variables explicitly set and the same .so/binary; cause unproven. The replacement was therefore never applied.
 - Blocker 2 re-confirmed: with the fonts loaded, error.log again has exactly 120,880 bitmapfont.cpp:436 Invalid character ID lines, so all glyphs >= 0x100 are dropped at load time regardless of the DLL.
 - Items 1-24 are now all accounted for. Remaining work is blockers (a) DLL activation and (b) the .fnt parser check, plus the item 22 blockers; no new item started.
+
+## DLL inactivation root cause (2026/11/21, item 25)
+
+- Recorded in `memory-bank/details/dll_inactivation_item25.md`. The "DLL stopped activating after 16:07" phenomenon is solved: `make test` (dub build --build=unittest for the default configuration) overwrites libeu4dll.so with a unittest build whose crt_constructor hijack() is a NOP under version(unittest), so the .so loads silently with no DIAGNOSTIC-RAW lines and no pattern_eu4jps.log.
+- Proven by reproduction: after `make test` the .so md5 is 24a49710b4b6eeee5042b9da6958a633 (exactly the value item 24 recorded during the failing period; /bin/true preload prints nothing, exit 0), and `make all` restores the normal build md5 2e645e64952315dacad5ed762024a6dd (/bin/true preload prints both DIAGNOSTIC-RAW lines). Items 22-24 ran their smokes while the unittest build was in place.
+- Restoration verified: smoke runs/20261121-170719 (decode opt-in + SetText probe Back=Home) shows DIAGNOSTIC-RAW lines, a fresh pattern_eu4jps.log with SetText id=0 result=applied, DLL [OK], ended_by_exit_button, eu4_wait=0; menu screenshot checked visually, normal English, no corruption.
+- Going forward: after any `make test`, run `make all` and confirm the normal build (the /bin/true DIAGNOSTIC check) before smoking. Item 24's Invalid character ID count is not evidence about the item 17 limiter, because the DLL was inactive in those runs; item 26 re-checks it with an active DLL.
