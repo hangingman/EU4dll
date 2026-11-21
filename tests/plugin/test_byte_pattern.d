@@ -75,8 +75,13 @@ unittest
         // .textセクションの先頭バイトパターンを検索
         setPattern("55 48 8d");
         findIndexes(binPath); // .toString() を削除
-        _results.length.should.equal(1);
+        // findIndexes records every hit (41 in this fixture), not just
+        // the first per section: hasSize() uniqueness checks by the
+        // injector side are only meaningful with the full count.
+        _results.length.should.equal(41);
         _results[0].address.should.equal(88160); // .textセクションのvirtualAddress
+        assert(hasSize(41, "findIndexes fixture"));
+        assert(!hasSize(1, "findIndexes fixture"));
 
     }
 
@@ -87,7 +92,7 @@ unittest
         getModuleRanges(binPath); // 追加
         setPattern("55 ?? 8d");
         findIndexes(binPath); // .toString() を削除
-        _results.length.should.equal(1);
+        _results.length.should.equal(56);
         _results[0].address.should.equal(88160); // .textセクションのvirtualAddress
     }
 

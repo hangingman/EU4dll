@@ -14,7 +14,7 @@ version (linux)
     import std.process : environment;
     import std.string : indexOf, lastIndexOf, split;
     import plugin.byte_pattern;
-    import plugin.patcher.patcher : patch_memory;
+    import plugin.patcher.patcher : patch_memory, makeAbsoluteJmp, makeAbsoluteJmpPadded;
 
     private enum size_t CopiedLength = 17;
     private enum size_t MaxProbeBytes = 256;
@@ -306,16 +306,6 @@ version (linux)
             tryReplace(first);
     }
 
-    private ubyte[] makeAbsoluteJmp(void* destination)
-    {
-        auto address = cast(size_t) destination;
-        return [0xff, 0x25, 0, 0, 0, 0,
-            cast(ubyte)(address >> 0), cast(ubyte)(address >> 8),
-            cast(ubyte)(address >> 16), cast(ubyte)(address >> 24),
-            cast(ubyte)(address >> 32), cast(ubyte)(address >> 40),
-            cast(ubyte)(address >> 48), cast(ubyte)(address >> 56)];
-    }
-
     private void* makeTrampoline(void* target)
     {
         auto memory = mmap(null, 32, PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -380,7 +370,14 @@ version (linux)
         auto pattern = BytePattern.tempInstance();
         // This is the observed v1.37.5 CTextSprite::SetText prologue. The
         // copied prefix consists only of complete push instructions.
-        pattern.findPattern("55 41 57 41 56 41 55 41 54 53 48 81 EC A8 00 00 00 44 89 4C 24 3C");
+        // The 22-byte prologue alone occurs twice in the Linux binary
+        // (a second function at VA 0x2140660 shares it and diverges at
+        // byte 22 with 4D 89 C5); the pattern is extended with the next
+        // instructions of this function (4C 89 44 24 20 48 89 4C 24 30)
+        // so the full-count uniqueness check below passes with exactly
+        // one hit at VA 0x20d9da4, the site every earlier smoke run
+        // hooked as the first hit.
+        pattern.findPattern("55 41 57 41 56 41 55 41 54 53 48 81 EC A8 00 00 00 44 89 4C 24 3C 4C 89 44 24 20 48 89 4C 24 30");
         if (pattern.count() != 1)
         {
             rawDiagnostic("[DIAGNOSTIC-RAW] SetText target pattern is not unique\n");
@@ -393,8 +390,9 @@ version (linux)
         rawDiagnostic(format("[DIAGNOSTIC-RAW] SetText target=0x%x stub=0x%x\n",
             cast(size_t) target, cast(size_t) callback));
         // The AOB covers the six pushes and the complete stack allocation.
-        // The 14-byte absolute jump is followed by three NOPs.
-        patch_memory(target, makeAbsoluteJmp(callback) ~ cast(ubyte[])[0x90, 0x90, 0x90]);
+        // The shared 14-byte absolute jump is NOP-padded to the 17 bytes
+        // of complete instructions being overwritten.
+        patch_memory(target, makeAbsoluteJmpPadded(callback, CopiedLength));
         rawDiagnostic("[DIAGNOSTIC-RAW] SetText probe installed\n");
         log(LogLevel.info, "[DIAGNOSTIC] SetText probe installed; only observed rdx CString is inspected; trailing ABI remains unverified");
     }

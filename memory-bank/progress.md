@@ -182,3 +182,11 @@
 - Proc4（ループ1）はループ1が3関数（GetRequiredSize／GetActualRequiredSize／GetActualRealRequiredSizeActually）に分かれており、各関数に取得箇所が1つずつあり（VA 0x2056872／0x2056198／0x20570b6）、各1件に一意化できた。
 - Proc2はWindowsの形では見つからなかった: バッファアドレスを取り出す `lea`（グローバルバッファ）が無く、カウント側は文字列を scratch バッファへ写さない。唯一のバイトコピーは色コード（0xA3）の名前をスタックへ写す処理（上限0x7E、各関数で一意だが役割が違う）。
 - Proc3は、フック形（グリフ+6の word 比較＋分岐）は `FillVertexBuffer` VA 0x2055619 に1件だけあるがループ2側で、戻り先2（グローバルフラグ比較 `80 3D ...`）は候補関数内に存在しない。Proc2→Proc3/Proc4 の `s_lastCodePoint` の受け渡しにもLinux側の足場が無いため、項目14/15ではWindowsのProc1〜4の移植ではなく、取得箇所そのもので復号する設計が要る。
+
+## Linux注入方式の整備（2026/11/21、項目14）
+
+- 詳細は `memory-bank/details/linux_injection_method.md` に記録した。`Font.init`／`TextView.init` はまだ有効にしていない。
+- patcher: SetTextで実証済みの14バイト絶対ジャンプを `makeAbsoluteJmp`／`makeAbsoluteJmpPadded` として共有化し、`makeJmp` は絶対ジャンプを返すようになった（旧5バイト相対形は `makeJmpRel`）。`PatchManager.addJmpPatch` を追加。SetTextフックは共有版を使うようになった（パッチは従来どおり17バイト）。
+- BytePattern: `findIndexes` が全件を数えるようになり（従来はセクションごとに最初の1件だけ）、スタブだった `hasSize` が実判定になった。注入側の `hasSize(1, ...)` の一意性確認がこれで実際に効く。最初の1件だけを使う正当な利用向けに `hasAtLeast` を追加した。
+- 全件化で見つかった既存の不整合を同項目で直した: (1) SetTextパターンは22バイトでは2件（もう1件は VA 0x2140660）あったため文脈を延長して VA 0x20d9da4 の1件に一意化した。(2) バージョン文字列は4件あるため PluginVersion は `hasAtLeast(1)` で明示した。(3) ReloadPdxLocalize はコピー長8バイトと結びついているため相対ジャンプを明示的に使う形に留めた（絶対ジャンプを流した中間ビルドではEU4が起動直後に落ちた。runs/20261121-144008、eu4_wait=11）。
+- 検証: `make test` 8モジュール通過、`make all` 成功。smoke runs/20261121-144447 でDLL [OK]、SetText target=0x20d9da4 に適用成功（id=0 result=applied）、Exitで正常終了（eu4_wait=0）、メニュー画面の英語表示は正常だった。

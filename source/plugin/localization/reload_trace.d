@@ -7,7 +7,7 @@ import std.format : format;
 import std.logger;
 import plugin.byte_pattern;
 import plugin.constant;
-import plugin.patcher.patcher : makeJmp, patch_memory;
+import plugin.patcher.patcher : makeJmpRel, patch_memory;
 
 private enum size_t CallPatchLength = 5;
 private __gshared bool reloadTraceActive;
@@ -104,7 +104,16 @@ void initReloadTrace(EU4Ver eu4Version)
         return;
     }
 
-    patch_memory(target, makeJmp(target, entry) ~ cast(ubyte[])[0x90, 0x90, 0x90]);
+    // This hook deliberately keeps the 5-byte relative jump: the
+    // original trampoline copies exactly 8 bytes (push/push/push/sub)
+    // and resumes at target+8, so the patch must total exactly 8 bytes
+    // (5-byte jump + 3 NOPs), and the entry trampoline is allocated
+    // within rel32 range and checked with fitsRel32 above. The 14-byte
+    // absolute makeJmp would overrun the copied prefix and resume
+    // inside the jump encoding. Migrating this hook to the absolute
+    // form requires extending the copied prefix past the following
+    // call instruction and fixing up its rel32 target; not done here.
+    patch_memory(target, makeJmpRel(target, entry) ~ cast(ubyte[])[0x90, 0x90, 0x90]);
     reloadTraceInstalled = true;
     log(LogLevel.info, format("[DIAGNOSTIC] ReloadPdxLocalize hook installed target=0x%x entry=0x%x",
         cast(size_t) target, cast(size_t) entry));

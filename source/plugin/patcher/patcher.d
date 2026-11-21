@@ -30,10 +30,60 @@ private ubyte[] makeJmpCall(void* fromAddress, void* toAddress, ubyte opcode)
     return instruction;
 }
 
-/// JMP命令のバイト列を生成する
-ubyte[] makeJmp(void* fromAddress, void* toAddress)
+/// Length in bytes of the absolute indirect jump used on Linux:
+/// FF 25 00 00 00 00 followed by the 8-byte little-endian target address.
+/// This is the form proven by the SetText hook (see
+/// memory-bank/details/linux_patching_details.md section 3): it reaches
+/// any 64-bit address, unlike the 5-byte rel32 jump, whose range is
+/// limited to +/-2 GiB and fails for far-apart Linux mappings.
+enum size_t absoluteJmpLength = 14;
+
+/// Build the 14-byte absolute indirect JMP (FF 25 00000000 + address).
+/// Pure, so the encoding can be unit tested without patching memory.
+ubyte[] makeAbsoluteJmp(void* toAddress)
+{
+    auto address = cast(size_t) toAddress;
+    ubyte[] instruction = [0xFF, 0x25, 0x00, 0x00, 0x00, 0x00];
+    foreach (shift; [0, 8, 16, 24, 32, 40, 48, 56])
+        instruction ~= cast(ubyte)(address >> shift);
+    return instruction;
+}
+
+/// Absolute jump padded with NOPs to exactly patchLength bytes.
+/// The caller must pass the length of complete instructions being
+/// overwritten (the SetText site uses 17: the 14-byte jump + 3 NOPs).
+/// Throws when patchLength cannot hold the absolute jump.
+ubyte[] makeAbsoluteJmpPadded(void* toAddress, size_t patchLength)
+{
+    import std.exception : enforce;
+    enforce(patchLength >= absoluteJmpLength,
+        "patch length is smaller than the 14-byte absolute jump");
+    auto instruction = makeAbsoluteJmp(toAddress);
+    foreach (_; absoluteJmpLength .. patchLength)
+        instruction ~= cast(ubyte) 0x90;
+    return instruction;
+}
+
+/// Build the legacy 5-byte relative JMP (E9 rel32). Kept for callers
+/// that explicitly need the relative form; new Linux hooks must use
+/// makeJmp / makeAbsoluteJmp instead.
+ubyte[] makeJmpRel(void* fromAddress, void* toAddress)
 {
     return makeJmpCall(fromAddress, toAddress, 0xE9);
+}
+
+/// JMP instruction for hooks. On Linux this is the proven 14-byte
+/// absolute jump, not the 5-byte rel32 form: fromAddress is kept only
+/// for signature compatibility with the relative form and is unused.
+/// WARNING: the patch overwrites 14 bytes at the target. The caller
+/// must overwrite only complete instructions totalling at least 14
+/// bytes, and any trampoline that copies the original prefix must copy
+/// exactly the patched length. Callers whose trampoline copies a
+/// shorter fixed prefix must use makeJmpRel instead (see
+/// reload_trace.d, which copies 8 bytes).
+ubyte[] makeJmp(void* fromAddress, void* toAddress)
+{
+    return makeAbsoluteJmp(toAddress);
 }
 
 /// CALL命令のバイト列を生成する
@@ -137,6 +187,21 @@ public:
         _patches ~= ScopedPatch(address, patchData); // struct なので new は不要
     }
 
+    /// Apply the proven 14-byte absolute jump at address towards
+    /// destination, managed like any other patch. patchLength is the
+    /// number of bytes of complete instructions being overwritten and
+    /// must be at least absoluteJmpLength; the jump is NOP-padded to it.
+    void addJmpPatch(void* address, void* destination, size_t patchLength = absoluteJmpLength)
+    {
+        addPatch(address, makeAbsoluteJmpPadded(destination, patchLength));
+    }
+
+    /// Number of patches currently managed (for tests and logging).
+    size_t patchCount()
+    {
+        return _patches.length;
+    }
+
     // 必要に応じて、内部配列へのアクセスを提供する
     ScopedPatch[] patches()
     {
@@ -157,8 +222,30 @@ unittest
     ubyte[] jmp_instr = makeJmp(func_a, func_b);
     ubyte[] call_instr = makeCall(func_a, func_b);
 
-    assert(jmp_instr.length == 5);
-    assert(jmp_instr[0] == 0xE9);
+    // makeJmp is now the 14-byte absolute jump proven by the SetText
+    // hook: FF 25 00000000 followed by the 8-byte target address.
+    assert(jmp_instr.length == absoluteJmpLength);
+    assert(jmp_instr[0 .. 6] == [0xFF, 0x25, 0x00, 0x00, 0x00, 0x00]);
+    assert(jmp_instr[6 .. 14] == [0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    assert(makeAbsoluteJmp(func_b) == jmp_instr);
+    // A target far outside the rel32 range still encodes exactly.
+    auto far = cast(void*) 0x7F12_3456_789A;
+    auto farJmp = makeJmp(func_a, far);
+    assert(farJmp[6 .. 14] == [0x9A, 0x78, 0x56, 0x34, 0x12, 0x7F, 0x00, 0x00]);
+    // The relative form remains available under its explicit name.
+    auto relJmp = makeJmpRel(func_a, func_b);
+    assert(relJmp.length == 5 && relJmp[0] == 0xE9);
+    // NOP padding fills exactly the overwritten instruction span.
+    auto padded = makeAbsoluteJmpPadded(func_b, 17);
+    assert(padded.length == 17);
+    assert(padded[0 .. 14] == jmp_instr);
+    assert(padded[14 .. 17] == [0x90, 0x90, 0x90]);
+    bool paddingRejected = false;
+    try
+        makeAbsoluteJmpPadded(func_b, 13);
+    catch (Exception)
+        paddingRejected = true;
+    assert(paddingRejected);
     assert(call_instr.length == 5);
     assert(call_instr[0] == 0xE8);
 

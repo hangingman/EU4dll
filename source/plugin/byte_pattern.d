@@ -232,9 +232,62 @@ class BytePattern
         return _results.length;
     }
 
+    // True only when the last search found exactly `expected` matches.
+    // Every injector gates on this before touching getFirst()/getSecond(),
+    // so a pattern that is missing or ambiguous must fail here instead of
+    // patching an arbitrary first hit. This was a stub returning true
+    // unconditionally until the Linux injection work (item 14); the real
+    // check also needs findIndexes() to record every hit, not just the
+    // first hit per section.
     bool hasSize(size_t expected, string desc)
     {
-        return true;
+        if (count() == expected)
+            return true;
+        std.logger.error(format(
+            "BytePattern match count mismatch for '%s': expected %d, found %d (pattern: %s)",
+            desc, expected, count(), _literal));
+        return false;
+    }
+
+    // True when the last search found at least `expected` matches.
+    // For callers that legitimately use only the first hit of a pattern
+    // that occurs several times (e.g. the EU4 version string, which
+    // occurs 4 times in the v1.37.5 binary): the count is still checked
+    // and logged here, instead of being silently assumed to be 1.
+    bool hasAtLeast(size_t expected, string desc)
+    {
+        if (count() >= expected)
+            return true;
+        std.logger.error(format(
+            "BytePattern match count too small for '%s': expected at least %d, found %d (pattern: %s)",
+            desc, expected, count(), _literal));
+        return false;
+    }
+
+    // Pure matcher used by findIndexes(): every offset in `section`
+    // whose bytes match `pattern` under its masks, in order, including
+    // overlapping matches. Kept separate so the counting behaviour can
+    // be unit tested without a module image.
+    static size_t[] findAllMatchOffsets(in ubyte[] section, in Patterns pattern)
+    {
+        size_t[] offsets;
+        if (pattern.length == 0 || section.length < pattern.length)
+            return offsets;
+        foreach (start; 0 .. section.length - pattern.length + 1)
+        {
+            bool matched = true;
+            foreach (i, pat; pattern)
+            {
+                if ((section[start + i] & pat.mask) != (pat.pattern & pat.mask))
+                {
+                    matched = false;
+                    break;
+                }
+            }
+            if (matched)
+                offsets ~= start;
+        }
+        return offsets;
     }
 
     bool empty()
@@ -268,12 +321,10 @@ class BytePattern
                 }
 
                 auto section = contents[range.fileOffset .. range.fileOffset + range.size];
-                ptrdiff_t index = std.algorithm.searching.countUntil!((a, b)
-                                              {
-                                                  return (a & b.mask) == (b.pattern & b.mask);
-                                              })(section, pattern);
-
-                if (index != -1)
+                // Record every hit, not just the first per section:
+                // hasSize() uniqueness checks are meaningless otherwise
+                // (a pattern occurring twice in .text would report 1).
+                foreach (index; findAllMatchOffsets(section, pattern))
                     {
                         MemoryPointer m = new MemoryPointer(range.virtualAddress + index, patternLen);
                         this._results.insertBack(m);
@@ -372,4 +423,20 @@ class BytePattern
         }
         return _results[index];
     }
+}
+
+unittest
+{
+    // findAllMatchOffsets counts every hit, including a second hit in
+    // the same section (the old findIndexes kept only the first one).
+    Patterns pat = [Pat(0xAA, 0xFF), Pat(0xBB, 0xFF)];
+    ubyte[] data = [0x00, 0xAA, 0xBB, 0xAA, 0xBB, 0xAA, 0x00];
+    assert(BytePattern.findAllMatchOffsets(data, pat) == [1, 3]);
+    // Masked (wildcard) bytes match any value in that position.
+    Patterns masked = [Pat(0xAA, 0xFF), Pat(0x00, 0x00)];
+    assert(BytePattern.findAllMatchOffsets(data, masked) == [1, 3, 5]);
+    // No hit, empty pattern and a pattern longer than the data are empty.
+    assert(BytePattern.findAllMatchOffsets(data, [Pat(0xFF, 0xFF)]).length == 0);
+    assert(BytePattern.findAllMatchOffsets(data, []).length == 0);
+    assert(BytePattern.findAllMatchOffsets([0xAA], pat).length == 0);
 }

@@ -44,3 +44,7 @@ Linux版EU4 v1.37.5で、`CTextSprite::SetText` の呼び出し境界に限定�
 ## TextView側のLinux用パターン導出（2026/11/21追記）
 
 - 詳細は `memory-bank/details/main_text_linux_patterns.md` に記録した（導出のみ、注入は無効のまま）。Proc1は `FillVertexBuffer` の2箇所（VA 0x2055562／0x2055ac1）、Proc4はループ1の3関数に各1箇所（VA 0x2056198／0x2056872／0x20570b6）が文脈込みで各1件に一意化できた。Proc2はWindowsの形（バッファ `lea`＋全文字コピー）がLinuxに無く、Proc3はフック形がループ2側に1件あるのみで戻り先2が無い。文字取得は `CString::operator[]` 経由、グリフ表+0x100、スケール+0x940。
+
+## Linux注入方式の整備（2026/11/21追記、項目14）
+
+- 詳細は `memory-bank/details/linux_injection_method.md` に記録した。patcherの `makeJmp` は14バイト絶対ジャンプになり、BytePatternは全件数え＋`hasSize` 実判定になった。`Font.init`／`TextView.init` はまだ無効。次は項目15（復号の有効化、opt-in）。絶対ジャンプを使う注入は「完全な命令を14バイト以上上書きし、トランポリンのコピー長と一致させる」ことが条件で、ReloadPdxLocalize（コピー長8バイト）は相対ジャンプのまま明示した。
