@@ -127,3 +127,34 @@ logged per key after that.
   validation was not traced, and storing is per-value GC
   allocation in the callback, acceptable for an opt-in first
   version but worth revisiting before default-on.
+
+
+## Real-machine verification (2026-11-21): hook works, game crashes later in an unhooked measure path
+
+Run runs/20261121-213554-multiplayer: throwaway mod with all 145
+placed localisation files plus the 32 item 23 font files,
+EU4DLL_LOCALIZE_ESCAPE=1, decode at its default. Throwaway mod
+removed afterwards, user folder restored.
+
+- Hook installed at the surveyed addresses (target=0x23671a1,
+  addKeyValuePair=0x236b7f8, pDataGlobal=0x3436390). Delegation for
+  ASCII values logged, and the first direct store of an escaped
+  value logged (key=l_french). So the load-side conversion bypass
+  itself works: escaped values reach the dictionary.
+- The game then crashed with SIGSEGV at 21:36:21, before the main
+  menu (all run screenshots are black). eu4_wait=11, minidump in
+  crashes/eu4_20261121_213621.
+- Crash stack (exception.txt): CBitmapFont::GetHeightOfString
+  (+0x1df, 0x2053d67) <- CInstantTextBox::UpdateScrollbarSize <-
+  CTutorialExtraPage::AddText <- CTutorial::Init <-
+  CFrontEnd::RestoreDeviceObjects. The tutorial text is localisation
+  text, now stored escape-encoded by this hook, and
+  GetHeightOfString is a measuring path the decode hooks of items
+  17-19/29 do not cover (they cover the RenderToTexture and
+  GetRequiredSize fetch sites). The working hypothesis is that this
+  measure loop mishandles escape bytes (lead byte 0x10-0x13) and
+  reads out of bounds; it is not yet disassembly-proven.
+- Next step: survey GetHeightOfString (and sibling measure paths)
+  for the same fetch-loop shape as the already-hooked sites and
+  extend decode coverage there. Until then EU4DLL_LOCALIZE_ESCAPE
+  stays opt-in and must not be enabled for real play.
