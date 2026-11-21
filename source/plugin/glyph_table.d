@@ -106,14 +106,83 @@ struct WideGlyphTable
 // hooks in plugin.main_text.
 private __gshared WideGlyphTable g_wideGlyphTable;
 
+// Opt-in debug logging (item 31). Enabled only when the
+// environment variable EU4DLL_GLYPH_DEBUG is exactly "1".
+// It records registration and lookup of the three code points
+// that distinguish the item 30 ellipsis outcome: U+623B and
+// U+308B (the two glyphs of the Game Browser button's Japanese
+// replacement text) and U+2026 (the ellipsis / NOT_DEF glyph).
+// Every other code point stays silent, so font loading (tens of
+// thousands of wide registrations) does not flood the log.
+// Output goes to fd 2 via a raw write, in the same style as the
+// SetText probe diagnostics; this logging is a temporary
+// diagnostic for item 31/32 and is off by default.
+private __gshared int g_glyphDebugState; // 0 unknown, 1 off, 2 on
+
+bool glyphDebugEnabled()
+{
+    if (g_glyphDebugState == 0)
+    {
+        import core.stdc.stdlib : getenv;
+
+        auto v = getenv("EU4DLL_GLYPH_DEBUG");
+        g_glyphDebugState = (v !is null && v[0] == '1' && v[1] == 0) ? 2 : 1;
+    }
+    return g_glyphDebugState == 2;
+}
+
+bool glyphDebugInteresting(uint codePoint)
+{
+    return codePoint == 0x623B || codePoint == 0x308B || codePoint == 0x2026;
+}
+
+// Pure formatter for the debug lines, unit-tested below.
+string formatGlyphDebugLine(string kind, size_t fontBase, uint codePoint,
+        void* glyph, size_t total)
+{
+    import std.format : format;
+
+    return format("[GLYPH-DEBUG] %s font=0x%x cp=0x%x glyph=0x%x total=%d\n",
+            kind, fontBase, codePoint, cast(size_t) glyph, total);
+}
+
+private void glyphDebugWrite(string line)
+{
+    import core.sys.posix.unistd : write;
+
+    write(2, line.ptr, line.length);
+}
+
 extern (C) bool wideGlyphRegister(size_t fontBase, uint codePoint, void* glyph)
 {
-    return g_wideGlyphTable.registerGlyph(fontBase, codePoint, glyph);
+    const ok = g_wideGlyphTable.registerGlyph(fontBase, codePoint, glyph);
+    if (glyphDebugEnabled() && glyphDebugInteresting(codePoint))
+        glyphDebugWrite(formatGlyphDebugLine(
+                ok ? "register-hit" : "register-rejected",
+                fontBase, codePoint, glyph, g_wideGlyphTable.length));
+    return ok;
 }
 
 extern (C) void* wideGlyphLookup(size_t fontBase, uint codePoint)
 {
-    return g_wideGlyphTable.lookupGlyph(fontBase, codePoint);
+    auto glyph = g_wideGlyphTable.lookupGlyph(fontBase, codePoint);
+    if (glyphDebugEnabled() && glyphDebugInteresting(codePoint))
+        glyphDebugWrite(formatGlyphDebugLine(
+                glyph is null ? "lookup-miss" : "lookup-hit",
+                fontBase, codePoint, glyph, g_wideGlyphTable.length));
+    return glyph;
+}
+
+// Font bases that hold a given code point (item 31 diagnostic:
+// lets a lookup miss be checked against every font instance
+// that registered the same code point).
+extern (C) size_t wideGlyphFontCountFor(uint codePoint)
+{
+    size_t n;
+    foreach (key; g_wideGlyphTable.entries.byKey)
+        if (key.codePoint == codePoint)
+            n++;
+    return n;
 }
 
 extern (C) void wideGlyphClearAll()
@@ -213,4 +282,18 @@ unittest
     assert(wideGlyphCount() == 1);
     wideGlyphClearAll();
     assert(wideGlyphCount() == 0);
+}
+
+unittest
+{
+    // Item 31 debug helpers: only the three distinguishing code
+    // points are logged, and the line carries font, code point,
+    // glyph and table size.
+    assert(glyphDebugInteresting(0x623B));
+    assert(glyphDebugInteresting(0x308B));
+    assert(glyphDebugInteresting(0x2026));
+    assert(!glyphDebugInteresting(0x41));
+    assert(!glyphDebugInteresting(0x100));
+    const line = formatGlyphDebugLine("lookup-miss", 0x1234, 0x623B, null, 42);
+    assert(line == "[GLYPH-DEBUG] lookup-miss font=0x1234 cp=0x623b glyph=0x0 total=42\n");
 }
