@@ -176,14 +176,105 @@ extern (C) bool wideGlyphRegister(size_t fontBase, uint codePoint, void* glyph)
     return ok;
 }
 
+// Debug log request for one lookup, handed to the preserving
+// wrapper below as a single pointer argument.
+private struct GlyphDebugLookupRequest
+{
+    string kind;
+    size_t fontBase;
+    uint codePoint;
+    void* glyph;
+    size_t total;
+    size_t caller;
+}
+
+private __gshared size_t g_glyphDebugLogLookupImplAddress;
+
+private extern (C) void glyphDebugLogLookupImpl(
+        GlyphDebugLookupRequest* request)
+{
+    glyphDebugWrite(formatGlyphDebugLineCaller(
+            request.kind, request.fontBase, request.codePoint,
+            request.glyph, request.total, request.caller));
+}
+
+// XMM-preserving wrapper around glyphDebugLogLookupImpl.
+//
+// The plain lookup path never touches an XMM register in
+// practice, and the fetch-site hooks rely on that: several of
+// them keep live values in XMM registers across the call to
+// wideGlyphLookup (most visibly CBitmapFont::GetWidthOfString,
+// whose XMM1 is the running advance*scale total). The debug
+// formatting (std.format) is under no such restraint and does
+// clobber XMM registers: with EU4DLL_GLYPH_DEBUG=1 the bitmap
+// accumulator turned to garbage (2.72e23) right after the
+// first logged code point (width_debug_triage.md). Spilling
+// the full XMM0-XMM15 around the formatting call makes the
+// debug path preserve every XMM register, whichever of them a
+// given call site keeps live. General-purpose registers need
+// no help here: the D callee keeps the callee-saved ones, and
+// call sites already protect the caller-saved ones they use,
+// exactly as they do for the plain lookup.
+private extern (C) void glyphDebugLogLookupPreserving(
+        GlyphDebugLookupRequest* request)
+{
+    asm
+    {
+        naked;
+        sub RSP, 264;
+        movups [RSP + 0], XMM0;
+        movups [RSP + 16], XMM1;
+        movups [RSP + 32], XMM2;
+        movups [RSP + 48], XMM3;
+        movups [RSP + 64], XMM4;
+        movups [RSP + 80], XMM5;
+        movups [RSP + 96], XMM6;
+        movups [RSP + 112], XMM7;
+        movups [RSP + 128], XMM8;
+        movups [RSP + 144], XMM9;
+        movups [RSP + 160], XMM10;
+        movups [RSP + 176], XMM11;
+        movups [RSP + 192], XMM12;
+        movups [RSP + 208], XMM13;
+        movups [RSP + 224], XMM14;
+        movups [RSP + 240], XMM15;
+        lea R11, [g_glyphDebugLogLookupImplAddress];
+        mov R11, qword ptr [R11];
+        call R11;
+        movups XMM0, [RSP + 0];
+        movups XMM1, [RSP + 16];
+        movups XMM2, [RSP + 32];
+        movups XMM3, [RSP + 48];
+        movups XMM4, [RSP + 64];
+        movups XMM5, [RSP + 80];
+        movups XMM6, [RSP + 96];
+        movups XMM7, [RSP + 112];
+        movups XMM8, [RSP + 128];
+        movups XMM9, [RSP + 144];
+        movups XMM10, [RSP + 160];
+        movups XMM11, [RSP + 176];
+        movups XMM12, [RSP + 192];
+        movups XMM13, [RSP + 208];
+        movups XMM14, [RSP + 224];
+        movups XMM15, [RSP + 240];
+        add RSP, 264;
+        ret;
+    }
+}
+
 extern (C) void* wideGlyphLookup(size_t fontBase, uint codePoint)
 {
     auto glyph = g_wideGlyphTable.lookupGlyph(fontBase, codePoint);
     if (glyphDebugEnabled() && glyphDebugInteresting(codePoint))
-        glyphDebugWrite(formatGlyphDebugLineCaller(
+    {
+        auto request = GlyphDebugLookupRequest(
                 glyph is null ? "lookup-miss" : "lookup-hit",
                 fontBase, codePoint, glyph, g_wideGlyphTable.length,
-                cast(size_t) llvm_returnaddress(0) - cast(size_t) &wideGlyphLookup));
+                cast(size_t) llvm_returnaddress(0) - cast(size_t) &wideGlyphLookup);
+        g_glyphDebugLogLookupImplAddress =
+                cast(size_t) &glyphDebugLogLookupImpl;
+        glyphDebugLogLookupPreserving(&request);
+    }
     return glyph;
 }
 
