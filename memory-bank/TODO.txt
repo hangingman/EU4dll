@@ -15,13 +15,13 @@
 
 ## 残っている課題
 
-1. フォントサイズ調整: 生成フォントが全体的に2〜3pt大きく見える（所有者の指摘、2026-11-21）。生成時のサイズ指定と .fnt メトリクスの調整方法を調査中。関連: details/font_generation_item23.md、details/charset_and_font_generation.md。
-2. ゲーム内マップの国名表示の実機確認: Render3d site 2 の wide path は修正済み（details/decode_widepath_fix.md）だが、ゲーム内マップで実際に踏んだ確認がまだ無い。
-3. 表示品質: チェックボックスのラベル重なり、狭い見出しの「…」省略、メニューボタンの文字切れ。日本語が英語より幅を取るためのレイアウト側の問題。
-4. バージョン更新時の再検証: EU4のバージョンが上がったら、各フックの AOB 一意性と命令境界を再検証する（恒常項目）。
+1. ゲーム内マップの国名表示の実機確認: Render3d site 2 の wide path は修正済み（details/decode_widepath_fix.md）だが、ゲーム内マップで実際に踏んだ確認がまだ無い。2026-11-22に所有者から「マップ上の国名はまだ出ていない」と報告があった。出ていないことの確認手段は所有者側で用意中。
+2. 表示品質: チェックボックスのラベル重なり、狭い見出しの「…」省略、メニューボタンの文字切れ。日本語が英語より幅を取るためのレイアウト側の問題。
+3. バージョン更新時の再検証: EU4のバージョンが上がったら、各フックの AOB 一意性と命令境界を再検証する（恒常項目）。
 
 ### 完了した判断（2026-11-22）
 
+- フォントサイズ調整: 完了。生成フォントが全体的に2〜3pt大きく見える問題（所有者の指摘、2026-11-21）に対し、生成時のラスタライズサイズを一律3px下げる delta3 を正式採用した。所有者が元・delta2・delta3 を実機で見比べ、delta3 が一番マシと判断した（2026-11-22）。生成スクリプトと文字集合は tools/generate_fonts.py と tools/font_charset.tsv としてリポジトリへ取り込み、Debianパッケージのビルド時に delta3 でないフォントを弾く確認を追加した（パッケージ0.3）。関連: details/font_size_survey.md。
 - EU4DLL_LOCALIZE_ESCAPE の既定ON化: 実施済み。既定で有効になり、無効化は EU4DLL_LOCALIZE_ESCAPE=0 で行う（details/localize_escape_default_enablement.md）。
 - SetText辞書の位置づけ: 廃止で確定。辞書経路と環境変数 EU4DLL_SETTEXT_FROM_TRANSLATIONS、EU4DLL_GAME_LOCALISATION_DIR を削除した（details/settext_dict_removal.md）。検討の経緯は details/settext_dict_position_review.md に残す。
 
@@ -35,6 +35,6 @@
 
 ## 完了条件
 
-1. 残課題1〜3が解消し、実機のスクリーンショットで確認できる。
+1. 残課題1〜2が解消し、実機のスクリーンショットで確認できる。
 2. make test と make all が成功する。
 3. 未検証のUI経路を未完了として記録している。
