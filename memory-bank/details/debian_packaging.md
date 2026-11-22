@@ -63,3 +63,42 @@ EU4DLL_MOD_SRC=/path/to/mod/eu4dll_translations dpkg-buildpackage -us -uc -b
 - Not verified: installing the .deb on a second machine and an
   in-game run using only the packaged files. The game itself was not
   started for this change.
+
+## Follow-up: LDC 1.43 (2026-11-22, package 0.2)
+
+PR #9 changed the naked asm to the form LDC 1.43 requires. Two
+consequences for the package:
+
+- Debian's ldc (1.40) can no longer build the source: the references
+  come out absolute and the link fails with
+  `relocation R_X86_64_32S against hidden symbol ... can not be used
+  when making a shared object`. This was reproduced in the owner's
+  own build. debian/rules now checks the ldc2 version first and
+  stops with a readable message. Build-Depends states
+  `ldc (>= 1.43)`; building with the official release tarball needs
+  `dpkg-buildpackage -d` because the tarball is invisible to dpkg.
+- A library built with LDC 1.43 needs
+  `libphobos2-ldc-shared.so.113` / `libdruntime-ldc-shared.so.113`,
+  which Debian does not package. The package therefore bundles the
+  compiler's shared runtime into `/usr/lib/eu4dll/` and sets the
+  library rpath to `$ORIGIN` with patchelf. dh_shlibdeps runs with
+  `--ignore-missing-info` so the bundled runtime does not turn into
+  an unsatisfiable Depends. The D language is only used for this
+  project on the target machines, so a self-contained package is
+  the right shape.
+
+Verification (2026-11-22, on the build machine):
+
+- Built with the LDC 1.43 release on PATH: package builds,
+  14.0 MB, and the generated Depends is only
+  `libc6 (>= 2.34), libgcc-s1 (>= 4.2)` - no D runtime.
+- The packaged library has RUNPATH `$ORIGIN`, and under `env -i`
+  its libphobos/libdruntime resolve to the bundled copies in
+  /usr/lib/eu4dll. `env -i LD_PRELOAD=<packaged .so> /bin/true`
+  exits 0 silently (preload guard).
+- Building with Debian's ldc 1.40 stops at the version check with
+  the readable message quoted in debian/rules.
+- eu4dll-install-mod from the 0.2 package passed the same scratch
+  data-home check as 0.1.
+- Not verified: installing the 0.2 .deb with apt on the target
+  machine and an in-game run using only the packaged files.

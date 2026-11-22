@@ -1,3 +1,14 @@
+eu4dll (0.2) unstable; urgency=low
+
+  * Require LDC >= 1.43 to build: the source uses the LDC 1.43
+    naked asm form, and older compilers fail at link time. The
+    build now stops early with a readable message instead.
+  * Bundle the LDC shared runtime (libphobos and libdruntime) in
+    /usr/lib/eu4dll and set the library rpath to $ORIGIN, so the
+    installed package does not depend on a system D runtime.
+
+ -- muse <muse@localhost>  Sun, 22 Nov 2026 08:15:00 +0900
+
 eu4dll (0.1) unstable; urgency=low
 
   * Initial Debian package: preload library, eu4dll_translations mod

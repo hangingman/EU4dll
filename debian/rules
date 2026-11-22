@@ -8,11 +8,26 @@
 EU4DLL_MOD_SRC ?= $(HOME)/.local/share/Paradox Interactive/Europa Universalis IV/mod/eu4dll_translations
 
 PKG := debian/eu4dll
+LIBDIR := usr/lib/eu4dll
+
+# Directory holding the shared D runtime libraries of the ldc2 in
+# use. The runtime is bundled into the package (see the install
+# target), so the installed library does not depend on whatever D
+# runtime the system happens to have.
+LDC_LIB_DIR := $(abspath $(dir $(shell command -v ldc2))/../lib)
 
 %:
 	dh $@
 
 override_dh_auto_build:
+	# The source needs LDC >= 1.43 (naked asm form). Fail early with
+	# a readable message instead of a link error.
+	@ver=$$(ldc2 --version | sed -n 's/.*(\([0-9][0-9.]*\)):/\1/p' | head -n 1); \
+	if [ -z "$$ver" ] || [ "$$(printf '1.43.0\n%s\n' "$$ver" | sort -V | head -n 1)" != "1.43.0" ]; then \
+		echo "error: LDC >= 1.43.0 is required to build eu4dll (found: $${ver:-unknown})." >&2; \
+		echo "Debian's ldc package is older. Extract the official LDC 1.43 release and put its bin directory first on PATH." >&2; \
+		exit 1; \
+	fi
 	# dpkg-buildflags exports a DFLAGS value that ldc2 rejects
 	# (-frelease), so build with it cleared.
 	DFLAGS= dub build --force --compiler=ldc2
@@ -23,7 +38,15 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 	# Preload library
-	install -D -m 0644 libeu4dll.so $(PKG)/usr/lib/eu4dll/libeu4dll.so
+	install -D -m 0644 libeu4dll.so $(PKG)/$(LIBDIR)/libeu4dll.so
+	# Bundled D runtime from the compiler in use
+	for lib in libphobos2-ldc-shared libdruntime-ldc-shared; do \
+		real=$$(readlink -f "$(LDC_LIB_DIR)/$$lib.so"); \
+		soname=$$(objdump -p "$$real" | awk '/SONAME/ {print $$2}'); \
+		echo "bundling $$soname from $$real"; \
+		install -m 0644 "$$real" "$(PKG)/$(LIBDIR)/$$soname"; \
+	done
+	patchelf --set-rpath '$$ORIGIN' $(PKG)/$(LIBDIR)/libeu4dll.so
 	# Helper scripts
 	install -D -m 0755 debian/scripts/eu4dll-launch $(PKG)/usr/bin/eu4dll-launch
 	install -D -m 0755 debian/scripts/eu4dll-install-mod $(PKG)/usr/bin/eu4dll-install-mod
@@ -35,6 +58,11 @@ override_dh_auto_install:
 	install -d $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/gfx/fonts
 	install -m 0644 "$(EU4DLL_MOD_SRC)"/gfx/fonts/* $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/gfx/fonts/
 	install -D -m 0644 debian/eu4dll_translations.mod $(PKG)/usr/share/eu4dll/mod/eu4dll_translations.mod
+
+override_dh_shlibdeps:
+	# The bundled D runtime has no Debian shlibs information; the
+	# package is self-contained, so do not turn it into Depends.
+	dh_shlibdeps -l$(CURDIR)/$(PKG)/$(LIBDIR) --dpkg-shlibdeps-params=--ignore-missing-info
 
 override_dh_auto_clean:
 	dub clean || true
