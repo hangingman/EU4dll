@@ -12,6 +12,7 @@ import plugin.misc;
 import plugin.input; // DllErrorとRunOptionsを使用するためインポート
 import plugin.patcher.patcher : ScopedPatch, PatchManager, makeJmp; // ScopedPatch, PatchManager, makeJmpを使用するためにインポート
 import plugin.glyph_table : wideGlyphLookup, wideGlyphRawLog;
+import plugin.width_debug : widthDebugBitmapWidth, widthDebugRttMeasure;
 import plugin.process.process : get_executable_memory_range; // get_executable_memory_range を使用するためにインポート
  // @naked を使用するため
 
@@ -714,6 +715,52 @@ extern (C)
                 pop RCX;
                 pop RAX;
             JMP_H:
+                // Width diagnostics (EU4DLL_WIDTH_DEBUG=1): log
+                // wide fetches with the glyph advance and the
+                // XMM1 accumulator (advance*scale total before
+                // this glyph; XMM1 is live across the fetch, so
+                // it and XMM0 are spilled around the call). The
+                // helper returns immediately when disabled.
+                cmp       EAX, 0x100;
+                jb        JMP_H2;
+                push RAX;
+                push RCX;
+                push RDX;
+                push RSI;
+                push RDI;
+                push R8;
+                push R9;
+                push R10;
+                sub RSP, 16;
+                mov qword ptr [RSP], 0;
+                movss dword ptr [RSP], XMM1;
+                movss dword ptr [RSP + 8], XMM0;
+                movss dword ptr [RSP + 12], XMM1;
+                mov ESI, EAX;
+                xor EDX, EDX;
+                xor ECX, ECX;
+                test RBP, RBP;
+                jz JMP_W1;
+                movsx EDX, word ptr [RBP + 0xC];
+                mov ECX, 1;
+            JMP_W1:
+                mov R8, RBX;
+                mov R9, R15;
+                lea R11, [mainTextWidthBitmapFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                movss XMM0, dword ptr [RSP + 8];
+                movss XMM1, dword ptr [RSP + 12];
+                add RSP, 16;
+                pop R10;
+                pop R9;
+                pop R8;
+                pop RDI;
+                pop RSI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
+            JMP_H2:
                 test RBP, RBP;
                 jz        JMP_Z;
                 movsx EAX, word ptr [RBP + 0xC];
@@ -1041,6 +1088,19 @@ extern (C)
                 movss dword ptr [RSP + 12], XMM3;
                 movss dword ptr [RSP + 16], XMM4;
                 movss dword ptr [RSP + 20], XMM5;
+                // Width diagnostics: stash the code point,
+                // the index at the sequence start, the char
+                // pointer and the font in the free tail of
+                // this spill block (offsets 24..47; the XMM
+                // spills use 0..23) for the call after the
+                // lookup below. RDX is already saved by the
+                // pushes above, so it is free as scratch.
+                mov dword ptr [RSP + 24], EAX;
+                mov EDX, R14D;
+                sub EDX, 2;
+                mov dword ptr [RSP + 28], EDX;
+                mov qword ptr [RSP + 32], R11;
+                mov qword ptr [RSP + 40], RCX;
                 push RAX;
                 push RCX;
                 push R10;
@@ -1063,6 +1123,58 @@ extern (C)
                 mov R11, qword ptr [R11];
                 call R11;
                 mov RBP, RAX;
+                // Width diagnostics (EU4DLL_WIDTH_DEBUG=1):
+                // RSP here is the fetch RSP - 80 (4 pushes +
+                // sub 48), so the values stashed above sit at
+                // +24.. and the game's float slots at
+                // +80+4 (word), +80+0x20 (line), +80+0x2c
+                // (limit candidate). 8 pushes + sub 32 hold
+                // the four stack arguments and keep RSP
+                // 16-byte aligned for the call. The helper
+                // returns immediately when disabled.
+                push RAX;
+                push RCX;
+                push RDX;
+                push RSI;
+                push RDI;
+                push R8;
+                push R9;
+                push R10;
+                sub RSP, 32;
+                mov EAX, dword ptr [RSP + 180];
+                mov dword ptr [RSP], EAX;
+                mov EAX, dword ptr [RSP + 208];
+                mov dword ptr [RSP + 8], EAX;
+                mov EAX, dword ptr [RSP + 220];
+                mov dword ptr [RSP + 16], EAX;
+                mov R10, qword ptr [RSP + 136];
+                mov EAX, dword ptr [R10 + 0x940];
+                mov dword ptr [RSP + 24], EAX;
+                mov RDI, R10;
+                mov ESI, dword ptr [RSP + 120];
+                xor EDX, EDX;
+                xor ECX, ECX;
+                test RBP, RBP;
+                jz JMP_W2;
+                movsx EDX, word ptr [RBP + 0xC];
+                mov ECX, 1;
+            JMP_W2:
+                mov R8, qword ptr [RSP + 128];
+                mov R11D, dword ptr [RSP + 124];
+                sub R8, R11;
+                mov R9D, dword ptr [RSP + 124];
+                lea R11, [mainTextWidthRttFuncAddress];
+                mov R11, qword ptr [R11];
+                call R11;
+                add RSP, 32;
+                pop R10;
+                pop R9;
+                pop R8;
+                pop RDI;
+                pop RSI;
+                pop RDX;
+                pop RCX;
+                pop RAX;
                 movss XMM0, dword ptr [RSP];
                 movss XMM1, dword ptr [RSP + 4];
                 movss XMM2, dword ptr [RSP + 8];
@@ -1636,6 +1748,8 @@ private __gshared size_t mainTextRender3dV137Site2ReturnAddress;
 private __gshared size_t mainTextRender3dV137Site2ZeroReturnAddress;
 private __gshared size_t mainTextGlyphLookupFuncAddress;
 private __gshared size_t mainTextRawLogFuncAddress;
+private __gshared size_t mainTextWidthBitmapFuncAddress;
+private __gshared size_t mainTextWidthRttFuncAddress;
 private __gshared size_t mainTextProc1ReturnAddress;
 private __gshared size_t mainTextProc2ReturnAddress;
 private __gshared size_t mainTextProc2BufferAddress;
@@ -2076,6 +2190,7 @@ DllError mainTextProc4Injector(RunOptions options)
                 mainTextBitmapWidthV137ReturnAddress = address + 0x11;
                 mainTextBitmapWidthV137ZeroReturnAddress = address + 0x7F;
                 mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
+                mainTextWidthBitmapFuncAddress = cast(size_t) &widthDebugBitmapWidth;
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextBitmapWidthV137_hook, 14);
                 writeln("JMP for mainTextProc4Injector (v1.37.5 GetWidthOfString, item 29) created.");
@@ -2155,6 +2270,7 @@ DllError mainTextProc4Injector(RunOptions options)
                 // (+0xC7).
                 mainTextRenderToTextureV137Site1ReturnAddress = address + 0x19;
                 mainTextRenderToTextureV137Site1ZeroReturnAddress = address + 0xC7;
+                mainTextWidthRttFuncAddress = cast(size_t) &widthDebugRttMeasure;
                 mainTextRawLogFuncAddress = cast(size_t) &wideGlyphRawLog;
                 mainTextGlyphLookupFuncAddress = cast(size_t) &wideGlyphLookup;
                 PatchManager.instance().addJmpPatch(cast(void*) address,
