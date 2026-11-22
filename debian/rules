@@ -53,6 +53,26 @@ override_dh_auto_install:
 	# Mod data
 	test -d "$(EU4DLL_MOD_SRC)/localisation" || { echo "EU4DLL_MOD_SRC=$(EU4DLL_MOD_SRC): localisation/ not found. Set EU4DLL_MOD_SRC to a eu4dll_translations mod directory."; exit 1; }
 	test -d "$(EU4DLL_MOD_SRC)/gfx/fonts" || { echo "EU4DLL_MOD_SRC=$(EU4DLL_MOD_SRC): gfx/fonts/ not found. Set EU4DLL_MOD_SRC to a eu4dll_translations mod directory."; exit 1; }
+	# The adopted fonts are the delta3 set (raster size reduced by 3 px;
+	# see memory-bank/details/font_size_survey.md section 7). Check the
+	# info size of every font against the delta3 table and stop the
+	# build if any font is not delta3.
+	@for spec in \
+		"Arial12 11" "garamond_12 9" "garamond_14 11" \
+		"garamond_14_bold 11" "garamond_16 13" "garamond_16_bold 13" \
+		"garamond_24 21" "standard 15" "standard_18 15" \
+		"standard_22 19" "vic_18 15" "vic_18_grey 15" \
+		"vic_22 19" "vic_22_bl 19" "vic_29 26" "vic_36 33"; do \
+		name=$${spec% *}; want=$${spec#* }; \
+		fnt="$(EU4DLL_MOD_SRC)/gfx/fonts/$$name.fnt"; \
+		got=$$(sed -n "s/^info .*size=\([0-9][0-9]*\).*/\1/p" "$$fnt" | head -n 1); \
+		if [ "$$got" != "$$want" ]; then \
+			echo "error: $$name.fnt has info size $${got:-unknown}, expected $$want (delta3)." >&2; \
+			echo "The packaged fonts must be the delta3 set. Regenerate them with tools/generate_fonts.py and try again." >&2; \
+			exit 1; \
+		fi; \
+	done; \
+	echo "font check: all 16 fonts match the delta3 info sizes."
 	install -d $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/localisation
 	install -m 0644 "$(EU4DLL_MOD_SRC)"/localisation/*.yml $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/localisation/
 	install -d $(PKG)/usr/share/eu4dll/mod/eu4dll_translations/gfx/fonts

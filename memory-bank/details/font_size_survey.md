@@ -226,3 +226,24 @@ Next step is the owner's A/B screen comparison from section 4:
 copy one set over the mod's `gfx/fonts`, launch, compare the
 same screens, then the other set. The `info size` open question
 in section 4 still stands for that first launch.
+
+## 7. Decision: delta3 adopted (2026-11-22)
+
+The owner compared the original, delta2 and delta3 sets in game
+and adopted delta3, judging it the best of the three ("一番マシ").
+The font size adjustment issue is therefore closed with a uniform
+3 px raster-size reduction; the delta3 info sizes are the table in
+section 6 (for example vic_18 size 15, garamond_12 size 9,
+vic_36 size 33).
+
+Follow-up in the same change:
+
+- The generator is now in the repository as
+  `tools/generate_fonts.py`, with DELTA=3 as the default
+  (EU4DLL_FONT_DELTA still overrides it for experiments) and the
+  charset bundled next to it as `tools/font_charset.tsv`.
+- The Debian package build (debian/rules) checks the info size of
+  every mod font against the delta3 table and stops with a readable
+  message if a font is not delta3, so a future package cannot
+  silently ship the original or delta2 fonts.
+- Package version 0.3 carries this change.

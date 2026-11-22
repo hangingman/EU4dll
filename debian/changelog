@@ -1,3 +1,15 @@
+eu4dll (0.3) unstable; urgency=low
+
+  * Adopt the delta3 font set (raster size reduced by 3 px) as the
+    official generated fonts, following the owner in-game comparison.
+  * The package build now checks that every mod font has the delta3
+    info size and stops with a readable message otherwise.
+  * Bundle the font generator and its charset in tools/
+    (generate_fonts.py and font_charset.tsv), with DELTA=3 as the
+    default.
+
+ -- muse <muse@localhost>  Sun, 22 Nov 2026 11:10:00 +0900
+
 eu4dll (0.2) unstable; urgency=low
 
   * Require LDC >= 1.43 to build: the source uses the LDC 1.43

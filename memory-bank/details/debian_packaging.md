@@ -102,3 +102,21 @@ Verification (2026-11-22, on the build machine):
   data-home check as 0.1.
 - Not verified: installing the 0.2 .deb with apt on the target
   machine and an in-game run using only the packaged files.
+
+## Follow-up: delta3 fonts adopted (2026-11-22, package 0.3)
+
+- The owner compared the original, delta2 (2 px smaller) and
+  delta3 (3 px smaller) generated font sets in game and adopted
+  delta3 as the official set. Details and the size table:
+  details/font_size_survey.md sections 6 and 7.
+- debian/rules now checks, before copying the mod data, that the
+  info size of every .fnt in EU4DLL_MOD_SRC matches the delta3
+  table (16 fonts; for example vic_18 is 15, garamond_12 is 9,
+  vic_36 is 33) and stops the build with a readable message
+  otherwise. This keeps a non-delta3 set from being packaged by
+  accident.
+- The generator and its charset are bundled in the repository as
+  tools/generate_fonts.py (DELTA defaults to 3) and
+  tools/font_charset.tsv, so the official fonts can be regenerated
+  from the repository alone.
+- Package version is 0.3.
