@@ -92,6 +92,81 @@ string localizeDelegateReasonText(LocalizeDelegateReason reason)
     }
 }
 
+/// Characters per line that fit the country-select description
+/// box. Measured 2026-11-25: RenderToTexture receives the box
+/// width as limit = 400 px, and Japanese text in that font
+/// averages 14-15 px per character (France 32 chars reached
+/// 460 px, Ottoman 53 chars reached 745 px), so 26 characters
+/// (390 px) is the most a line can hold.
+enum size_t WrapCharsPerLine = 26;
+
+/// Insert explicit line breaks into a long space-free text, or
+/// return null when the text is not in the class that needs it.
+///
+/// Why: RenderToTexture's measuring pass only compares its line
+/// accumulator against the box width at markup tokens and at
+/// explicit newline characters (disassembly at VA 0x204edb2 /
+/// 0x204f062, measured 2026-11-25); the per-character loop never
+/// compares. A Japanese sentence has no spaces, so no break
+/// opportunity ever arises and the text runs past the box
+/// (defect 2). An explicit '\n' in the stored text does reset
+/// the accumulator, so breaks are inserted here, at load time.
+///
+/// Scope is deliberately narrow: text that contains a space or
+/// an existing newline is left alone (the game's own word
+/// wrapping, or the author's breaks, apply there), and text that
+/// fits one line is left alone. A break is never placed between
+/// '§' and its code character.
+///
+/// shortcut: the interval is a fixed character count derived
+/// from the measured average glyph width above, not a
+/// per-glyph measurement (the font that will render the text is
+/// not known at localisation load time). If that font or the
+/// 400 px box width changes, re-measure and adjust
+/// WrapCharsPerLine.
+string insertWrapBreaks(const(char)[] value)
+{
+    import std.utf : decode, encode, UTFException;
+
+    dchar[] chars;
+    size_t index = 0;
+    while (index < value.length)
+    {
+        dchar cp;
+        try
+        {
+            cp = decode(value, index);
+        }
+        catch (UTFException)
+        {
+            return null;
+        }
+        if (cp == ' ' || cp == '\n' || cp == '\r')
+            return null;
+        chars ~= cp;
+    }
+    if (chars.length <= WrapCharsPerLine)
+        return null;
+
+    dchar[] broken;
+    size_t lineLength = 0;
+    foreach (i, cp; chars)
+    {
+        if (lineLength >= WrapCharsPerLine && chars[i - 1] != '§')
+        {
+            broken ~= '\n';
+            lineLength = 0;
+        }
+        broken ~= cp;
+        lineLength++;
+    }
+    char[] result;
+    char[4] buf;
+    foreach (cp; broken)
+        result ~= buf[0 .. encode(buf, cp)];
+    return cast(string) result;
+}
+
 /// Pure decision: given the key and value bytes exactly as read
 /// from the two CUTF8Strings, decide whether the hook stores an
 /// escaped pair itself or delegates to the original function.
@@ -110,8 +185,11 @@ LocalizeStorePlan planLocalizeStore(const(ubyte)[] key, const(ubyte)[] value)
         plan.reason = LocalizeDelegateReason.asciiValue;
         return plan;
     }
+    auto storeText = cast(const(char)[]) value;
+    if (auto wrapped = insertWrapBreaks(storeText))
+        storeText = wrapped;
     ubyte[] escaped;
-    if (!encodeUtf8ToEscaped(cast(const(char)[]) value, escaped))
+    if (!encodeUtf8ToEscaped(storeText, escaped))
     {
         plan.action = LocalizePlanAction.delegateToOriginal;
         plan.reason = LocalizeDelegateReason.unencodableValue;
@@ -240,6 +318,49 @@ unittest
         cast(const(ubyte)[]) "戻る");
     assert(keyPlan.action == LocalizePlanAction.delegateToOriginal);
     assert(keyPlan.reason == LocalizeDelegateReason.nonAsciiKey);
+
+    // Defect 2 wrap: a space-free text longer than one line gets
+    // an explicit break after WrapCharsPerLine characters; the
+    // stored escaped form carries the raw 0x0A byte.
+    string longText;
+    foreach (_; 0 .. 32)
+        longText ~= "あ";
+    auto wrapped = insertWrapBreaks(longText);
+    assert(wrapped !is null);
+    assert(wrapped.length == 26 * 3 + 1 + 6 * 3);
+    assert(wrapped[26 * 3] == '\n');
+    auto wrapPlan = planLocalizeStore(cast(const(ubyte)[]) "DESC",
+        cast(const(ubyte)[]) longText);
+    assert(wrapPlan.action == LocalizePlanAction.storeEscaped);
+    assert(wrapPlan.escapedValue.length == 32 * 3 + 1);
+    assert(wrapPlan.escapedValue[26 * 3] == 0x0A);
+
+    // Text that fits one line, text with a space and text with
+    // an author's newline are all left unwrapped.
+    assert(insertWrapBreaks("戻る") is null);
+    string spacedText;
+    foreach (_; 0 .. 20)
+        spacedText ~= "あ";
+    spacedText ~= " ";
+    foreach (_; 0 .. 20)
+        spacedText ~= "あ";
+    assert(insertWrapBreaks(spacedText) is null);
+    assert(insertWrapBreaks(longText ~ "\n" ~ longText) is null);
+
+    // A break never splits '§' from its code character: with
+    // '§' as character 26, the break moves one character later.
+    string markupText;
+    foreach (_; 0 .. 25)
+        markupText ~= "あ";
+    markupText ~= "§Y";
+    foreach (_; 0 .. 10)
+        markupText ~= "あ";
+    auto markupWrapped = insertWrapBreaks(markupText);
+    assert(markupWrapped !is null);
+    // 25 wide chars (75 bytes) + '§' (2 bytes) + 'Y' (1 byte),
+    // then the break, then the remaining 10 wide chars.
+    assert(markupWrapped.length == 78 + 1 + 10 * 3);
+    assert(markupWrapped[78] == '\n');
 
     assert(localizeDelegateReasonText(LocalizeDelegateReason.nonAsciiKey)
         == "non-ascii-key");
