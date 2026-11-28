@@ -1,3 +1,18 @@
+eu4dll (0.4) unstable; urgency=low
+
+  * Fix the country-select description text overflowing its box, and
+    the hover dialog on country choices wrapping one character per
+    line.
+  * Show country names in Japanese on the map: MapView,
+    MapAdjustment and MapJustify ported to v1.37.5, plus the
+    FillVertexBuffer copy fix.
+  * Add the outlined Mapfont generator to tools/
+    (generate_mapfont.py and build_dds.py). The bundled Mapfont is
+    now the outlined set (dark core, white outline, thin dark outer
+    edge), and the package build checks its atlas size.
+
+ -- muse <muse@localhost>  Sat, 28 Nov 2026 13:43:00 +0900
+
 eu4dll (0.3) unstable; urgency=low
 
   * Adopt the delta3 font set (raster size reduced by 3 px) as the
