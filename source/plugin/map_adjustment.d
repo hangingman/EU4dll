@@ -122,7 +122,7 @@ void mapAdjustmentProc1V137ToUpper_hook()
             add       EBP, 2;
             mov       EAX, EBP;
             cmp       RAX, R14;
-            ja        JMP_C;
+            jb        JMP_C;
             lea       R11, [mapAdjProc1V137ToUpperExitAddress];
             jmp       qword ptr [R11];
         JMP_C:
@@ -143,7 +143,7 @@ void mapAdjustmentProc1V137ToUpper_hook()
             call      R11;
             mov       byte ptr [RBX], AL;
             mov       EAX, EBP;
-            cmp       RAX, R14;
+            cmp       R14, RAX;
             lea       R11, [mapAdjProc1V137ToUpperReturnAddress];
             jmp       qword ptr [R11];
         }
@@ -167,7 +167,7 @@ void mapAdjustmentProc1V137ToLower_hook()
             add       EBP, 2;
             mov       EAX, EBP;
             cmp       RAX, R14;
-            ja        JMP_C;
+            jb        JMP_C;
             lea       R11, [mapAdjProc1V137ToLowerExitAddress];
             jmp       qword ptr [R11];
         JMP_C:
@@ -188,7 +188,7 @@ void mapAdjustmentProc1V137ToLower_hook()
             call      R11;
             mov       byte ptr [RBX], AL;
             mov       EAX, EBP;
-            cmp       RAX, R14;
+            cmp       R14, RAX;
             lea       R11, [mapAdjProc1V137ToLowerReturnAddress];
             jmp       qword ptr [R11];
         }
