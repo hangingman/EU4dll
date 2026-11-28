@@ -203,14 +203,14 @@ void hijackProcess()
         std.logger.info("[DIAGNOSTIC] EU4DLL_ENABLE_DECODE=0; skipping Font.init / TextView.init");
     }
 
-    // TODO: マップ文字位置調整
-    // success = success | MapAdj.init(eu4Version);
+    // マップ文字位置調整
+    success = success | MapAdj.init(eu4Version);
 
-    // TODO: マップ文字justify
-    // success = success | MapJustify.init(eu4Version);
+    // マップ文字justify
+    success = success | MapJustify.init(eu4Version);
 
-    // TODO: マップ文字表示
-    // success = success | MapView.init(eu4Version);
+    // マップ文字表示
+    success = success | MapView.init(eu4Version);
 
     // TODO: その他
     // success |= Misc.init(eu4Version); // Misc.init is not defined in misc.d
