@@ -3,10 +3,38 @@
 #
 # The game directory can be overridden with EU4_DIR. The default is
 # the Steam install location used by the Debian Steam package.
+#
+# With --steam, run Steam's own command instead of ./eu4: write
+# "eu4dll-launch --steam %command%" in Steam's launch options for
+# EU4. Steam expands %command% to its launcher chain (runtime,
+# reaper, dowser), and the preload settings set here are passed
+# down to the game the launcher starts.
 set -eu
 
-EU4_DIR="${EU4_DIR:-$HOME/.steam/debian-installation/steamapps/common/Europa Universalis IV}"
 LIB="${EU4DLL_LIB:-/usr/lib/eu4dll/libeu4dll.so}"
+
+if [ "${1:-}" = "--steam" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo "eu4dll-launch: --steam needs the command Steam gave (%command%)" >&2
+        exit 1
+    fi
+    if [ ! -r "$LIB" ]; then
+        echo "eu4dll-launch: preload library not readable: $LIB" >&2
+        exit 1
+    fi
+    # Keep Steam's own preload entries (the overlay) behind ours.
+    if [ -n "${LD_PRELOAD:-}" ]; then
+        LD_PRELOAD="$LIB:$LD_PRELOAD"
+    else
+        LD_PRELOAD="$LIB"
+    fi
+    export LD_PRELOAD
+    export EU4DLL_LOCALIZE_ESCAPE="${EU4DLL_LOCALIZE_ESCAPE:-1}"
+    exec "$@"
+fi
+
+EU4_DIR="${EU4_DIR:-$HOME/.steam/debian-installation/steamapps/common/Europa Universalis IV}"
 
 if [ ! -x "$EU4_DIR/eu4" ]; then
     echo "eu4 executable not found in: $EU4_DIR" >&2
