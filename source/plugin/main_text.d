@@ -450,6 +450,38 @@ extern (C)
             }
         }
     }
+    // mainTextProc1V137SiteACopy_hook (Linux v1.37.5)
+    // FillVertexBuffer wrap pass, right after the per-byte copy
+    // append (VA 0x2055548). Entry state (verified by
+    // disassembly): RBP = input CString, R14D = index of the
+    // byte just appended, the word CString is at RSP+0x38 and
+    // the temp CString at RSP+0x10. The 15-byte patch covers
+    // the game's temp free check, which the helper
+    // (fillVertexCopyAppendPayload) replays, and returns right
+    // after it. No caller-saved register or XMM value is live
+    // at this point (the fetch that follows reloads everything
+    // it needs), and the function runs with RSP % 16 == 0, so
+    // the helper call is ABI-aligned. Callee-saved registers
+    // are preserved by the helper.
+    void mainTextProc1V137SiteACopy_hook()
+    {
+        version (X86_64)
+        {
+            asm
+            {
+                naked;
+                mov       RDI, qword ptr [RBP];
+                mov       ESI, R14D;
+                lea       RDX, [RSP + 0x38];
+                lea       RCX, [RSP + 0x10];
+                lea       R11, [mainTextProc1V137CopyFixFuncAddress];
+                mov       R11, qword ptr [R11];
+                call      R11;
+                lea       R11, [mainTextProc1V137SiteACopyReturnAddress];
+                jmp       qword ptr [R11];
+            }
+        }
+    }
     // mainTextProc4V137GetActual_hook (Linux v1.37.5)
     void mainTextProc4V137GetActual_hook()
     {
@@ -1614,6 +1646,11 @@ extern (C)
 
 private __gshared size_t mainTextProc1V137SiteAReturnAddress;
 private __gshared size_t mainTextProc1V137SiteBReturnAddress;
+private __gshared size_t mainTextProc1V137SiteACopyReturnAddress;
+private __gshared size_t mainTextProc1V137CopyFixFuncAddress;
+private __gshared size_t mainTextGameCStringCtorCharAddress;
+private __gshared size_t mainTextGameCStringAppendMoveAddress;
+private __gshared size_t mainTextGameOperatorDeleteAddress;
 private __gshared size_t mainTextProc4V137GetActualReturnAddress;
 private __gshared size_t mainTextProc4V137GetRequiredReturnAddress;
 private __gshared size_t mainTextProc4V137GetActualRealReturnAddress;
@@ -1644,6 +1681,92 @@ private __gshared size_t mainTextProc3ReturnAddress2;
 private __gshared size_t mainTextProc4ReturnAddress;
 // mainTextProc4ReturnAddress_after_movzx_eax は C++版には存在しないため削除
 // mainTextProcCopyBuffReturnAddress も C++版には存在しないため削除
+
+// FillVertexBuffer wrap-pass copy fix (Linux v1.37.5).
+//
+// CBitmapFont::FillVertexBuffer first runs a wrap pass over
+// the input string: it appends each byte to a word string
+// (CString at rsp+0x38, built one byte per iteration through
+// a temporary CString at rsp+0x10) and flushes whole words
+// into the output string the vertex pass then walks. The
+// site A fetch hook advances the loop index by 2 on an
+// escape sequence, so the copy append of that iteration
+// keeps only the lead byte and the wrapped string loses the
+// two payload bytes of every escaped character. The vertex
+// pass (site B) then decodes a lead-byte-only string and
+// emits almost no vertices (map country names: 0 or 6
+// vertices instead of 6 per character, investigation
+// section 14).
+//
+// mainTextProc1V137SiteACopy_hook sits right after the copy
+// append and calls the helper below, which appends the two
+// payload bytes to the word string with the game's own
+// CString operations - the same remedy item 29 step 2
+// applied to RenderToScreen's scratch buffer, adapted to a
+// CString destination. It ends with the temp free check the
+// patched-out game code ran, so non-escape bytes behave
+// exactly as before. The game entry points are resolved by
+// the injector from the call sites next to the patch and
+// are only valid for v1.37.5, like every hook in this
+// family.
+
+private alias GameCStringCtorChar = extern (C) void function(void*, char);
+private alias GameCStringAppendMove = extern (C) void function(void*, void*);
+private alias GameOperatorDelete = extern (C) void function(void*);
+
+// Pure predicate for the copy fix (unit-tested below): the
+// lead byte of a 3-byte escape sequence.
+bool isEscapeLeadByte(ubyte b)
+{
+    return b >= ESCAPE_SEQ_1 && b <= ESCAPE_SEQ_4;
+}
+
+// The game's CString layout (verified against the temp
+// handling in FillVertexBuffer itself): +0x00 buffer
+// pointer, +0x08 size, +0x10 small-string buffer. A heap
+// buffer is in use exactly when the buffer pointer differs
+// from the object's own +0x10 address; that is the check
+// the game runs before calling operator delete on a temp.
+private void fillVertexCopyTempFree(void* temp)
+{
+    auto buffer = *cast(void**) temp;
+    if (buffer !is null && buffer != temp + 0x10)
+    {
+        auto del = cast(GameOperatorDelete) mainTextGameOperatorDeleteAddress;
+        del(buffer);
+    }
+}
+
+extern (C) void fillVertexCopyAppendPayload(const(char)* buffer, uint index,
+        void* word, void* temp)
+{
+    if (buffer !is null && isEscapeLeadByte(cast(ubyte) buffer[index]))
+    {
+        auto ctor = cast(GameCStringCtorChar) mainTextGameCStringCtorCharAddress;
+        auto append = cast(GameCStringAppendMove) mainTextGameCStringAppendMoveAddress;
+        foreach (k; 1 .. 3)
+        {
+            fillVertexCopyTempFree(temp);
+            ctor(temp, buffer[index + k]);
+            append(word, temp);
+        }
+    }
+    // The patched-out free check runs for every byte, not
+    // only for escape lead bytes.
+    fillVertexCopyTempFree(temp);
+}
+
+unittest
+{
+    assert(!isEscapeLeadByte(0x00));
+    assert(!isEscapeLeadByte(0x0F));
+    assert(isEscapeLeadByte(0x10));
+    assert(isEscapeLeadByte(0x11));
+    assert(isEscapeLeadByte(0x12));
+    assert(isEscapeLeadByte(0x13));
+    assert(!isEscapeLeadByte(0x14));
+    assert(!isEscapeLeadByte(0xFF));
+}
 
 DllError mainTextProc1Injector(RunOptions options)
 {
@@ -1728,6 +1851,39 @@ DllError mainTextProc1Injector(RunOptions options)
                 PatchManager.instance().addJmpPatch(cast(void*) address,
                     cast(void*)&mainTextProc1V137SiteB_hook, 14);
                 writeln("JMP for mainTextProc1Injector (v1.37.5 site B) created.");
+            }
+            else
+            {
+                e.unmatchdMainTextProc1Injector = true;
+            }
+
+            // Linux v1.37.5: FillVertexBuffer wrap-pass copy
+            // fix (see fillVertexCopyAppendPayload above).
+            // The pattern covers the copy append's tail (lea
+            // of the word string, the append call) and the
+            // temp free check the patch replaces. The game's
+            // CString entry points are read out of the call
+            // sites around the patch: the char ctor just
+            // before the pattern, the append inside it, and
+            // operator delete inside the patched span.
+            BytePattern.tempInstance()
+                .findPattern("48 8D 7C 24 38 48 89 DE E8 3C 6C 4F 00 48 8B 7C 24 10 4C 39 E7 74 05");
+            if (BytePattern.tempInstance().hasSize(1, "MainText Proc1 v1.37.5 site A copy"))
+            {
+                size_t address = BytePattern.tempInstance().getFirst().address;
+                // Patch starts at the free check (pattern + 13)
+                // and returns right after it (15 bytes).
+                mainTextProc1V137SiteACopyReturnAddress = address + 13 + 15;
+                mainTextProc1V137CopyFixFuncAddress = cast(size_t) &fillVertexCopyAppendPayload;
+                mainTextGameCStringCtorCharAddress = address +
+                    *cast(int*)(address - 4);
+                mainTextGameCStringAppendMoveAddress = address + 13 +
+                    *cast(int*)(address + 9);
+                mainTextGameOperatorDeleteAddress = address + 28 +
+                    *cast(int*)(address + 24);
+                PatchManager.instance().addJmpPatch(cast(void*)(address + 13),
+                    cast(void*)&mainTextProc1V137SiteACopy_hook, 15);
+                writeln("JMP for mainTextProc1Injector (v1.37.5 site A copy) created.");
             }
             else
             {
